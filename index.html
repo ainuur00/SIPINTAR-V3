@@ -114,6 +114,42 @@
   <style id="sipintar-critical-css">
     *,*::before,*::after{box-sizing:border-box}
     html,body{margin:0;padding:0;width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:100%;text-size-adjust:100%;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#0f172a;color:#0f172a}
+
+    /* ============================================================
+       [V3.6] ROTASI BEBAS — POTRET & LANSKAP TANPA TERPOTONG
+       - Tinggi halaman memakai 100dvh (tinggi layar sesungguhnya di HP),
+         sehingga saat diputar tidak ada bagian yang tersembunyi.
+       - Semua gambar di area ujian (termasuk gambar soal dari editor)
+         dibatasi selebar layar dan diskalakan utuh (object-fit: contain),
+         jadi tidak pernah terpotong maupun pecah.
+       - Di lanskap layar pendek (HP dimiringkan), halaman ujian & admin
+         berubah menjadi bisa digulir, bukan memotong isi.
+       ============================================================ */
+    @supports (height: 100dvh) {
+      .min-h-screen{min-height:100dvh}
+      #page-exam{height:100dvh}
+      #page-admin{height:100dvh}
+      #page-login{min-height:100dvh}
+    }
+    #page-exam img{max-width:100%!important;object-fit:contain}
+    #page-exam img:not([class*="h-"]):not([class*="w-"]){height:auto;width:auto}
+    #page-siswa-hub img:not([class*="h-"]):not([class*="w-"]),
+    #page-result img:not([class*="h-"]):not([class*="w-"]),
+    #page-exam-info img:not([class*="h-"]):not([class*="w-"]){max-width:100%;height:auto}
+    #page-exam table{max-width:100%}
+    @media screen and (orientation: landscape) and (max-height: 540px) {
+      #page-exam{height:auto;min-height:100vh;min-height:100dvh;overflow-y:auto}
+      #page-admin{height:auto;min-height:100vh;min-height:100dvh;overflow:auto}
+      #page-lobby{overflow-y:auto}
+      .exam-header{padding-top:6px!important;padding-bottom:6px!important}
+    }
+    @media screen and (orientation: portrait) {
+      #page-exam img{max-height:70vh}
+    }
+    @media screen and (orientation: landscape) {
+      #page-exam img{max-height:85vh}
+    }
+
     .hidden{display:none!important}
     .flex{display:flex} .items-center{align-items:center} .justify-center{justify-content:center}
     .min-h-screen{min-height:100vh} .w-full{width:100%} .relative{position:relative} .absolute{position:absolute}
@@ -1517,6 +1553,15 @@
           <div id="loginError" class="p-3 rounded-lg bg-red-100 text-red-700 text-sm text-center hidden border border-red-200 font-medium">
             <span id="errorText">Error message here</span>
           </div>
+
+          <!-- [V3.5] Tombol pasang aplikasi (PWA) — selalu tersedia, tidak seperti banner yang bisa tertutup -->
+          <button type="button" id="btn-pasang-app" onclick="sipPwaInstallClick()"
+                  class="w-full py-2 text-sm rounded-lg font-bold border-2 border-amber-400 text-amber-700 bg-amber-50 hover:bg-amber-100 flex justify-center items-center gap-2 transition">
+            <i class="fas fa-download"></i> <span>Pasang Aplikasi di Perangkat</span>
+          </button>
+          <p id="pasang-app-note" class="text-[11px] text-center text-slate-400">
+            Tidak wajib dipasang — aplikasi tetap bisa dipakai penuh langsung lewat browser ini.
+          </p>
 
           <div id="login-developer" class="login-dev-bar" aria-label="Kredit sistem">
             <span class="login-dev-k">Inovasi Pembelajaran Version 3</span>
@@ -18889,6 +18934,34 @@ function sipSisipTandaGambar_() {
       };
     }
 
+    // [V3.5] Tombol "Pasang Aplikasi di Perangkat" di halaman login:
+    // 1) sudah terpasang -> beri tahu; 2) prompt instal tersedia -> langsung tampilkan;
+    // 3) browser tanpa prompt (Firefox/iOS/bawaan HP) -> tampilkan petunjuk sesuai perangkat.
+    window.sipPwaInstallClick = function () {
+      if (isStandalone()) {
+        try { Swal.fire({ icon: 'success', title: 'Sudah terpasang', text: 'SIPINTAR sudah berjalan sebagai aplikasi terpasang di perangkat ini.', confirmButtonColor: '#1b3a6b' }); }
+        catch (e) { alert('Aplikasi sudah terpasang.'); }
+        return;
+      }
+      if (deferredPrompt) {
+        try {
+          deferredPrompt.prompt();
+          deferredPrompt.userChoice.then(function () { deferredPrompt = null; removeBanner(); }).catch(function () {});
+        } catch (e) {}
+        return;
+      }
+      var ua = navigator.userAgent || '';
+      var isIos = /iphone|ipad|ipod/i.test(ua) || (/macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+      var isFx = /firefox|fxios/i.test(ua);
+      var msg = isIos
+        ? 'Di iPhone/iPad: tekan tombol Bagikan (kotak dengan panah ke atas) di Safari, lalu pilih "Tambah ke Layar Utama".'
+        : (isFx
+          ? 'Di Firefox: buka menu \u22ee di pojok layar, lalu pilih "Pasang" atau "Tambahkan ke Layar Utama".'
+          : 'Buka menu browser (\u22ee atau \u2026), lalu pilih "Tambahkan ke Layar Utama" atau "Instal aplikasi". Catatan: tanpa dipasang pun, semua fitur tetap bisa dipakai langsung lewat browser.');
+      try { Swal.fire({ icon: 'info', title: 'Cara memasang aplikasi', text: msg, confirmButtonColor: '#1b3a6b' }); }
+      catch (e) { alert(msg); }
+    };
+
     window.addEventListener('beforeinstallprompt', function (e) {
       e.preventDefault();
       deferredPrompt = e;
@@ -18900,8 +18973,19 @@ function sipSisipTandaGambar_() {
     window.addEventListener('appinstalled', function () {
       deferredPrompt = null;
       removeBanner();
+      var pb = document.getElementById('btn-pasang-app');
+      var pn = document.getElementById('pasang-app-note');
+      if (pb) pb.style.display = 'none';
+      if (pn) pn.textContent = 'Aplikasi berhasil dipasang di perangkat Anda.';
     });
     document.addEventListener('DOMContentLoaded', function () {
+      // Mode terpasang: tombol pasang tidak perlu ditampilkan
+      if (isStandalone()) {
+        var pb = document.getElementById('btn-pasang-app');
+        var pn = document.getElementById('pasang-app-note');
+        if (pb) pb.style.display = 'none';
+        if (pn) pn.style.display = 'none';
+      }
       var ua = navigator.userAgent || '';
       var isIos = /iphone|ipad|ipod/i.test(ua) || (/macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
       if (isIos && !isStandalone()) { showBanner('ios'); return; }
@@ -18942,5 +19026,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a494916e1dd0fdec',t:'MTc5MTc5MTk5Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a494dca9faacccce',t:'MTc5MTc5NTA3OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
