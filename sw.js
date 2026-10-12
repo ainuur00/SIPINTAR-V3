@@ -1,11 +1,11 @@
 /* ============================================================
-   SIPINTAR V3 — SERVICE WORKER (PWA, khusus modul ujian)
+   SIPINTAR V3 - SERVICE WORKER (PWA, khusus modul ujian)
    Strategi: NETWORK-FIRST (aplikasi ujian harus selalu terbaru),
    cache hanya sebagai cadangan ketika jaringan putus sesaat.
    Panggilan API ke script.google.com TIDAK pernah di-cache.
    ============================================================ */
-const CACHE_NAME = 'sipintar-v3-ujian-9';
-const CORE_ASSETS = [
+var CACHE_NAME = 'sipintar-v3-ujian-10';
+var CORE_ASSETS = [
   './',
   'index.html',
   'config.js',
@@ -18,8 +18,12 @@ const CORE_ASSETS = [
 self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(CACHE_NAME)
-      .then(function (c) { return c.addAll(CORE_ASSETS).catch(function () {}); })
-      .then(function () { return self.skipWaiting(); })
+      .then(function (c) {
+        return c.addAll(CORE_ASSETS).catch(function () {});
+      })
+      .then(function () {
+        return self.skipWaiting();
+      })
   );
 });
 
@@ -28,24 +32,33 @@ self.addEventListener('activate', function (e) {
     caches.keys().then(function (keys) {
       return Promise.all(keys.map(function (k) {
         if (k !== CACHE_NAME) return caches.delete(k);
+        return null;
       }));
-    }).then(function () { return self.clients.claim(); })
+    }).then(function () {
+      return self.clients.claim();
+    })
   );
 });
 
 self.addEventListener('fetch', function (event) {
-  if (event.request.method !== 'GET') return;            // POST API: langsung ke jaringan
-  const url = event.request.url;
-  if (url.indexOf('script.google.com') >= 0 ||
-      url.indexOf('googleusercontent.com') >= 0) return; // API & Drive: jangan di-cache
+  if (event.request.method !== 'GET') return;
+  var url = event.request.url;
+  if (url.indexOf('script.google.com') >= 0) return;
+  if (url.indexOf('googleusercontent.com') >= 0) return;
 
   event.respondWith(
     fetch(event.request, { cache: 'no-store' })
       .then(function (res) {
-        const copy = res.clone();
-        caches.open(CACHE_NAME).then(function (c) { c.put(event.request, copy); }).catch(function () {});
+        try {
+          var copy = res.clone();
+          caches.open(CACHE_NAME).then(function (c) {
+            c.put(event.request, copy);
+          }).catch(function () {});
+        } catch (err) {}
         return res;
       })
-      .catch(function () { return caches.match(event.request); })
+      .catch(function () {
+        return caches.match(event.request);
+      })
   );
 });
