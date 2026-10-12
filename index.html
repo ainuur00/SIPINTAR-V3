@@ -203,10 +203,25 @@
     .login-dev-bar .login-dev-n{display:block;margin-top:3px;font-size:12px;font-weight:700}
     .login-dev-bar .login-dev-y{display:block;margin-top:2px;font-size:11px;font-weight:800;letter-spacing:.16em}
     .glass{background:rgba(255,255,255,.92);backdrop-filter:blur(8px)}
-    #login-clock-box{margin-top:8px;padding:8px 16px;border-radius:12px;background:#1e293b;color:#fff;display:inline-flex;flex-direction:column;align-items:center;border:1px solid #334155}
-    #login-clock{color:#fff!important;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:1.25rem;font-weight:800;letter-spacing:.14em;line-height:1.2}
-    #login-date-display{color:#cbd5e1;font-size:12px;font-weight:600}
-    #login-tz-label,#sipintar-ui-build{color:#94a3b8;font-size:10px}
+    /* === [V3.5] JAM LOGIN LUX — tanpa kartu, digit gradien biru-emas === */
+    #login-clock-lux{margin-top:10px;display:flex;flex-direction:column;align-items:center;gap:7px;user-select:none;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .25s ease}
+    #login-clock-lux:hover{transform:scale(1.045)}
+    #login-clock-lux:active{transform:scale(.97)}
+    #lux-time{display:inline-flex;align-items:baseline;line-height:1;filter:drop-shadow(0 3px 8px rgba(37,99,235,.28))}
+    .lux-d{display:inline-block;min-width:.66em;text-align:center;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:2.15rem;font-weight:800;background:linear-gradient(180deg,#0f2a5f 0%,#2563eb 52%,#0f2a5f 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+    .lux-d.lux-sec{font-size:1.35rem;background:linear-gradient(180deg,#8a6a12 0%,#d4af37 55%,#8a6a12 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+    .lux-sep{font-size:1.85rem;font-weight:800;margin:0 3px;color:#d4af37;transform:translateY(-2px);animation:luxBlink 2s ease-in-out infinite}
+    .lux-sep.lux-sep-s{font-size:1.25rem}
+    #lux-ampm{font-size:.68rem;font-weight:800;letter-spacing:.2em;color:#b78a1e;margin-left:7px}
+    .lux-anim{animation:luxDrop .5s cubic-bezier(.22,1,.36,1)}
+    @keyframes luxDrop{0%{transform:translateY(-55%) scale(.82);opacity:0;filter:blur(3px)}60%{transform:translateY(7%) scale(1.04);opacity:1;filter:blur(0)}100%{transform:translateY(0) scale(1)}}
+    @keyframes luxBlink{0%,100%{opacity:1;text-shadow:0 0 9px rgba(212,175,55,.8)}50%{opacity:.3;text-shadow:none}}
+    #lux-sec-track{width:200px;max-width:72%;height:3px;border-radius:999px;background:rgba(15,42,95,.12);overflow:hidden}
+    #lux-sec-bar{height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,#b78a1e,#f1d27a,#d4af37);box-shadow:0 0 8px rgba(212,175,55,.75);transition:width .95s linear}
+    #lux-date{display:flex;align-items:center;gap:10px}
+    #login-date-display{font-size:12px;font-weight:700;letter-spacing:.07em;color:#475569}
+    .lux-line{display:inline-block;width:28px;height:1px;background:linear-gradient(90deg,transparent,#d4af37)}
+    #lux-date .lux-line:last-child{background:linear-gradient(90deg,#d4af37,transparent)}
     #swal-lite{position:fixed;inset:0;z-index:99999;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,.55);padding:16px}
   </style>
   <script>
@@ -1298,29 +1313,68 @@
           <h1 id="login-title" class="text-2xl font-bold text-slate-800 tracking-tight">SIPINTAR</h1>
           <p id="login-subtitle" class="text-sm text-slate-600 mt-1 font-medium">Sistem Penilaian Terintegrasi</p>
 
-          <!-- Jam Real-time Login -->
-          <div id="login-clock-box" class="mt-2 py-2 px-4 rounded-xl bg-slate-800/70 inline-flex flex-col items-center gap-0.5 shadow-inner border border-slate-700/50">
-            <div id="login-clock" class="text-xl font-bold text-white font-mono tracking-widest">--:--:--</div>
-            <div id="login-date-display" class="text-xs text-slate-300 font-medium"></div>
-            <div id="login-tz-label" class="text-[10px] text-slate-400 font-mono"></div>
-            <div id="sipintar-ui-build" class="text-[9px] text-slate-400 mt-0.5 tracking-wide">UI 2.0.3</div>
+          <!-- [V3.5] Jam Real-time Login — tampilan lux tanpa kartu -->
+          <div id="login-clock-lux" title="Ketuk untuk ganti format 12/24 jam">
+            <div id="lux-time">
+              <span class="lux-d" id="lux-h1">-</span><span class="lux-d" id="lux-h2">-</span><span class="lux-sep">:</span><span class="lux-d" id="lux-m1">-</span><span class="lux-d" id="lux-m2">-</span><span class="lux-sep lux-sep-s">:</span><span class="lux-d lux-sec" id="lux-s1">-</span><span class="lux-d lux-sec" id="lux-s2">-</span><span id="lux-ampm"></span>
+            </div>
+            <div id="lux-sec-track"><div id="lux-sec-bar"></div></div>
+            <div id="lux-date"><span class="lux-line"></span><span id="login-date-display"></span><span class="lux-line"></span></div>
           </div>
 <script>
 (function(){
+  // Format 12/24 jam tersimpan di perangkat (ketuk jam untuk ganti)
+  window._luxClock12 = (function(){ try { return localStorage.getItem('sip-clock-12')==='1'; } catch(e){ return false; } })();
+
+  function setDigit(id, ch){
+    var el=document.getElementById(id);
+    if(!el) return;
+    if(el.textContent!==ch){
+      el.textContent=ch;
+      el.classList.remove('lux-anim');
+      void el.offsetWidth;            // restart animasi
+      el.classList.add('lux-anim');
+    }
+  }
+
+  // Renderer global — juga dipanggil _tickClock() (jam zona-waktu Apps Script)
+  window.sipLuxClockRender = function(timeStr, dateStr){
+    if(!timeStr || timeStr.length<8) return;
+    var hh=timeStr.slice(0,2), mm=timeStr.slice(3,5), ss=timeStr.slice(6,8);
+    var ampm='';
+    if(window._luxClock12){
+      var h=parseInt(hh,10);
+      ampm=(h>=12)?'PM':'AM';
+      h=h%12; if(h===0) h=12;
+      hh=(h<10?'0':'')+h;
+    }
+    setDigit('lux-h1',hh.charAt(0)); setDigit('lux-h2',hh.charAt(1));
+    setDigit('lux-m1',mm.charAt(0)); setDigit('lux-m2',mm.charAt(1));
+    setDigit('lux-s1',ss.charAt(0)); setDigit('lux-s2',ss.charAt(1));
+    var ap=document.getElementById('lux-ampm'); if(ap) ap.textContent=ampm;
+    var bar=document.getElementById('lux-sec-bar');
+    if(bar){ var s=parseInt(ss,10)||0; bar.style.width=((s/59)*100)+'%'; }
+    if(dateStr){ var dt=document.getElementById('login-date-display'); if(dt) dt.textContent=dateStr; }
+  };
+
   function p(n){ n=String(n); return n.length<2 ? ('0'+n) : n; }
   function tick(){
-    var el=document.getElementById('login-clock');
-    if(!el) return;
     var d=new Date();
-    el.textContent=p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
-    var dt=document.getElementById('login-date-display');
-    if(dt){
-      try { dt.textContent=d.toLocaleDateString('id-ID',{weekday:'long',year:'numeric',month:'long',day:'numeric'}); }
-      catch(e){ try { dt.textContent=d.toLocaleDateString('id-ID'); } catch(e2){} }
-    }
-    var tz=document.getElementById('login-tz-label');
-    if(tz && !tz.textContent) tz.textContent='WIB (UTC+7)';
+    var t=p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
+    var ds='';
+    try { ds=d.toLocaleDateString('id-ID',{weekday:'long',year:'numeric',month:'long',day:'numeric'}); }
+    catch(e){ try { ds=d.toLocaleDateString('id-ID'); } catch(e2){} }
+    window.sipLuxClockRender(t, ds);
   }
+
+  // Interaktif: ketuk/klik jam -> ganti format 12/24 jam seketika
+  var lux=document.getElementById('login-clock-lux');
+  if(lux) lux.addEventListener('click', function(){
+    window._luxClock12=!window._luxClock12;
+    try { localStorage.setItem('sip-clock-12', window._luxClock12?'1':'0'); } catch(e){}
+    tick();
+  });
+
   tick();
   if(window._clockInterval) clearInterval(window._clockInterval);
   window._clockInterval=setInterval(tick,1000);
@@ -2202,14 +2256,10 @@ function _tickClock() {
   } catch (eD) {
     dateStr = now.toLocaleDateString('id-ID');
   }
-  const tzLabel = _getTimezoneLabel(tz);
-
-  const loginClock = document.getElementById('login-clock');
-  const loginDate  = document.getElementById('login-date-display');
-  const loginTz    = document.getElementById('login-tz-label');
-  if (loginClock) loginClock.innerText = timeStr;
-  if (loginDate)  loginDate.innerText  = dateStr;
-  if (loginTz)    loginTz.innerText    = tzLabel;
+  // [V3.5] Jam login lux (digit animasi); label zona waktu tidak ditampilkan lagi
+  if (typeof window.sipLuxClockRender === 'function') {
+    try { window.sipLuxClockRender(timeStr, dateStr); } catch (eLux) {}
+  }
 
   const navTime = document.getElementById('current-time-display');
   const navDate = document.getElementById('current-date-display');
@@ -18800,5 +18850,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a49479d9ebd397fb',t:'MTc5MTc5MTAzMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a49484f5afd8ce5f',t:'MTc5MTc5MTQ4Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
