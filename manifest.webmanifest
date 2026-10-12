@@ -3,6 +3,7 @@
   "short_name": "SIPINTAR",
   "description": "Aplikasi ujian digital SMP Negeri 26 Surakarta — khusus modul ujian.",
   "lang": "id",
+  "id": "./",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
