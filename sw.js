@@ -4,7 +4,7 @@
    cache hanya sebagai cadangan ketika jaringan putus sesaat.
    Panggilan API ke script.google.com TIDAK pernah di-cache.
    ============================================================ */
-const CACHE_NAME = 'sipintar-v3-ujian-8';
+const CACHE_NAME = 'sipintar-v3-ujian-9';
 const CORE_ASSETS = [
   './',
   'index.html',
