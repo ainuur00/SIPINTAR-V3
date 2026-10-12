@@ -12,6 +12,11 @@
   <meta name="theme-color" content="#0f2a5f">
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
+  <meta name="application-name" content="SIPINTAR">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="SIPINTAR">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <script src="config.js"></script>
   <script>
   /* ==========================================================================
@@ -18667,6 +18672,105 @@ function sipSisipTandaGambar_() {
       navigator.serviceWorker.register('sw.js').catch(function () {});
     });
   }
+
+  // [V3.5] PWA: ajakan instal saat pertama kali membuka link.
+  // - Chrome/Edge (Android & desktop): tangkap beforeinstallprompt -> banner "Instal".
+  // - iOS/iPadOS (Safari): tidak ada prompt otomatis -> banner panduan "Tambah ke Layar Utama".
+  // - Jika sudah berjalan sebagai aplikasi terpasang (standalone), banner tidak pernah muncul.
+  (function () {
+    var deferredPrompt = null;
+
+    function isStandalone() {
+      try {
+        return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+          || window.navigator.standalone === true;
+      } catch (e) { return false; }
+    }
+    function dismissed() {
+      try { return sessionStorage.getItem('sip-pwa-dismiss') === '1'; } catch (e) { return false; }
+    }
+    function removeBanner() {
+      var b = document.getElementById('sip-pwa-banner');
+      if (b && b.parentNode) b.parentNode.removeChild(b);
+    }
+    function showBanner(mode) {
+      if (isStandalone() || dismissed()) return;
+      if (document.getElementById('sip-pwa-banner')) return;
+      if (!document.body) return;
+      var wrap = document.createElement('div');
+      wrap.id = 'sip-pwa-banner';
+      wrap.setAttribute('style',
+        'position:fixed;left:12px;right:12px;bottom:12px;z-index:99999;' +
+        'background:linear-gradient(135deg,#0f2a5f,#1b3a6b);color:#fff;' +
+        'border:1px solid rgba(212,175,55,.65);border-radius:16px;' +
+        'box-shadow:0 10px 30px rgba(2,6,23,.45);padding:13px 15px;' +
+        'display:flex;align-items:center;gap:12px;max-width:560px;margin:0 auto;');
+      var icon = '<img src="icon-192.png" alt="" style="width:44px;height:44px;border-radius:10px;flex:none;background:#fff;object-fit:cover">';
+      var text, buttons;
+      if (mode === 'ios') {
+        text = '<div style="flex:1;min-width:0"><div style="font-weight:800;font-size:14px">Pasang SIPINTAR di layar utama</div>'
+          + '<div style="font-size:12px;opacity:.92;margin-top:2px;line-height:1.45">Ketuk tombol <b>Bagikan</b> <span style="border:1px solid rgba(255,255,255,.5);border-radius:4px;padding:0 4px">&#8679;</span> di Safari, lalu pilih <b>Tambah ke Layar Utama</b>.</div></div>';
+        buttons = '<button id="sip-pwa-close" style="flex:none;background:rgba(255,255,255,.15);color:#fff;border:0;border-radius:10px;padding:9px 12px;font-size:12px;font-weight:700;cursor:pointer">Tutup</button>';
+      } else if (mode === 'generic') {
+        // Firefox / browser bawaan HP / browser lain: tidak ada prompt instal otomatis.
+        // Aplikasi tetap berfungsi penuh di browser; tawarkan cara pasang manual.
+        var isFirefox = /firefox|fxios/i.test(navigator.userAgent || '');
+        text = '<div style="flex:1;min-width:0"><div style="font-weight:800;font-size:14px">SIPINTAR siap dipakai di browser ini</div>'
+          + '<div style="font-size:12px;opacity:.92;margin-top:2px;line-height:1.45">Semua fitur berjalan langsung tanpa instal. Agar lebih praktis: buka <b>menu browser</b> (&#8942;) lalu pilih <b>'
+          + (isFirefox ? 'Pasang / Tambahkan ke Layar Utama' : 'Tambahkan ke Layar Utama')
+          + '</b>.</div></div>';
+        buttons = '<button id="sip-pwa-close" style="flex:none;background:rgba(255,255,255,.15);color:#fff;border:0;border-radius:10px;padding:9px 12px;font-size:12px;font-weight:700;cursor:pointer">Mengerti</button>';
+      } else {
+        text = '<div style="flex:1;min-width:0"><div style="font-weight:800;font-size:14px">Instal aplikasi SIPINTAR</div>'
+          + '<div style="font-size:12px;opacity:.92;margin-top:2px;line-height:1.45">Pasang di perangkat agar dibuka seperti aplikasi. Tetap bisa juga dipakai langsung lewat browser.</div></div>';
+        buttons = '<button id="sip-pwa-install" style="flex:none;background:#d4af37;color:#1b2a4a;border:0;border-radius:10px;padding:9px 16px;font-size:13px;font-weight:800;cursor:pointer">Instal</button>'
+          + '<button id="sip-pwa-close" style="flex:none;background:rgba(255,255,255,.15);color:#fff;border:0;border-radius:10px;padding:9px 10px;font-size:12px;font-weight:700;cursor:pointer">Nanti</button>';
+      }
+      wrap.innerHTML = icon + text + buttons;
+      document.body.appendChild(wrap);
+      var closeBtn = document.getElementById('sip-pwa-close');
+      if (closeBtn) closeBtn.onclick = function () {
+        try { sessionStorage.setItem('sip-pwa-dismiss', '1'); } catch (e) {}
+        removeBanner();
+      };
+      var instBtn = document.getElementById('sip-pwa-install');
+      if (instBtn) instBtn.onclick = function () {
+        if (!deferredPrompt) { removeBanner(); return; }
+        try {
+          deferredPrompt.prompt();
+          deferredPrompt.userChoice.then(function () { deferredPrompt = null; removeBanner(); })
+            .catch(function () { removeBanner(); });
+        } catch (e) { removeBanner(); }
+      };
+    }
+
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      deferredPrompt = e;
+      window._sipPwaPrompt = e; // cadangan: bisa dipicu manual dari console/menu
+      removeBanner(); // ganti banner panduan umum (jika sempat tampil) dengan tombol Instal
+      if (document.body) showBanner('android');
+      else document.addEventListener('DOMContentLoaded', function () { showBanner('android'); });
+    });
+    window.addEventListener('appinstalled', function () {
+      deferredPrompt = null;
+      removeBanner();
+    });
+    document.addEventListener('DOMContentLoaded', function () {
+      var ua = navigator.userAgent || '';
+      var isIos = /iphone|ipad|ipod/i.test(ua) || (/macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+      if (isIos && !isStandalone()) { showBanner('ios'); return; }
+      // Firefox, browser bawaan HP (Mi Browser, vivo, Samsung Internet lama, Opera, dll.):
+      // beforeinstallprompt tidak tersedia -> setelah 3 detik tampilkan banner panduan
+      // bahwa aplikasi bisa langsung dipakai di browser ini + cara pasang manual.
+      var isMobile = /android|mobile|opera mini|ucbrowser/i.test(ua);
+      if (isMobile && !isStandalone()) {
+        setTimeout(function () {
+          if (!deferredPrompt && !isStandalone()) showBanner('generic');
+        }, 3000);
+      }
+    });
+  })();
   // Sinkron konfigurasi tampilan (nama, logo, subjudul, background) dari Spreadsheet
   document.addEventListener('DOMContentLoaded', function () {
     try {
@@ -18696,5 +18800,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4945149ab8f3e5b',t:'MTc5MTc4OTM2OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a49479d9ebd397fb',t:'MTc5MTc5MTAzMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
