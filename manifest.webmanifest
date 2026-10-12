@@ -1,16 +1,19 @@
 {
-  "name": "SIPINTAR — SMPN 26 Surakarta",
+  "name": "SIPINTAR — Sistem Penilaian Terintegrasi",
   "short_name": "SIPINTAR",
-  "description": "Portal ujian digital SIPINTAR, SMP Negeri 26 Surakarta.",
+  "description": "Aplikasi ujian digital SMP Negeri 26 Surakarta — khusus modul ujian.",
+  "lang": "id",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#1b3a6b",
-  "theme_color": "#1b3a6b",
-  "lang": "id",
+  "orientation": "any",
+  "background_color": "#0f172a",
+  "theme_color": "#0f2a5f",
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon-1024.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any" }
   ]
 }
