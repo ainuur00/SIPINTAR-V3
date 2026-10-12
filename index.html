@@ -3356,15 +3356,37 @@ function showStudentHub(optTab) {
   google.script.run
     .withSuccessHandler(function (res) {
       window._siswaProfilCache = (res && res.profil) || null;
+      // [V3.4] Status profil dari server: lengkap? terkunci? diminta revisi?
+      window._siswaProfilFilled = !!(res && res.success && res.filled);
+      window._siswaProfilLocked = !!(res && res.success && res.locked);
+      window._siswaProfilValidasi = (res && res.validasiProfil) || '';
       if (!res || !res.success) {
         if (formBox) formBox.innerHTML = '<p class="text-sm text-red-500">' + escapeHtmlProfil_((res && res.message) || 'Gagal memuat profil.') + '</p>';
       } else if (formBox) {
-        formBox.innerHTML = profilFormHtml_(res.profil, { readOnly: !res.canEdit, lockIdentitas: !!(currentUser && currentUser.role === 'Siswa') })
+        var profilBanner = '';
+        if (res.locked) {
+          profilBanner = '<div class="mb-4 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-sm text-emerald-800"><i class="fas fa-lock mr-2"></i><b>Profil terkunci.</b> Data profil Anda sudah lengkap dan dikunci sistem — tidak dapat diubah lagi. Hubungi Panitia/Admin bila ada data yang keliru (profil dibuka kembali dengan status REVISI).</div>';
+        } else if (window._siswaProfilValidasi === 'REVISI') {
+          profilBanner = '<div class="mb-4 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-sm text-amber-800"><i class="fas fa-triangle-exclamation mr-2"></i><b>Panitia meminta revisi profil.</b> Perbaiki data Anda lalu simpan — setelah tersimpan, profil akan terkunci kembali.</div>';
+        } else if (!res.filled && currentUser && currentUser.role === 'Siswa') {
+          profilBanner = '<div class="mb-4 p-4 rounded-2xl bg-blue-50 border border-blue-200 text-sm text-blue-800"><i class="fas fa-circle-info mr-2"></i><b>Wajib lengkapi profil.</b> Semua menu lain (kisi-kisi, modul ujian, nilai) terkunci sampai profil beserta foto selesai diisi dan disimpan. Setelah tersimpan, profil dikunci sistem.</div>';
+        }
+        formBox.innerHTML = profilBanner
+          + profilFormHtml_(res.profil, { readOnly: !res.canEdit, lockIdentitas: !!(currentUser && currentUser.role === 'Siswa') })
           + (res.canEdit ? '<div class="mt-4 flex justify-end"><button type="button" onclick="saveHubProfil()" class="px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold shadow"><i class="fas fa-save mr-1"></i> Simpan Profil</button></div>' : '');
         sipSetSiswaFotoUI_((res.profil && res.profil.fotoUrl) || '');
       }
       sipSetSiswaFotoUI_((res.profil && res.profil.fotoUrl) || '');
       renderSiswaDashboard_();
+      // [V3.4] Gerbang profil: siswa belum lengkap -> wajib ke tab Profil dulu
+      if (currentUser && currentUser.role === 'Siswa' && res && res.success && !res.filled) {
+        window._siswaExamGateOk = false;
+        showSiswaTab('profil');
+        if (!window._sipProfilGateInfoShown) {
+          window._sipProfilGateInfoShown = true;
+          Swal.fire({ icon: 'info', title: 'Lengkapi profil dulu', text: 'Anda wajib melengkapi profil (termasuk foto) sebelum menggunakan fitur lain. Setelah disimpan, profil dikunci sistem.', confirmButtonColor: '#1b3a6b' });
+        }
+      }
     })
     .withFailureHandler(function (err) {
       if (formBox) formBox.innerHTML = '<p class="text-sm text-red-500">' + escapeHtmlProfil_(err) + '</p>';
@@ -3418,6 +3440,11 @@ function sipSiswaProfilSiap_() {
 }
 
 function showSiswaTab(tab) {
+  // [V3.4] Gerbang profil: sebelum profil lengkap, semua tab selain Profil terkunci
+  if (currentUser && currentUser.role === 'Siswa' && tab !== 'profil' && window._siswaProfilFilled === false) {
+    Swal.fire({ icon: 'warning', title: 'Profil belum lengkap', text: 'Lengkapi dan simpan profil Anda (termasuk foto) terlebih dahulu untuk membuka menu ini.', confirmButtonColor: '#1b3a6b' });
+    tab = 'profil';
+  }
   // [UJIAN SAJA] Menu belajar (materi/tugas/jurnal/game) telah dihapus.
   if (tab === 'ujian' && !window._siswaExamGateOk) {
     startSiswaExamRelogin_();
@@ -3982,9 +4009,14 @@ function saveHubProfil() {
         if (res && res.success) {
           Swal.fire({ icon: 'success', title: 'Selamat!', text: res.message, confirmButtonText: 'Siap mengikuti ujian', confirmButtonColor: '#1b3a6b' });
           window._siswaProfilCache = (res && res.profil) || p || window._siswaProfilCache;
+          // [V3.4] Profil kini lengkap: menu lain terbuka, form profil terkunci
+          window._siswaProfilFilled = true;
+          window._siswaProfilLocked = true;
           sipSetSiswaFotoUI_((p && p.fotoUrl) || profilFieldVal_('pf-fotoUrl'));
           const statusEl = document.getElementById('siswa-hub-profil-status');
-          if (statusEl) statusEl.innerHTML = '<span class="text-emerald-600 font-bold"><i class="fas fa-check-circle mr-1"></i>Profil lengkap tersimpan — menunggu kartu ujian dari panitia</span>';
+          if (statusEl) statusEl.innerHTML = '<span class="text-emerald-600 font-bold"><i class="fas fa-check-circle mr-1"></i>Profil lengkap tersimpan & terkunci — menunggu kartu ujian dari panitia</span>';
+          // Muat ulang hub agar form profil tampil dalam mode terkunci (hanya-baca)
+          try { showStudentHub('profil'); } catch (eRef) {}
         } else {
           Swal.fire({ icon: 'error', title: 'Gagal', text: (res && res.message) || 'Tidak dapat menyimpan.' });
         }
@@ -4001,6 +4033,12 @@ function saveHubProfil() {
 }
 
 function continueFromStudentHub() {
+  // [V3.4] Profil wajib lengkap sebelum masuk ruang ujian
+  if (currentUser && currentUser.role === 'Siswa' && window._siswaProfilFilled === false) {
+    Swal.fire({ icon: 'warning', title: 'Profil belum lengkap', text: 'Lengkapi dan simpan profil Anda terlebih dahulu sebelum masuk ruang ujian.', confirmButtonColor: '#1b3a6b' });
+    showSiswaTab('profil');
+    return;
+  }
   const pinEl = document.getElementById('siswa-exam-pin');
   const pin = pinEl ? String(pinEl.value || '').trim() : '';
   if (!pin) {
@@ -4592,7 +4630,7 @@ function paintKartuTemplateEditor_() {
     id: '', nama: '', judul: 'KARTU PESERTA UJIAN', subjudul: 'SIPINTAR — Sistem Penilaian Interaktif',
     instansi: 'Inovasi Pembelajaran',
     catatan: '© Copyright Inovasi Pembelajaran Version 3 · Arif Nuur Iswahyudi, S.Pd., Gr · 2026',
-    tampilkanFoto: false, tampilkanPin: false, warna: '#2b369e'
+    tampilkanFoto: true, tampilkanPin: false, warna: '#2b369e'
   };
   box.innerHTML = `
     <input type="hidden" id="kt-id" value="${escapeHtmlProfil_(t.id || '')}">
@@ -4600,13 +4638,14 @@ function paintKartuTemplateEditor_() {
     <div class="grid md:grid-cols-2 gap-3">
       <label class="text-xs font-bold">Nama Template<input id="kt-nama" value="${escapeHtmlProfil_(t.nama || '')}" class="mt-1 w-full px-3 py-2 rounded-lg border text-sm"></label>
       <label class="text-xs font-bold">Warna header<input id="kt-warna" type="color" value="${escapeHtmlProfil_(t.warna || '#2b369e')}" class="mt-1 h-10 w-full rounded-lg border"></label>
+      <label class="text-xs font-bold md:col-span-2 flex items-center gap-2 mt-1"><input type="checkbox" id="kt-foto" ${t.tampilkanFoto ? 'checked' : ''} class="w-4 h-4 accent-blue-600"> Tampilkan foto siswa pada kartu (otomatis diambil dari folder "Foto Profil" milik masing-masing siswa)</label>
       <label class="text-xs font-bold">Header — Judul kartu<input id="kt-judul" value="${escapeHtmlProfil_(t.judul || '')}" class="mt-1 w-full px-3 py-2 rounded-lg border text-sm"></label>
       <label class="text-xs font-bold">Header — Subjudul<input id="kt-subjudul" value="${escapeHtmlProfil_(t.subjudul || '')}" class="mt-1 w-full px-3 py-2 rounded-lg border text-sm"></label>
       <label class="text-xs font-bold md:col-span-2">Header — Instansi / identitas sekolah<input id="kt-instansi" value="${escapeHtmlProfil_(t.instansi || '')}" class="mt-1 w-full px-3 py-2 rounded-lg border text-sm"></label>
       <label class="text-xs font-bold md:col-span-2">Footer — identitas (copyright / alamat / catatan)
         <textarea id="kt-catatan" rows="2" class="mt-1 w-full px-3 py-2 rounded-lg border text-sm">${escapeHtmlProfil_(t.catatan || '')}</textarea>
       </label>
-      <p class="text-[11px] text-slate-500 md:col-span-2">Isi kartu tetap: Nama Siswa, User ID, Password, Kelas, Mata Ujian, Tanggal Pelaksanaan, Sesi/Waktu. Password siswa tidak dapat diubah siswa.</p>
+      <p class="text-[11px] text-slate-500 md:col-span-2">Isi kartu tetap: Nama Siswa, User ID, Password, Kelas, Mata Ujian, Tanggal Pelaksanaan, Sesi/Waktu — plus foto siswa 3&times;4 bila dicentang. Sistem hanya memakai foto dari folder siswa yang bersangkutan (file foto-profil-&lt;UserID&gt;.jpg hasil unggahan siswa). Password siswa tidak dapat diubah siswa.</p>
     </div>`;
 }
 
@@ -4619,7 +4658,7 @@ function collectKartuTemplateForm_() {
     instansi: profilFieldVal_('kt-instansi'),
     catatan: profilFieldVal_('kt-catatan'),
     warna: (document.getElementById('kt-warna') || {}).value || '#2b369e',
-    tampilkanFoto: false,
+    tampilkanFoto: !!((document.getElementById('kt-foto') || {}).checked),
     tampilkanPin: false
   };
 }
@@ -4636,7 +4675,7 @@ function newKartuTemplate_() {
     subjudul: 'SIPINTAR — Sistem Penilaian Interaktif',
     instansi: 'Inovasi Pembelajaran',
     catatan: '© Copyright Inovasi Pembelajaran Version 3 · Arif Nuur Iswahyudi, S.Pd., Gr · 2026',
-    tampilkanFoto: false, tampilkanPin: false, warna: '#2b369e'
+    tampilkanFoto: true, tampilkanPin: false, warna: '#2b369e'
   }]);
   paintKartuTemplateEditor_();
 }
@@ -4757,6 +4796,7 @@ function buildKartuPrintHtml_(res) {
         + '<div class="hx"><div class="kt">' + escapeHtmlProfil_(t.judul || 'KARTU PESERTA UJIAN') + '</div>'
         + '<div class="ks">' + escapeHtmlProfil_(t.subjudul || 'SIPINTAR') + '</div>'
         + '<div class="ki">' + escapeHtmlProfil_(t.instansi || '') + '</div></div></div></div>'
+        + '<div style="display:table;width:100%"><div style="display:table-cell;vertical-align:top">'
         + '<table class="kb">'
         + row('Nama Siswa', c.name)
         + row('User ID', c.userID)
@@ -4765,7 +4805,16 @@ function buildKartuPrintHtml_(res) {
         + row('Mata Ujian', c.subject || res.examSubject)
         + row('Tanggal', c.tanggal || res.examTanggal)
         + row('Sesi / Waktu', c.sesi || res.examSesi)
-        + '</table>'
+        + '</table></div>'
+        + (t.tampilkanFoto
+          ? '<div style="display:table-cell;width:21mm;vertical-align:top;padding:2mm 2mm 0 0">'
+            + '<div style="width:19mm;height:25mm;border:1px solid #cbd5e1;border-radius:2px;overflow:hidden;background:#f1f5f9;text-align:center">'
+            + (c.fotoUrl
+              ? '<img src="' + escapeHtmlProfil_(c.fotoUrl) + '" style="width:100%;height:100%;object-fit:cover" referrerpolicy="no-referrer">'
+              : '<div style="font-size:6px;color:#94a3b8;padding-top:11mm">FOTO 3&times;4</div>')
+            + '</div></div>'
+          : '')
+        + '</div>'
         + '<div class="kf">' + escapeHtmlProfil_(t.catatan || t.instansi || '') + '</div>'
         + '</div></td>';
     }
@@ -4785,7 +4834,7 @@ function buildKartuPrintHtml_(res) {
     + '.kb td.c{width:4%;color:#94a3b8}.kb td.v{font-weight:700}'
     + '.kf{font-size:6.5px;color:#64748b;padding:3px 8px 5px;border-top:1px dashed #cbd5e1;text-align:center}'
     + '</style></head><body><table class="sheet">' + rows + '</table>'
-    + '<script>window.onload=function(){setTimeout(function(){window.print()},300)}<\/script></body></html>';
+    + '<script>window.onload=function(){setTimeout(function(){window.print()},' + (t.tampilkanFoto ? 1500 : 300) + ')}<\/script></body></html>';
 }
 
 function sipintarPrintHtml_(htmlDoc) {
@@ -18647,5 +18696,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4941c986e1a1658',t:'MTc5MTc4NzIxMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4945149ab8f3e5b',t:'MTc5MTc4OTM2OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
