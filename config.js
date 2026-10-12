@@ -10,7 +10,7 @@
 //  (URL akan tersimpan otomatis di perangkat tersebut.)
 // ============================================================
 window.APP_CONFIG = {
-  GAS_WEB_APP_URL: "", // ← TEMPEL URL /exec ANDA DI SINI (sekali saja)
+  GAS_WEB_APP_URL: "https://script.google.com/macros/s/AKfycbyXxmSOGWdmzrghFrIJ97K_AtAAloFdoEaaVGKm1C_R5UW1hlPMNxPTLrGcouXR9Q55nA/exec", // ← TEMPEL URL /exec ANDA DI SINI (sekali saja)
   APP_NAME: "SIPINTAR",
   APP_TAGLINE: "SMP Negeri 26 Surakarta",
   APP_VERSION: "3.0.0"
