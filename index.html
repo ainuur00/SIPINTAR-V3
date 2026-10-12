@@ -17,6 +17,9 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="SIPINTAR">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;800;900&display=swap" rel="stylesheet">
   <script src="config.js"></script>
   <script>
   /* ==========================================================================
@@ -1012,10 +1015,14 @@
   }
   #login-logo-img,
   .login-logo-3d {
-    width: 148px;
-    height: 148px;
-    max-width: 42vw;
+    /* [V3.5] Ukuran ikon presisi: kotak 1:1 pasti, proporsional di layar kecil */
+    width: 132px;
+    height: 132px;
+    aspect-ratio: 1 / 1;
+    max-width: 40vw;
+    max-height: 40vw;
     object-fit: contain;
+    object-position: center;
     background: transparent !important;
     border: none !important;
     border-radius: 0 !important;
@@ -1252,12 +1259,56 @@
     box-shadow: 0 10px 24px rgba(212,160,23,.35) !important;
   }
   #btnLogin:hover { filter: brightness(1.05); }
-  /* Judul login: garis emas */
+  /* === [V3.5] JUDUL LOGIN LUX — huruf muncul satu per satu === */
   #login-title {
-    background: linear-gradient(135deg, #1e3a8a, #0f2a5f);
-    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    display: flex; flex-wrap: wrap; justify-content: center;
+    column-gap: .5em; row-gap: 3px; margin-top: 8px;
+    font-family: 'Cinzel', Georgia, 'Times New Roman', serif;
+    font-weight: 800;
+    font-size: clamp(1.02rem, 4.6vw, 1.5rem);
+    letter-spacing: .14em; line-height: 1.4;
+    cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
+    perspective: 500px;
   }
-  #login-subtitle { color: #92700c !important; font-weight: 700 !important; }
+  #login-title .lux-w { display: inline-flex; white-space: nowrap; }
+  #login-title .lux-l {
+    display: inline-block; opacity: 0;
+    background: linear-gradient(115deg, #0f2a5f 0%, #2563eb 32%, #b78a1e 50%, #2563eb 68%, #0f2a5f 100%);
+    background-size: 300% 100%;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: luxLetterIn .72s cubic-bezier(.22,1,.36,1) forwards;
+    transition: transform .22s ease, filter .22s ease;
+  }
+  #login-title .lux-l.done {
+    opacity: 1; transform: none;
+    animation: luxTitleSheen 7s linear infinite;
+  }
+  #login-title .lux-l.done:hover {
+    transform: translateY(-4px) scale(1.22);
+    filter: drop-shadow(0 5px 12px rgba(212,175,55,.6));
+  }
+  @keyframes luxLetterIn {
+    0%   { opacity: 0; transform: translateY(26px) rotateX(78deg) scale(.7); filter: blur(5px); }
+    60%  { opacity: 1; filter: blur(0); }
+    80%  { transform: translateY(-3px) rotateX(-8deg) scale(1.06); }
+    100% { opacity: 1; transform: translateY(0) rotateX(0) scale(1); }
+  }
+  @keyframes luxTitleSheen {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 300% 50%; }
+  }
+  #login-title-rule {
+    display: flex; align-items: center; justify-content: center; gap: 9px;
+    margin-top: 8px; opacity: 0; animation: luxRuleIn .9s ease forwards;
+  }
+  #login-title-rule .ltr-line { width: 58px; height: 1px; background: linear-gradient(90deg, transparent, #d4af37); }
+  #login-title-rule .ltr-line:last-child { background: linear-gradient(90deg, #d4af37, transparent); }
+  #login-title-rule .ltr-gem {
+    width: 7px; height: 7px; transform: rotate(45deg);
+    background: linear-gradient(135deg, #f1d27a, #b78a1e);
+    box-shadow: 0 0 9px rgba(212,175,55,.85);
+  }
+  @keyframes luxRuleIn { to { opacity: 1; } }
   /* Header ujian & hub siswa: garis bawah emas */
   .exam-header { border-bottom: 3px solid var(--sip-gold) !important; }
   #page-siswa-hub header { border-bottom: 3px solid var(--sip-gold) !important; }
@@ -1310,8 +1361,9 @@
                  onerror="spOwlFallback(this)">
           </div>
 
-          <h1 id="login-title" class="text-2xl font-bold text-slate-800 tracking-tight">SIPINTAR</h1>
-          <p id="login-subtitle" class="text-sm text-slate-600 mt-1 font-medium">Sistem Penilaian Terintegrasi</p>
+          <!-- [V3.5] Judul login lux — huruf muncul satu per satu (klik judul untuk memutar ulang animasi) -->
+          <h1 id="login-title" data-text="SISTEM PENILAIAN TERINTEGRASI" aria-label="Sistem Penilaian Terintegrasi" title="Klik untuk memutar ulang animasi"></h1>
+          <div id="login-title-rule"><span class="ltr-line"></span><span class="ltr-gem"></span><span class="ltr-line"></span></div>
 
           <!-- [V3.5] Jam Real-time Login — tampilan lux tanpa kartu -->
           <div id="login-clock-lux" title="Ketuk untuk ganti format 12/24 jam">
@@ -1378,6 +1430,46 @@
   tick();
   if(window._clockInterval) clearInterval(window._clockInterval);
   window._clockInterval=setInterval(tick,1000);
+
+  // ===== [V3.5] JUDUL LUX: huruf muncul satu per satu =====
+  // Dipakai juga oleh applyConfigToLogin/getAppConfig bila nama aplikasi
+  // diubah dari menu Konfigurasi (animasi tetap berjalan untuk nama baru).
+  window.sipLuxTitleRender = function(text){
+    var el=document.getElementById('login-title');
+    if(!el) return;
+    var t=String(text||'').trim();
+    // Sesuai permintaan: kata "SIPINTAR" tidak ditampilkan sebagai judul
+    if(!t || /^sipintar$/i.test(t) || /^sipintar\s*matematika$/i.test(t)) t='SISTEM PENILAIAN TERINTEGRASI';
+    t=t.toUpperCase();
+    el.setAttribute('data-text', t);
+    el.innerHTML='';
+    var words=t.split(/\s+/), idx=0;
+    for(var w=0; w<words.length; w++){
+      var ws=document.createElement('span'); ws.className='lux-w';
+      for(var i=0; i<words[w].length; i++){
+        var s=document.createElement('span'); s.className='lux-l';
+        s.textContent=words[w].charAt(i);
+        s.style.animationDelay=(idx*55)+'ms';
+        s.addEventListener('animationend', function(ev){
+          if(ev.animationName==='luxLetterIn') this.classList.add('done');
+        });
+        ws.appendChild(s); idx++;
+      }
+      el.appendChild(ws);
+    }
+    // Garis emas + permata muncul setelah huruf terakhir
+    var rule=document.getElementById('login-title-rule');
+    if(rule){
+      rule.style.animation='none'; void rule.offsetWidth;
+      rule.style.animation=''; rule.style.animationDelay=(idx*55+180)+'ms';
+    }
+  };
+  window.sipLuxTitleRender(document.getElementById('login-title') ? document.getElementById('login-title').getAttribute('data-text') : '');
+  // Interaktif: klik judul -> putar ulang animasi hurufnya
+  var ttl=document.getElementById('login-title');
+  if(ttl) ttl.addEventListener('click', function(){
+    window.sipLuxTitleRender(ttl.getAttribute('data-text')||'');
+  });
 })();
 </script>
         </div>
@@ -14802,7 +14894,9 @@ function handleSaveConfig(e) {
 function applyConfigToLogin(title, subtitle, logo) {
     if (title) {
         if (/SIPINTAR\s*MATEMATIKA/i.test(String(title))) title = 'SIPINTAR';
-        document.getElementById('login-title').innerText = title;
+        // [V3.5] Judul login kini dirender per huruf (lux); "SIPINTAR" otomatis
+        // ditampilkan sebagai "SISTEM PENILAIAN TERINTEGRASI" di layar login.
+        if (typeof window.sipLuxTitleRender === 'function') window.sipLuxTitleRender(title);
         // Juga ubah Title Header Admin
         const adminHeader = document.querySelector('.sidebar-header-text h1');
         if (adminHeader) adminHeader.innerText = title;
@@ -14810,7 +14904,8 @@ function applyConfigToLogin(title, subtitle, logo) {
         document.title = title;
     }
     if (subtitle) {
-        document.getElementById('login-subtitle').innerText = subtitle;
+        var lsub = document.getElementById('login-subtitle');
+        if (lsub) lsub.innerText = subtitle; // elemen subtitle sudah dihapus (V3.5) — aman bila null
     }
     if (logo) {
         document.getElementById('login-logo-img').src = logo;
@@ -18836,13 +18931,10 @@ function sipSisipTandaGambar_() {
             var li = document.getElementById('login-logo-img');
             if (li) li.src = c.app_logo;
           }
-          if (c.app_subtitle) {
-            var ls = document.getElementById('login-subtitle');
-            if (ls) ls.textContent = c.app_subtitle;
-          }
           if (c.app_name) {
-            var lt = document.getElementById('login-title');
-            if (lt) lt.textContent = c.app_name;
+            // [V3.5] Render per huruf (lux); "SIPINTAR" tampil sebagai
+            // "SISTEM PENILAIAN TERINTEGRASI" di layar login.
+            if (typeof window.sipLuxTitleRender === 'function') window.sipLuxTitleRender(c.app_name);
             document.title = c.app_name + ' | Sistem Penilaian Terintegrasi';
           }
         } catch (eCfg) {}
@@ -18850,5 +18942,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a49484f5afd8ce5f',t:'MTc5MTc5MTQ4Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a494916e1dd0fdec',t:'MTc5MTc5MTk5Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
