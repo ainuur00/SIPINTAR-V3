@@ -1368,7 +1368,7 @@
           </div>
 
           <div id="login-developer" class="login-dev-bar" aria-label="Kredit sistem">
-            <span class="login-dev-k">Inovasi Pembelajaran version 2</span>
+            <span class="login-dev-k">Inovasi Pembelajaran Version 3</span>
             <span class="login-dev-n">Arif Nuur Iswahyudi</span>
             <span class="login-dev-y">2026</span>
           </div>
@@ -1497,7 +1497,7 @@
             <img id="sp-logo-sidebar" class="sp-owl-slot w-10 h-10 rounded-lg object-contain shrink-0" style="background:rgba(255,255,255,.08)" alt="Logo SIPINTAR" title="SIPINTAR">
             <div class="sidebar-header-text">
               <h1 class="text-white font-bold text-lg tracking-tight">SIPINTAR</h1>
-              <p class="text-xs text-slate-400">Admin Panel v2.0</p>
+              <p class="text-xs text-slate-400">Admin Panel v3.0</p>
             </div>
           </div>
         </div>
@@ -1956,7 +1956,7 @@
 
 // --- Kredit login (IIFE) ---
 (function() {
-  const HTML = '<span class="login-dev-k">Inovasi Pembelajaran version 2</span><span class="login-dev-n">Arif Nuur Iswahyudi</span><span class="login-dev-y">2026</span>';
+  const HTML = '<span class="login-dev-k">Inovasi Pembelajaran Version 3</span><span class="login-dev-n">Arif Nuur Iswahyudi</span><span class="login-dev-y">2026</span>';
   setInterval(function() {
     const foot = document.getElementById('mj-secure-footer');
     if (foot && foot.parentNode) foot.parentNode.removeChild(foot);
@@ -1969,7 +1969,7 @@
       el.className = 'login-dev-bar';
       form.appendChild(el);
     }
-    if (el.innerHTML.indexOf('Inovasi Pembelajaran version 2') < 0) {
+    if (el.innerHTML.indexOf('Inovasi Pembelajaran Version 3') < 0) {
       el.className = 'login-dev-bar';
       el.innerHTML = HTML;
     }
@@ -2541,8 +2541,10 @@ function initAdminPanel() {
 
   if (currentUser && currentUser.role === 'Guru') {
     const _pgwIzin = (currentUser && currentUser.pengawas) || {};
-    const izinUjianGuru = _pgwIzin.izinUjian !== false;    // default TRUE utk sesi lama
-    const izinBankGuru = _pgwIzin.izinBankSoal !== false;  // default TRUE utk sesi lama
+    // [V3] Izin harus EKSPLISIT dari penunjukan Admin. Guru tanpa penunjukan
+    // (bukan Pengawas & bukan Tim Pembuat Soal) hanya melihat Dashboard.
+    const izinUjianGuru = _pgwIzin.izinUjian === true;
+    const izinBankGuru = _pgwIzin.izinBankSoal === true;
     adminOnlyMenus.forEach(id => {
       const el = document.getElementById(id);
       if (el) el.classList.add('hidden');
@@ -2967,12 +2969,13 @@ function showAdminTab(tabId, el) {
     // [PENGAWAS] Guru hanya boleh: Dashboard, Jadwal Ujian, Bank Soal, Hasil & Nilai
     const _pgwIzinTab = (currentUser && currentUser.pengawas) || {};
     const allowedGuruTabs = ['dash-home'];
-    if (_pgwIzinTab.izinUjian !== false) allowedGuruTabs.push('dash-pgw-ujian', 'dash-pgw-koreksi');
-    if (_pgwIzinTab.izinBankSoal !== false) allowedGuruTabs.push('dash-questions');
+    // [V3] Izin harus EKSPLISIT true dari penunjukan Admin
+    if (_pgwIzinTab.izinUjian === true) allowedGuruTabs.push('dash-pgw-ujian', 'dash-pgw-koreksi');
+    if (_pgwIzinTab.izinBankSoal === true) allowedGuruTabs.push('dash-questions');
     if (!allowedGuruTabs.includes(tabId)) {
       Swal.fire({
         title: 'Akses Ditolak',
-        text: 'Menu ini hanya dapat diakses oleh Administrator.',
+        text: 'Menu ini memerlukan penunjukan dari Administrator (Pengawas Ujian / Tim Pembuat Soal).',
         icon: 'error',
         confirmButtonColor: '#d33'
       });
@@ -3425,6 +3428,10 @@ function renderSiswaDashboard_() {
   google.script.run
     .withSuccessHandler(function (res) {
       const info = (res && res.data) || {};
+      // [V3] Informasi/pengumuman tampil untuk siswa hanya jika tujuannya
+      // 'semua' atau 'siswa' (ditentukan Admin).
+      const _tjS = String(info.tujuan || 'semua').toLowerCase();
+      const _utkSiswa = (_tjS === 'semua' || _tjS === 'siswa');
       const judulEl = document.getElementById('siswa-eb-title');
       if (judulEl) judulEl.textContent = info.subjudul || 'SIPINTAR';
       box.innerHTML = `
@@ -3457,8 +3464,8 @@ function renderSiswaDashboard_() {
           </div>
           <div class="px-5 py-4 bg-amber-50 border-t border-amber-100">
             <p class="text-[10px] font-black uppercase tracking-widest text-amber-700 mb-1">Pengumuman</p>
-            <p class="text-sm text-slate-700 whitespace-pre-line">${escapeHtmlProfil_(info.pengumuman || '-')}</p>
-            ${info.proktor ? '<p class="text-xs text-slate-500 mt-2">Proktor / pengawas: <b>' + escapeHtmlProfil_(info.proktor) + '</b></p>' : ''}
+            <p class="text-sm text-slate-700 whitespace-pre-line">${_utkSiswa ? escapeHtmlProfil_(info.pengumuman || '-') : 'Belum ada pengumuman yang ditujukan untuk siswa.'}</p>
+            ${(_utkSiswa && info.proktor) ? '<p class="text-xs text-slate-500 mt-2">Proktor / pengawas: <b>' + escapeHtmlProfil_(info.proktor) + '</b></p>' : ''}
           </div>
         </div>
         <div class="flex flex-wrap gap-2">
@@ -3945,19 +3952,29 @@ function paintDashInfoUjian_() {
       const d = (res && res.data) || {};
       const isAdmin = currentUser && currentUser.role === 'Admin';
       if (!isAdmin) {
+        // [V3] Dashboard GURU: informasi ujian tampil hanya jika Admin
+        // menujukan informasi ke 'semua' atau 'guru'.
+        const _tjG = String(d.tujuan || 'semua').toLowerCase();
+        if (_tjG === 'siswa') {
+          box.innerHTML = `
+            <h3 class="font-bold text-slate-800 mb-1 flex items-center gap-2"><i class="fas fa-info-circle text-blue-600"></i> Informasi ujian</h3>
+            <div class="bg-slate-50 rounded-xl p-4 text-sm text-slate-500">Belum ada informasi ujian yang ditujukan untuk guru.</div>`;
+          return;
+        }
         box.innerHTML = `
-          <h3 class="font-bold text-slate-800 mb-1 flex items-center gap-2"><i class="fas fa-info-circle text-blue-600"></i> Informasi ujian (tampilan siswa)</h3>
-          <p class="text-xs text-slate-500 mb-3">Informasi ini tampil di dashboard siswa bergaya Exam Browser.</p>
+          <h3 class="font-bold text-slate-800 mb-1 flex items-center gap-2"><i class="fas fa-info-circle text-blue-600"></i> Informasi ujian</h3>
+          <p class="text-xs text-slate-500 mb-3">Informasi resmi dari Admin untuk pelaksanaan ujian.</p>
           <div class="bg-slate-50 rounded-xl p-4 text-sm">
             <p class="font-black text-slate-800">${escapeHtmlProfil_(d.judul || '')}</p>
             <p class="text-slate-600">${escapeHtmlProfil_(d.satuan || '')} ${d.tahun ? '· ' + escapeHtmlProfil_(d.tahun) : ''}</p>
             <p class="mt-2 whitespace-pre-line text-slate-700">${escapeHtmlProfil_(d.pengumuman || '-')}</p>
+            ${d.proktor ? '<p class="text-xs text-slate-500 mt-2">Proktor / pengawas: <b>' + escapeHtmlProfil_(d.proktor) + '</b></p>' : ''}
           </div>`;
         return;
       }
       box.innerHTML = `
         <h3 class="font-bold text-slate-800 mb-1 flex items-center gap-2"><i class="fas fa-info-circle text-blue-600"></i> Informasi dashboard ujian</h3>
-        <p class="text-xs text-slate-500 mb-4">Isian ini tampil untuk seluruh siswa (gaya Exam Browser ANBK) dan guru.</p>
+        <p class="text-xs text-slate-500 mb-4">Isian ini tampil di dashboard guru dan/atau siswa — pilih tujuannya pada kolom <b>Tujuan informasi</b>.</p>
         <div class="grid md:grid-cols-2 gap-3">
           <label class="text-xs font-bold">Judul kegiatan<input id="dash-info-judul" value="${escapeHtmlProfil_(d.judul || '')}" class="mt-1 w-full px-3 py-2 rounded-lg border text-sm"></label>
           <label class="text-xs font-bold">Subjudul / aplikasi<input id="dash-info-subjudul" value="${escapeHtmlProfil_(d.subjudul || '')}" class="mt-1 w-full px-3 py-2 rounded-lg border text-sm"></label>
@@ -3965,7 +3982,12 @@ function paintDashInfoUjian_() {
           <label class="text-xs font-bold">Tahun pelajaran<input id="dash-info-tahun" value="${escapeHtmlProfil_(d.tahun || '')}" class="mt-1 w-full px-3 py-2 rounded-lg border text-sm"></label>
           <label class="text-xs font-bold">Jenjang<input id="dash-info-jenjang" value="${escapeHtmlProfil_(d.jenjang || '')}" class="mt-1 w-full px-3 py-2 rounded-lg border text-sm"></label>
           <label class="text-xs font-bold">Proktor / pengawas<input id="dash-info-proktor" value="${escapeHtmlProfil_(d.proktor || '')}" class="mt-1 w-full px-3 py-2 rounded-lg border text-sm"></label>
-          <label class="text-xs font-bold md:col-span-2">Pengumuman untuk siswa &amp; guru<textarea id="dash-info-pengumuman" rows="3" class="mt-1 w-full px-3 py-2 rounded-lg border text-sm">${escapeHtmlProfil_(d.pengumuman || '')}</textarea></label>
+          <label class="text-xs font-bold">Tujuan informasi<select id="dash-info-tujuan" class="mt-1 w-full px-3 py-2 rounded-lg border text-sm bg-white">
+            <option value="semua" ${String(d.tujuan || 'semua') === 'semua' ? 'selected' : ''}>Semua (guru &amp; siswa)</option>
+            <option value="guru" ${String(d.tujuan) === 'guru' ? 'selected' : ''}>Guru saja</option>
+            <option value="siswa" ${String(d.tujuan) === 'siswa' ? 'selected' : ''}>Siswa saja</option>
+          </select></label>
+          <label class="text-xs font-bold md:col-span-2">Pengumuman / informasi ujian<textarea id="dash-info-pengumuman" rows="3" class="mt-1 w-full px-3 py-2 rounded-lg border text-sm">${escapeHtmlProfil_(d.pengumuman || '')}</textarea></label>
         </div>
         <div class="mt-3 text-right">
           <button type="button" onclick="saveDashInfoUjian_()" class="px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-bold">Simpan informasi</button>
@@ -3982,7 +4004,8 @@ function saveDashInfoUjian_() {
     tahun: (document.getElementById('dash-info-tahun') || {}).value || '',
     jenjang: (document.getElementById('dash-info-jenjang') || {}).value || '',
     proktor: (document.getElementById('dash-info-proktor') || {}).value || '',
-    pengumuman: (document.getElementById('dash-info-pengumuman') || {}).value || ''
+    pengumuman: (document.getElementById('dash-info-pengumuman') || {}).value || '',
+    tujuan: (document.getElementById('dash-info-tujuan') || {}).value || 'semua'
   };
   google.script.run
     .withSuccessHandler(function (res) {
@@ -4410,7 +4433,7 @@ function paintKartuTemplateEditor_() {
   const t = (window._kartuTemplates || []).filter(function (x) { return x.id === id; })[0] || {
     id: '', nama: '', judul: 'KARTU PESERTA UJIAN', subjudul: 'SIPINTAR — Sistem Penilaian Interaktif',
     instansi: 'Inovasi Pembelajaran',
-    catatan: '© Copyright Inovasi Pembelajaran Version 2 · Arif Nuur Iswahyudi, S.Pd., Gr · 2026',
+    catatan: '© Copyright Inovasi Pembelajaran Version 3 · Arif Nuur Iswahyudi, S.Pd., Gr · 2026',
     tampilkanFoto: false, tampilkanPin: false, warna: '#2b369e'
   };
   box.innerHTML = `
@@ -4454,7 +4477,7 @@ function newKartuTemplate_() {
     id: '', nama: 'Template Baru', judul: 'KARTU PESERTA UJIAN',
     subjudul: 'SIPINTAR — Sistem Penilaian Interaktif',
     instansi: 'Inovasi Pembelajaran',
-    catatan: '© Copyright Inovasi Pembelajaran Version 2 · Arif Nuur Iswahyudi, S.Pd., Gr · 2026',
+    catatan: '© Copyright Inovasi Pembelajaran Version 3 · Arif Nuur Iswahyudi, S.Pd., Gr · 2026',
     tampilkanFoto: false, tampilkanPin: false, warna: '#2b369e'
   }]);
   paintKartuTemplateEditor_();
@@ -5117,9 +5140,9 @@ function renderAdminHome(container) {
                 <button onclick="refreshDashboard()" class="flex-1 sm:flex-none bg-white border border-slate-200 text-slate-600 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-50 hover:text-blue-600 shadow-sm transition flex items-center justify-center gap-2">
                   <i class="fas fa-sync-alt"></i> <span>Refresh</span>
                 </button>
-                   <button onclick="openExamModal()" class="flex-1 sm:flex-none bg-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-700 shadow-lg shadow-blue-500/30 transition flex items-center justify-center gap-2 transform active:scale-95">
+                   ${isGuruDash ? '' : `<button onclick="openExamModal()" class="flex-1 sm:flex-none bg-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-700 shadow-lg shadow-blue-500/30 transition flex items-center justify-center gap-2 transform active:scale-95">
                       <i class="fas fa-plus"></i> <span>Buat Ujian</span>
-                   </button>
+                   </button>`}
                </div>
            </div>
        </div>
@@ -5255,7 +5278,7 @@ function renderAdminHome(container) {
                   </div>
               </div>
               <div class="bg-slate-950 p-3 text-center text-[10px] text-slate-600 font-mono">
-                  System v2.0 • Secure Connection
+                  System v3.0 • Secure Connection
               </div>
           </div>
        </div>
@@ -5291,7 +5314,7 @@ function renderAdminHome(container) {
             '</div>';
         } else {
           _pb2.innerHTML = '<p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Pengawasan</p>' +
-            '<p class="text-sm text-slate-500">Belum ada penunjukan pengawas aktif atas nama Anda. Hubungi Admin.</p>';
+            '<p class="text-sm text-slate-500">Anda belum ditunjuk sebagai <b>Pengawas Ujian</b> / <b>Tim Pembuat Soal</b>, sehingga saat ini hanya Dashboard informasi ujian yang tersedia. Hubungi Admin untuk penunjukan.</p>';
         }
       })
       .withFailureHandler(function () {})
@@ -18084,5 +18107,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4929597fed38bc9',t:'MTc5MTc3MTE5Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a492bbee3ac29c59',t:'MTc5MTc3Mjc2Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
