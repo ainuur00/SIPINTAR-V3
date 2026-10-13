@@ -9,6 +9,17 @@
 <head>
   <base target="_top">
   <link rel="manifest" href="manifest.webmanifest">
+  <!-- [V3.8] Tangkap prompt instal PWA SEDINI MUNGKIN. Halaman ini besar; di
+       perangkat lambat Chrome bisa mengirim event instal sebelum skrip utama di
+       bagian bawah termuat. Dulu event itu hilang -> tombol pasang tidak berfungsi. -->
+  <script>
+    window._sipPwaPrompt = null;
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      window._sipPwaPrompt = e;
+      try { if (window._sipPwaOnPrompt) window._sipPwaOnPrompt(e); } catch (err) {}
+    });
+  </script>
   <meta name="theme-color" content="#0f2a5f">
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
@@ -18981,7 +18992,8 @@ function sipSisipTandaGambar_() {
   // - iOS/iPadOS (Safari): tidak ada prompt otomatis -> banner panduan "Tambah ke Layar Utama".
   // - Jika sudah berjalan sebagai aplikasi terpasang (standalone), banner tidak pernah muncul.
   (function () {
-    var deferredPrompt = null;
+    // [V3.8] Ambil prompt yang mungkin SUDAH ditangkap skrip kecil di <head>
+    var deferredPrompt = window._sipPwaPrompt || null;
 
     function isStandalone() {
       try {
@@ -19056,35 +19068,54 @@ function sipSisipTandaGambar_() {
         catch (e) { alert('Aplikasi sudah terpasang.'); }
         return;
       }
-      if (deferredPrompt) {
+      // [V3.8] Pakai prompt dari skrip <head> bila penangkap lokal kosong
+      var p = deferredPrompt || window._sipPwaPrompt || null;
+      if (p) {
         try {
-          deferredPrompt.prompt();
-          deferredPrompt.userChoice.then(function () { deferredPrompt = null; removeBanner(); }).catch(function () {});
+          p.prompt();
+          p.userChoice.then(function (pilihan) {
+            deferredPrompt = null; window._sipPwaPrompt = null; removeBanner();
+            if (pilihan && pilihan.outcome === 'accepted') {
+              try {
+                Swal.fire({ icon: 'success', title: 'Sedang dipasang\u2026', text: 'Tunggu beberapa detik, lalu cek ikon SIPINTAR di daftar aplikasi perangkat Anda.', confirmButtonColor: '#1b3a6b' });
+              } catch (e2) {}
+            }
+          }).catch(function () {});
         } catch (e) {}
         return;
       }
       var ua = navigator.userAgent || '';
       var isIos = /iphone|ipad|ipod/i.test(ua) || (/macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
       var isFx = /firefox|fxios/i.test(ua);
-      var msg = isIos
-        ? 'Di iPhone/iPad: tekan tombol Bagikan (kotak dengan panah ke atas) di Safari, lalu pilih "Tambah ke Layar Utama".'
-        : (isFx
-          ? 'Di Firefox: buka menu \u22ee di pojok layar, lalu pilih "Pasang" atau "Tambahkan ke Layar Utama".'
-          : 'Buka menu browser (\u22ee atau \u2026), lalu pilih "Tambahkan ke Layar Utama" atau "Instal aplikasi". Catatan: tanpa dipasang pun, semua fitur tetap bisa dipakai langsung lewat browser.');
+      // [V3.8] Browser "dalam aplikasi" (WhatsApp, Telegram, Facebook, Instagram, dst.)
+      // tidak pernah bisa memasang aplikasi -> arahkan buka di Chrome.
+      var isWv = /\bwv\b|; wv\)|FBAN|FBAV|Instagram|Line\/|Telegram|WhatsApp/i.test(ua);
+      var msg;
+      if (isWv) {
+        msg = 'Halaman ini sedang dibuka lewat browser di dalam aplikasi lain (misalnya WhatsApp/Telegram) yang memang tidak bisa memasang aplikasi. Ketuk menu \u22ee di pojok kanan atas, pilih "Buka di Chrome", lalu tekan tombol ini lagi.';
+      } else if (isIos) {
+        msg = 'Di iPhone/iPad: tekan tombol Bagikan (kotak dengan panah ke atas) di Safari, lalu pilih "Tambah ke Layar Utama".';
+      } else if (isFx) {
+        msg = 'Di Firefox: buka menu \u22ee di pojok layar, lalu pilih "Pasang" atau "Tambahkan ke Layar Utama".';
+      } else {
+        msg = 'Jendela pemasangan belum siap. Pastikan memakai Google Chrome, tunggu 5\u201310 detik setelah halaman terbuka penuh, lalu tekan tombol ini lagi. Atau buka menu \u22ee Chrome: bila ada pilihan "Instal aplikasi" / "Tambahkan ke Layar Utama" dengan kata "Instal", itulah pemasangan penuh.';
+      }
       try { Swal.fire({ icon: 'info', title: 'Cara memasang aplikasi', text: msg, confirmButtonColor: '#1b3a6b' }); }
       catch (e) { alert(msg); }
     };
 
-    window.addEventListener('beforeinstallprompt', function (e) {
-      e.preventDefault();
+    // [V3.8] Event beforeinstallprompt kini ditangkap skrip kecil di <head>
+    // (paling awal), lalu diteruskan ke sini. Tidak ada lagi event yang hilang.
+    window._sipPwaOnPrompt = function (e) {
       deferredPrompt = e;
-      window._sipPwaPrompt = e; // cadangan: bisa dipicu manual dari console/menu
       removeBanner(); // ganti banner panduan umum (jika sempat tampil) dengan tombol Instal
       if (document.body) showBanner('android');
       else document.addEventListener('DOMContentLoaded', function () { showBanner('android'); });
-    });
+    };
+    if (deferredPrompt) window._sipPwaOnPrompt(deferredPrompt);
     window.addEventListener('appinstalled', function () {
       deferredPrompt = null;
+      window._sipPwaPrompt = null;
       removeBanner();
       var pb = document.getElementById('btn-pasang-app');
       var pn = document.getElementById('pasang-app-note');
@@ -19139,5 +19170,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a49a28a36934fd21',t:'MTc5MTg1MDYxOQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
