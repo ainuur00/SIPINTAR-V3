@@ -2729,7 +2729,7 @@ function initAdminPanel() {
  
   // ── LOGIKA VISIBILITAS MENU BERDASARKAN ROLE ──────────────────────
   // [PENGAWAS] Guru (pengawas) hanya melihat: Dashboard, Jadwal Ujian, Bank Soal, Hasil & Nilai
-  const guruAllowedMenus = ['menu-home', 'menu-pgw-ujian', 'menu-pgw-koreksi', 'menu-questions', 'menu-exams', 'menu-results', 'menu-profil', 'menu-kartu'];
+  const guruAllowedMenus = ['menu-home', 'menu-pgw-ujian', 'menu-pgw-koreksi', 'menu-questions', 'menu-exams', 'menu-results', 'menu-profil', 'menu-kartu', 'menu-users'];
   const adminOnlyMenus = ['menu-kisi', 'menu-ai-generator', 'menu-hermes', 'menu-capaian',
     'menu-report-template', 'menu-users', 'menu-profil', 'menu-kartu',
     'menu-images', 'menu-music', 'menu-config',
@@ -2752,12 +2752,14 @@ function initAdminPanel() {
       if ((id === 'menu-pgw-ujian' || id === 'menu-pgw-koreksi') && !izinUjianGuru) return;
       if ((id === 'menu-questions' || id === 'menu-exams') && !izinBankGuru) return;
       if ((id === 'menu-profil' || id === 'menu-kartu' || id === 'menu-results') && !izinPanitiaGuru) return;
+      // [V3.7] Manajemen User tampil untuk Guru yang ditunjuk PENGAWAS
+      if (id === 'menu-users' && !izinUjianGuru) return;
       const el = document.getElementById(id);
       if (el) el.classList.remove('hidden');
     });
     // [V3.1] Panitia butuh Modul Data (Profil Siswa & Kartu Ujian); Modul Sistem tetap khusus Admin
     const elModData = document.getElementById('mod-data');
-    if (elModData) elModData.classList.toggle('hidden', !izinPanitiaGuru);
+    if (elModData) elModData.classList.toggle('hidden', !(izinPanitiaGuru || izinUjianGuru));
     const elModSistem = document.getElementById('mod-sistem');
     if (elModSistem) elModSistem.classList.add('hidden');
   } else {
@@ -3354,8 +3356,9 @@ function showAdminTab(tabId, el) {
  
   } else if (tabId === 'dash-users') {
     // Judul disesuaikan dengan role
+    const _izinUM = (currentUser && currentUser.pengawas) || {};
     title.innerText = (currentUser && currentUser.role === 'Guru')
-      ? 'Manajemen Siswa Kelas Saya'
+      ? (_izinUM.izinUjian === true ? 'Manajemen User — Pengawas' : 'Manajemen Siswa Kelas Saya')
       : 'Manajemen Pengguna';
     renderUserManagement(content);
  
@@ -12788,6 +12791,11 @@ function renderUserManagement(container) {
               class="flex-1 md:flex-none bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg transition flex items-center justify-center gap-2 transform active:scale-95">
               <i class="fas fa-user-plus"></i><span class="hidden sm:inline">Tambah User</span>
             </button>
+            <button onclick="handleAcakPasswordTerpilih()"
+              class="flex-1 md:flex-none bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg transition flex items-center justify-center gap-2 transform active:scale-95"
+              title="Ganti password user terpilih dengan password acak (huruf besar, kecil & angka)">
+              <i class="fas fa-dice"></i><span class="hidden sm:inline">Acak Sandi Terpilih</span>
+            </button>
           </div>
         </div>
         <div class="flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
@@ -13324,11 +13332,17 @@ function renderUserTableInternal() {
                         <i class="fas fa-pen-to-square"></i>
                     </button>
 
-                    <button onclick="handleDeleteUser('${u.id}')"
+                    <button onclick="handleAcakPassword('${u.id}')"
+                        class="w-8 h-8 flex items-center justify-center rounded-lg text-amber-500 hover:text-white hover:bg-amber-500 border border-transparent hover:shadow-lg transition transform hover:scale-105"
+                        title="Acak Password (huruf besar, kecil & angka)">
+                        <i class="fas fa-dice"></i>
+                    </button>
+
+                    ${currentUser && currentUser.role === 'Admin' ? `<button onclick="handleDeleteUser('${u.id}')"
                         class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-white hover:bg-red-500 border border-transparent hover:shadow-lg transition transform hover:scale-105"
                         title="Hapus">
                         <i class="fas fa-trash-can"></i>
-                    </button>
+                    </button>` : ''}
 
                 </div>
             </td>
@@ -13958,7 +13972,15 @@ function createUserModalHTML() {
 
                 <div>
                     <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Password</label>
-                    <input type="text" name="password" id="input-password" class="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition text-sm" placeholder="Minimal 6 karakter" required>
+                    <div class="flex gap-2">
+                        <input type="text" name="password" id="input-password" class="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition text-sm" placeholder="Minimal 6 karakter" required>
+                        <button type="button" onclick="isiPasswordAcak_()"
+                            class="shrink-0 px-3 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold transition"
+                            title="Isi dengan password acak (huruf besar, kecil & angka)">
+                            <i class="fas fa-dice"></i> Acak
+                        </button>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-1">Tombol Acak membuat password berisi huruf besar, huruf kecil, dan angka.</p>
                 </div>
 
               <div id="field-class-student" class="hidden">
@@ -14183,6 +14205,97 @@ function handleUserSubmit(e) {
     }
 }
 // KODE BARU (AMAN - SUDAH MENGIRIM KREDENSIAL ADMIN)
+// ===== [V3.7] ACAK PASSWORD (huruf besar + huruf kecil + angka) =====
+function sipGenPasswordJS_(len) {
+  var up = 'ABCDEFGHJKMNPQRSTUVWXYZ', lo = 'abcdefghjkmnpqrstuvwxyz', dg = '23456789';
+  var all = up + lo + dg, n = Math.max(8, len || 10);
+  function pick(s) { return s.charAt(Math.floor(Math.random() * s.length)); }
+  var out = [pick(up), pick(lo), pick(dg), pick(dg)];
+  while (out.length < n) out.push(pick(all));
+  for (var i = out.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var t = out[i]; out[i] = out[j]; out[j] = t;
+  }
+  return out.join('');
+}
+
+function isiPasswordAcak_() {
+  var el = document.getElementById('input-password');
+  if (el) { el.value = sipGenPasswordJS_(10); el.focus(); }
+}
+
+function handleAcakPassword(uid) {
+  var u = (allUsersData || []).find(function (x) { return String(x.id) === String(uid); }) || {};
+  Swal.fire({
+    title: 'Acak password?',
+    html: 'Password <b>' + (u.username || uid) + '</b> akan diganti password baru buatan sistem (mengandung huruf besar, huruf kecil, dan angka).',
+    icon: 'question', showCancelButton: true,
+    confirmButtonText: 'Ya, acak sekarang', cancelButtonText: 'Batal', confirmButtonColor: '#1b3a6b'
+  }).then(function (r) {
+    if (!r.isConfirmed) return;
+    document.getElementById('global-loading').classList.remove('hidden');
+    google.script.run.withSuccessHandler(function (res) {
+      document.getElementById('global-loading').classList.add('hidden');
+      if (res && res.success) {
+        Swal.fire({
+          icon: 'success', title: 'Password baru',
+          html: '<div class="text-sm">' + (res.nama || res.userId) + '</div>'
+            + '<div class="mt-2 text-2xl font-mono font-bold tracking-widest bg-slate-100 rounded-lg py-2">' + res.password + '</div>'
+            + '<div class="mt-2 text-xs text-slate-400">Catat dan sampaikan kepada pemilik akun.</div>',
+          confirmButtonColor: '#1b3a6b'
+        });
+        loadUserTable();
+      } else {
+        Swal.fire('Gagal', (res && res.message) || 'Terjadi kesalahan.', 'error');
+      }
+    }).withFailureHandler(function (e) {
+      document.getElementById('global-loading').classList.add('hidden');
+      Swal.fire('Gagal', String((e && e.message) || e), 'error');
+    }).acakPasswordUser(uid, currentUser.userID, currentUser.token);
+  });
+}
+
+function handleAcakPasswordTerpilih() {
+  var ids = [].slice.call(document.querySelectorAll('.user-checkbox:checked')).map(function (c) { return c.value; });
+  if (!ids.length) {
+    Swal.fire('Belum ada yang dipilih', 'Centang dulu user yang password-nya ingin diacak.', 'info');
+    return;
+  }
+  Swal.fire({
+    title: 'Acak ' + ids.length + ' password?',
+    html: 'Semua user terpilih akan mendapat password baru buatan sistem (huruf besar, huruf kecil, dan angka).',
+    icon: 'question', showCancelButton: true,
+    confirmButtonText: 'Ya, acak sekarang', cancelButtonText: 'Batal', confirmButtonColor: '#1b3a6b'
+  }).then(function (r) {
+    if (!r.isConfirmed) return;
+    document.getElementById('global-loading').classList.remove('hidden');
+    google.script.run.withSuccessHandler(function (res) {
+      document.getElementById('global-loading').classList.add('hidden');
+      if (!(res && res.success)) {
+        Swal.fire('Gagal', (res && res.message) || 'Terjadi kesalahan.', 'error');
+        return;
+      }
+      var rows = (res.hasil || []).map(function (h) {
+        return '<tr><td class="px-2 py-1 text-left font-mono">' + h.userId + '</td><td class="px-2 py-1 text-left">' + h.nama + '</td><td class="px-2 py-1 text-left font-mono font-bold">' + h.password + '</td></tr>';
+      }).join('');
+      window._acakHasilTeks = (res.hasil || []).map(function (h) { return h.userId + '\t' + h.nama + '\t' + h.password; }).join('\n');
+      Swal.fire({
+        title: 'Password baru (' + (res.hasil || []).length + ' user)',
+        html: '<div class="max-h-64 overflow-y-auto text-xs border border-slate-200 rounded-lg"><table class="w-full">'
+          + '<tr class="font-bold text-slate-500 bg-slate-50"><td class="px-2 py-1 text-left">User ID</td><td class="px-2 py-1 text-left">Nama</td><td class="px-2 py-1 text-left">Password Baru</td></tr>'
+          + rows + '</table></div>'
+          + ((res.dilewati || 0) > 0 ? '<div class="mt-2 text-xs text-amber-600">' + res.dilewati + ' akun dilewati (bukan Siswa).</div>' : '')
+          + '<button onclick="if(navigator.clipboard){navigator.clipboard.writeText(window._acakHasilTeks);this.innerText=\'Tersalin!\';}" class="mt-3 px-4 py-2 rounded-lg bg-slate-800 text-white text-xs font-bold">Salin Semua</button>',
+        confirmButtonText: 'Selesai', confirmButtonColor: '#1b3a6b', width: 640
+      });
+      loadUserTable();
+    }).withFailureHandler(function (e) {
+      document.getElementById('global-loading').classList.add('hidden');
+      Swal.fire('Gagal', String((e && e.message) || e), 'error');
+    }).acakPasswordMassal(ids, currentUser.userID, currentUser.token);
+  });
+}
+
 function handleDeleteUser(uid) {
     Swal.fire({
         title: 'Hapus User?', 
@@ -14245,7 +14358,7 @@ function handleToggleUser(uid, rawStatus) {
                 Swal.fire('Error', 'Gagal terhubung ke server: ' + err, 'error');
             })
             // ✅ Kirim string yang sudah dinormalisasi, bukan nilai mentah dari sheet
-            .toggleUserStatus(uid, isCurrentlyActive ? 'TRUE' : 'FALSE');
+            .toggleUserStatus(uid, isCurrentlyActive ? 'TRUE' : 'FALSE', currentUser.userID, currentUser.token);
     });
 }
 
@@ -19026,5 +19139,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a494dca9faacccce',t:'MTc5MTc5NTA3OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
