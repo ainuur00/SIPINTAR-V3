@@ -1787,6 +1787,10 @@
         </div>
 
         <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+          <!-- [V4.4.1] Tombol minimize di dalam sidebar (tampil di semua ukuran layar) -->
+          <button type="button" id="sidebar-min-btn" class="menu-mod-head" onclick="toggleDesktopSidebar()" title="Minimize / tampilkan menu">
+            <span class="menu-mod-title"><i class="fas fa-angles-left mod-ico" id="sidebar-min-ico"></i><span class="sidebar-text">Minimize Menu</span></span>
+          </button>
           <div class="menu-mod" id="mod-ujian">
             <button type="button" class="menu-mod-head" onclick="toggleMenuMod('mod-ujian')" title="Tampilkan / sembunyikan modul">
               <span class="menu-mod-title"><i class="fas fa-laptop-code mod-ico"></i><span class="sidebar-text">Modul Ujian</span></span>
@@ -1893,7 +1897,7 @@
               <i class="fas fa-bars text-xl"></i>
             </button>
 
-            <button class="hidden md:flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 text-slate-600 hover:bg-blue-100 hover:text-blue-600 transition" onclick="toggleDesktopSidebar()">
+            <button class="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 text-slate-600 hover:bg-blue-100 hover:text-blue-600 transition" onclick="toggleDesktopSidebar()" title="Minimize / tampilkan menu">
               <i class="fas fa-indent text-sm" id="collapse-icon"></i>
             </button>
 
@@ -2321,6 +2325,12 @@ function toggleDesktopSidebar() {
 
   const on = sidebar.classList.contains('collapsed');
   if (icon) icon.className = on ? 'fas fa-outdent text-sm' : 'fas fa-indent text-sm';
+  const ico2 = document.getElementById('sidebar-min-ico');
+  if (ico2) ico2.className = on ? 'fas fa-angles-right mod-ico' : 'fas fa-angles-left mod-ico';
+  // Di layar kecil sidebar tersembunyi (off-canvas): tombol header membukanya dulu
+  if (window.innerWidth < 768 && sidebar.classList.contains('-translate-x-full')) {
+    try { toggleMobileSidebar(); } catch (eM) {}
+  }
   // [V4.4] simpan pilihan + tooltip ikon saat menu diminimize
   try { localStorage.setItem('sipintar-admin-side-min', on ? '1' : '0'); } catch (e) {}
   sipIsiTooltipMenu_();
@@ -2348,6 +2358,8 @@ function sipRestoreAdminSideMin_() {
       var ic = document.getElementById('collapse-icon');
       if (sb) sb.classList.add('collapsed');
       if (ic) ic.className = 'fas fa-outdent text-sm';
+      var ic2 = document.getElementById('sidebar-min-ico');
+      if (ic2) ic2.className = 'fas fa-angles-right mod-ico';
     }
   } catch (e) {}
   sipIsiTooltipMenu_();
@@ -19651,5 +19663,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a49cb4ee18bc5f72',t:'MTc5MTg3NzMzNw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a49cc03f99fff8e4',t:'MTc5MTg3NzgwMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
