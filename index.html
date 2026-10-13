@@ -691,6 +691,18 @@
     .siswa-menu-mod-head { display: none; }
   }
   #siswa-side-nav.siswa-nav-min .siswa-nav-min-btn { text-align: center; padding: 10px 0; }
+  /* [V4.4] Minimize nav siswa juga di layar kecil: baris menu jadi ikon saja */
+  @media (max-width: 639px) {
+    #siswa-side-nav.siswa-nav-min { width: 100%; }
+    #siswa-side-nav .siswa-nav-min-btn { display: block; }
+  }
+  /* [V4.4] Proteksi screenshot hasil (siswa) */
+  .sip-noshot, .sip-noshot * { -webkit-user-select: none; user-select: none; }
+  #sip-shield { position: fixed; inset: 0; z-index: 100000; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 10px; background: #0b1b3a; color: #fff; text-align: center; padding: 24px; }
+  #sip-shield.on { display: flex; }
+  @media print {
+    #page-result, #siswa-tab-nilai, #siswa-tab-ujian { display: none !important; }
+  }
 
   @keyframes sipDevShift {
     0% { background-position: 0% 50%; }
@@ -1664,7 +1676,7 @@
       </header>
       <div class="flex flex-1 min-h-0">
         <nav id="siswa-side-nav" class="w-full sm:w-56 bg-[#143056] text-blue-100 flex sm:flex-col shrink-0 overflow-x-auto sm:overflow-y-auto">
-          <button type="button" class="siswa-nav-min-btn hidden sm:block" onclick="toggleSiswaNavMin()" title="Minimize / tampilkan menu">
+          <button type="button" class="siswa-nav-min-btn" onclick="toggleSiswaNavMin()" title="Minimize / tampilkan menu">
             <i class="fas fa-angles-left" id="siswa-nav-min-ico"></i> <span class="siswa-nav-label">Menu</span>
           </button>
           <button type="button" id="siswa-nav-dash" onclick="showSiswaTab('dash')" class="siswa-nav-btn active px-4 py-3 text-left text-sm font-bold flex items-center gap-2 whitespace-nowrap">
@@ -1696,7 +1708,7 @@
             </div>
           </div>
           <div id="siswa-tab-kisi" class="siswa-tab hidden"></div>
-          <div id="siswa-tab-nilai" class="siswa-tab hidden"></div>
+          <div id="siswa-tab-nilai" class="siswa-tab sip-noshot hidden"></div>
           <div id="siswa-tab-ujian" class="siswa-tab hidden">
             <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 md:p-6 max-w-xl">
               <h2 class="font-bold text-slate-800 mb-1">Modul Ujian</h2>
@@ -1913,7 +1925,7 @@
       <div id="mobile-overlay" class="fixed inset-0 bg-black/50 z-30 hidden md:hidden glass" onclick="toggleMobileSidebar()"></div>
     </div>
 
-<div id="page-result" class="hidden min-h-screen bg-slate-100 flex flex-col">
+<div id="page-result" class="sip-noshot hidden min-h-screen bg-slate-100 flex flex-col">
   
   <header class="bg-[#2b369e] text-white px-6 py-4 flex items-center justify-between shadow-lg sticky top-0 z-30">
     <div class="flex items-center gap-3">
@@ -2307,11 +2319,38 @@ function toggleDesktopSidebar() {
   const icon = document.getElementById('collapse-icon');
   sidebar.classList.toggle('collapsed');
 
-  if (sidebar.classList.contains('collapsed')) {
-    icon.className = 'fas fa-outdent text-sm';
-  } else {
-    icon.className = 'fas fa-indent text-sm';
-  }
+  const on = sidebar.classList.contains('collapsed');
+  if (icon) icon.className = on ? 'fas fa-outdent text-sm' : 'fas fa-indent text-sm';
+  // [V4.4] simpan pilihan + tooltip ikon saat menu diminimize
+  try { localStorage.setItem('sipintar-admin-side-min', on ? '1' : '0'); } catch (e) {}
+  sipIsiTooltipMenu_();
+}
+
+// [V4.4] Tooltip nama menu saat hanya ikon yang tampil (admin & siswa)
+function sipIsiTooltipMenu_() {
+  try {
+    document.querySelectorAll('#admin-sidebar .sidebar-item').forEach(function (it) {
+      var t = it.querySelector('.sidebar-text');
+      if (t && !it.title) it.title = t.textContent.trim();
+    });
+    document.querySelectorAll('#siswa-side-nav .siswa-nav-btn').forEach(function (b) {
+      var l = b.querySelector('.siswa-nav-label');
+      if (l && !b.title) b.title = l.textContent.trim();
+    });
+  } catch (e) {}
+}
+
+// [V4.4] Pulihkan keadaan minimize sidebar admin/guru dari perangkat
+function sipRestoreAdminSideMin_() {
+  try {
+    if (localStorage.getItem('sipintar-admin-side-min') === '1') {
+      var sb = document.getElementById('admin-sidebar');
+      var ic = document.getElementById('collapse-icon');
+      if (sb) sb.classList.add('collapsed');
+      if (ic) ic.className = 'fas fa-outdent text-sm';
+    }
+  } catch (e) {}
+  sipIsiTooltipMenu_();
 }
 
 function toggleMobileSidebar() {
@@ -2791,6 +2830,8 @@ function initAdminPanel() {
   if (window.innerWidth < 1024 && window.innerWidth > 768) {
     document.getElementById('admin-sidebar').classList.add('collapsed');
   }
+  // [V4.4] pulihkan pilihan minimize user + siapkan tooltip ikon
+  try { sipRestoreAdminSideMin_(); } catch (eMin0) {}
  
   // ── LOGIKA VISIBILITAS MENU BERDASARKAN ROLE ──────────────────────
   // [PENGAWAS] Guru (pengawas) hanya melihat: Dashboard, Jadwal Ujian, Bank Soal, Hasil & Nilai
@@ -3701,6 +3742,7 @@ function showStudentHub(optTab) {
   // [V4.0] muat notifikasi lonceng siswa (di latar)
   try { setTimeout(function () { sipLoadNotif_(); }, 1500); } catch (eNtS) {}
   if (typeof sipRestoreSiswaNavMin_ === 'function') sipRestoreSiswaNavMin_();
+  if (typeof sipIsiTooltipMenu_ === 'function') sipIsiTooltipMenu_();
   if (typeof sipRestoreSiswaMods_ === 'function') sipRestoreSiswaMods_();
   const name = (currentUser && (currentUser.name || currentUser.username || currentUser.userID)) || 'Siswa';
   const uid = currentUser && currentUser.userID ? currentUser.userID : '';
@@ -19375,6 +19417,66 @@ function sipSisipTandaGambar_() {
     }, 50);
   };
 
+  // ============================================================
+  // [V4.4] PROTEKSI SCREENSHOT HASIL & NILAI (KHUSUS SISWA)
+  // - PrintScreen: layar hasil langsung ditutup + clipboard ditimpa + peringatan.
+  // - Ctrl/Cmd+P, +S, +C, +X diblokir saat melihat hasil.
+  // - Pindah aplikasi / jendela lain: hasil ditutup tirai sampai kembali fokus.
+  // - Klik kanan & seleksi teks dimatikan pada halaman hasil.
+  // ============================================================
+  function sipShieldAktif_() {
+    try {
+      if (!window.currentUser || currentUser.role !== 'Siswa') return false;
+      var pr = document.getElementById('page-result');
+      if (pr && !pr.classList.contains('hidden')) return true;
+      var tn = document.getElementById('siswa-tab-nilai');
+      if (tn && !tn.classList.contains('hidden')) return true;
+    } catch (e) {}
+    return false;
+  }
+  function sipShieldEl_() {
+    var el = document.getElementById('sip-shield');
+    if (el) return el;
+    el = document.createElement('div');
+    el.id = 'sip-shield';
+    el.innerHTML = '<i class="fas fa-shield-halved" style="font-size:44px;color:#d4af37"></i>' +
+      '<p style="font-weight:800;font-size:16px;margin:0">Hasil ujian dilindungi</p>' +
+      '<p style="font-size:13px;color:#b9c6da;margin:0;max-width:420px">Screenshot / perekaman hasil tidak diizinkan. Kembali ke aplikasi untuk melanjutkan.</p>';
+    document.body.appendChild(el);
+    return el;
+  }
+  function sipShieldShow_() { sipShieldEl_().classList.add('on'); }
+  function sipShieldHide_() {
+    var el = document.getElementById('sip-shield');
+    if (el) el.classList.remove('on');
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden && sipShieldAktif_()) sipShieldShow_();
+    else if (!document.hidden) sipShieldHide_();
+  });
+  window.addEventListener('blur', function () { if (sipShieldAktif_()) sipShieldShow_(); });
+  window.addEventListener('focus', function () { sipShieldHide_(); });
+  document.addEventListener('keyup', function (e) {
+    if ((e.key === 'PrintScreen' || e.keyCode === 44) && sipShieldAktif_()) {
+      try { navigator.clipboard.writeText('Screenshot hasil ujian tidak diizinkan \u2014 SIPINTAR'); } catch (eC) {}
+      sipShieldShow_();
+      setTimeout(sipShieldHide_, 1500);
+      try { Swal.fire({ icon: 'warning', title: 'Screenshot ditolak', text: 'Sistem tidak mengizinkan mengambil tangkapan layar hasil ujian.', confirmButtonColor: '#1b3a6b' }); } catch (eS) {}
+    }
+  });
+  document.addEventListener('keydown', function (e) {
+    if (!sipShieldAktif_()) return;
+    var k = String(e.key || '').toLowerCase();
+    if ((e.ctrlKey || e.metaKey) && (k === 'p' || k === 's' || k === 'c' || k === 'x')) {
+      e.preventDefault();
+      e.stopPropagation();
+      try { Swal.fire({ icon: 'warning', title: 'Tidak diizinkan', text: 'Menyalin, menyimpan, atau mencetak hasil ujian tidak diizinkan.', confirmButtonColor: '#1b3a6b' }); } catch (eS2) {}
+    }
+  }, true);
+  document.addEventListener('contextmenu', function (e) {
+    if (sipShieldAktif_()) e.preventDefault();
+  });
+
   // [V3.9.2] Centang otomatis "Login sebagai Admin / Guru" saat User ID
   // berawalan ADM/GUR diketik; berawalan SIS -> centang dilepas otomatis.
   document.addEventListener('DOMContentLoaded', function () {
@@ -19549,5 +19651,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a49c715fc9be0d78',t:'MTc5MTg3NDU3MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a49cb4ee18bc5f72',t:'MTc5MTg3NzMzNw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
