@@ -126,6 +126,13 @@
     *,*::before,*::after{box-sizing:border-box}
     html,body{margin:0;padding:0;width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:100%;text-size-adjust:100%;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#0f172a;color:#0f172a}
 
+    /* [V4.0] KARTU LOGIN TRANSPARAN — hanya field isian yang tetap berlatar */
+    #login-card{background:transparent !important;box-shadow:none !important;border:none !important;backdrop-filter:none !important;-webkit-backdrop-filter:none !important;}
+    #login-card label.block{color:#dbe4f0 !important;text-shadow:0 1px 8px rgba(2,6,23,.85);}
+    #login-card .text-slate-700{color:#e6edf7 !important;text-shadow:0 1px 8px rgba(2,6,23,.85);}
+    #login-card .text-slate-400{color:#b9c6da !important;text-shadow:0 1px 8px rgba(2,6,23,.85);}
+    #login-card input[type="text"], #login-card input[type="password"]{background:#ffffff !important;}
+
     /* ============================================================
        [V3.6] ROTASI BEBAS — POTRET & LANSKAP TANPA TERPOTONG
        - Tinggi halaman memakai 100dvh (tinggi layar sesungguhnya di HP),
@@ -1397,7 +1404,7 @@
         <span style="top:30%;left:24%;font-size:28px;animation-delay:1.5s;">&#8593;2</span>
       </div>
 
-      <div id="login-card" class="glass w-full p-5 rounded-2xl shadow-2xl fade-in relative z-10">
+      <div id="login-card" class="w-full p-5 rounded-2xl fade-in relative z-10">
         <div class="text-center mb-4 relative z-10">
 
           <div id="login-logo-wrap" class="inline-flex items-center justify-center mb-2 bg-transparent">
@@ -1589,6 +1596,11 @@
           <span class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-[10px] font-bold text-emerald-200 uppercase tracking-wider">
             <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Terhubung
           </span>
+          <button type="button" id="btn-notif-siswa" onclick="toggleNotifPanel(event)"
+            class="relative w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-blue-100 transition shrink-0" title="Notifikasi">
+            <i class="fas fa-bell"></i>
+            <span id="notif-badge-siswa" class="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full border-2 border-[#1b3a6b] items-center justify-center" style="display:flex">0</span>
+          </button>
           <div class="flex items-center gap-2 shrink-0">
             <div class="text-right min-w-0">
               <div class="text-xs font-bold truncate max-w-[38vw] sm:max-w-[160px]" id="siswa-eb-head-name">Siswa</div>
@@ -1834,9 +1846,10 @@
               <div class="text-sm font-bold text-slate-700 font-mono tracking-wider" id="current-time-display">--:--:--</div>
             </div>
             <div class="h-8 w-px bg-slate-200 hidden sm:block"></div>
-            <button class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200 transition relative">
+            <button type="button" id="btn-notif" onclick="toggleNotifPanel(event)"
+              class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200 transition relative" title="Notifikasi">
               <i class="fas fa-bell"></i>
-              <span class="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+              <span id="notif-badge" class="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full border-2 border-white items-center justify-center" style="display:flex">0</span>
             </button>
           </div>
         </header>
@@ -2719,6 +2732,8 @@ function logout() {
 
 function initAdminPanel() {
   switchPage('page-admin');
+  // [V4.0] muat notifikasi lonceng (di latar, tidak menahan dashboard)
+  try { setTimeout(function () { sipLoadNotif_(); }, 1500); } catch (eNt0) {}
   document.getElementById('admin-sidebar-name').innerText = currentUser.username;
   try { setDateDisplay(); } catch (eSD0) {}
   try { showAdminTab('dash-home'); } catch (eHome0) {}
@@ -3362,7 +3377,7 @@ function showAdminTab(tabId, el) {
     // Judul disesuaikan dengan role
     const _izinUM = (currentUser && currentUser.pengawas) || {};
     title.innerText = (currentUser && currentUser.role === 'Guru')
-      ? (_izinUM.izinUjian === true ? 'Monitor Siswa — Kelas Diawasi' : 'Manajemen Siswa Kelas Saya')
+      ? (_izinUM.izinUjian === true ? 'Monitor Ujian — Kelas Diawasi' : 'Manajemen Siswa Kelas Saya')
       : 'Manajemen Pengguna';
     renderUserManagement(content);
  
@@ -3535,6 +3550,8 @@ function collectProfilForm_() {
 function showStudentHub(optTab) {
   window._siswaHubTab = optTab || 'dash';
   try { switchPage('page-siswa-hub'); } catch (eSw) {}
+  // [V4.0] muat notifikasi lonceng siswa (di latar)
+  try { setTimeout(function () { sipLoadNotif_(); }, 1500); } catch (eNtS) {}
   if (typeof sipRestoreSiswaNavMin_ === 'function') sipRestoreSiswaNavMin_();
   if (typeof sipRestoreSiswaMods_ === 'function') sipRestoreSiswaMods_();
   const name = (currentUser && (currentUser.name || currentUser.username || currentUser.userID)) || 'Siswa';
@@ -12761,10 +12778,10 @@ function renderUserManagement(container) {
  
     <!-- TAB NAVIGATION -->
     <div class="dash-card p-2 flex gap-1 bg-white">
-      <button id="tab-btn-users" onclick="switchUserMgmtTab('users')"
+      ${currentUser && currentUser.role === 'Admin' ? `<button id="tab-btn-users" onclick="switchUserMgmtTab('users')"
         class="user-mgmt-tab flex-1 md:flex-none px-5 py-2.5 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 bg-blue-600 text-white shadow">
         <i class="fas fa-users-cog"></i><span>Data Pengguna</span>
-      </button>
+      </button>` : ''}
       <button id="tab-btn-monitor" onclick="switchUserMgmtTab('monitor')"
         class="user-mgmt-tab flex-1 md:flex-none px-5 py-2.5 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 text-slate-500 hover:bg-slate-100">
         <i class="fas fa-satellite-dish"></i><span>Monitor Ujian</span>
@@ -12772,7 +12789,7 @@ function renderUserManagement(container) {
       </button>
     </div>
  
-    <!-- ── TAB PANEL: DATA PENGGUNA ── -->
+${currentUser && currentUser.role === 'Admin' ? `    <!-- ── TAB PANEL: DATA PENGGUNA ── -->
     <div id="tab-panel-users" class="w-full space-y-4">
       <div class="dash-card p-6">
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
@@ -12869,6 +12886,8 @@ function renderUserManagement(container) {
       </div>
     </div>
  
+` : ''}
+
     <!-- ── TAB PANEL: MONITOR UJIAN ── -->
     <div id="tab-panel-monitor" class="w-full space-y-4 hidden">
  
@@ -13021,6 +13040,11 @@ function renderUserManagement(container) {
   </div>`;
  
   if(typeof selectedUsers !== 'undefined') selectedUsers.clear();
+  // [V4.0] Pengawas: langsung tab Monitor Ujian (tanpa Data Pengguna)
+  if (currentUser && currentUser.role !== 'Admin') {
+    switchUserMgmtTab('monitor');
+    return;
+  }
   loadUserTable();
  
   if (!document.getElementById('modal-user')) createUserModalHTML();
@@ -13078,6 +13102,7 @@ function updateBulkButtonState() {
 
 function loadUserTable() {
     const wrapper = document.getElementById('user-table-wrapper');
+    if (!wrapper) return; // [V4.0] mode pengawas: tabel pengguna tidak dirender
     
     // 1. Cek apakah user sedang login (Objek currentUser harus ada)
     if (!currentUser || !currentUser.userID || !currentUser.token) {
@@ -13436,7 +13461,9 @@ function switchUserMgmtTab(tab) {
   const btnMonitor   = document.getElementById('tab-btn-monitor');
   const liveBadge    = document.getElementById('monitor-live-badge');
  
+  // [V4.0] Mode pengawas: elemen "Data Pengguna" tidak dirender sama sekali
   if (tab === 'users') {
+    if (!panelUsers || !btnUsers) return;
     stopMonitorPolling();
     if (liveBadge) liveBadge.classList.add('hidden');
     panelUsers.classList.remove('hidden');
@@ -13446,12 +13473,14 @@ function switchUserMgmtTab(tab) {
     btnMonitor.classList.remove('bg-blue-600','text-white','shadow');
     btnMonitor.classList.add('text-slate-500','hover:bg-slate-100');
   } else {
-    panelUsers.classList.add('hidden');
+    if (panelUsers) panelUsers.classList.add('hidden');
     panelMonitor.classList.remove('hidden');
     btnMonitor.classList.add('bg-blue-600','text-white','shadow');
     btnMonitor.classList.remove('text-slate-500','hover:bg-slate-100');
-    btnUsers.classList.remove('bg-blue-600','text-white','shadow');
-    btnUsers.classList.add('text-slate-500','hover:bg-slate-100');
+    if (btnUsers) {
+      btnUsers.classList.remove('bg-blue-600','text-white','shadow');
+      btnUsers.classList.add('text-slate-500','hover:bg-slate-100');
+    }
     if (liveBadge) liveBadge.classList.remove('hidden');
     startMonitorPolling();
   }
@@ -19078,6 +19107,104 @@ function sipSisipTandaGambar_() {
     });
   }
 
+  // ===== [V4.0] NOTIFIKASI LONCENG =====
+  window.sipNotif = { items: [], at: 0, loading: false };
+  function sipNotifReadSet_() {
+    try { return new Set(JSON.parse(localStorage.getItem('sip-notif-read') || '[]')); } catch (e) { return new Set(); }
+  }
+  function sipNotifSimpanRead_(set) {
+    try { localStorage.setItem('sip-notif-read', JSON.stringify(Array.from(set).slice(-120))); } catch (e) {}
+  }
+  window.sipNotifBadge_ = function () {
+    var read = sipNotifReadSet_();
+    var n = sipNotif.items.filter(function (it) { return !read.has(it.id); }).length;
+    ['notif-badge', 'notif-badge-siswa'].forEach(function (id) {
+      var b = document.getElementById(id);
+      if (!b) return;
+      if (n > 0) { b.textContent = n > 9 ? '9+' : String(n); b.classList.remove('hidden'); }
+      else b.classList.add('hidden');
+    });
+  };
+  window.sipLoadNotif_ = function (cb) {
+    if (!window.currentUser || !currentUser.userID || sipNotif.loading) { if (cb) cb(); return; }
+    sipNotif.loading = true;
+    google.script.run.withSuccessHandler(function (res) {
+      sipNotif.loading = false;
+      sipNotif.items = (res && res.items) || [];
+      sipNotif.at = Date.now();
+      sipNotifBadge_();
+      if (cb) cb();
+    }).withFailureHandler(function () { sipNotif.loading = false; if (cb) cb(); })
+      .getNotifikasi(currentUser.userID, currentUser.token);
+  };
+  function sipNotifWarna_(w) {
+    return w === 'green' ? '#059669' : w === 'amber' ? '#d97706' : w === 'red' ? '#dc2626' : '#2563eb';
+  }
+  window.sipNotifRender_ = function () {
+    var panel = document.getElementById('sip-notif-panel');
+    if (!panel) return;
+    var read = sipNotifReadSet_();
+    var body;
+    if (!sipNotif.items.length) {
+      body = '<div style="padding:26px 14px;text-align:center;color:#94a3b8;font-size:13px"><i class="far fa-bell-slash" style="font-size:22px;display:block;margin-bottom:8px"></i>Tidak ada notifikasi saat ini.</div>';
+    } else {
+      body = sipNotif.items.map(function (it) {
+        var sudah = read.has(it.id);
+        return '<div onclick="sipNotifKlik_(\'' + it.id + '\')" style="display:flex;gap:10px;padding:11px 14px;border-bottom:1px solid #f1f5f9;cursor:pointer;background:' + (sudah ? '#fff' : '#eff6ff') + '">'
+          + '<div style="width:34px;height:34px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;color:#fff;background:' + sipNotifWarna_(it.warna) + '"><i class="fas ' + (it.ikon || 'fa-bell') + '"></i></div>'
+          + '<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:12.5px;color:#0f172a">' + it.judul + '</div>'
+          + '<div style="font-size:11.5px;color:#64748b;margin-top:2px;line-height:1.45">' + it.teks + '</div></div>'
+          + (sudah ? '' : '<span style="width:8px;height:8px;border-radius:99px;background:#3b82f6;flex:none;margin-top:5px"></span>')
+          + '</div>';
+      }).join('');
+    }
+    panel.innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid #e2e8f0;background:#f8fafc">'
+      + '<div style="font-weight:800;font-size:13px;color:#0f2a5f"><i class="fas fa-bell" style="color:#d4af37"></i>&nbsp; Notifikasi</div>'
+      + '<div style="display:flex;gap:12px"><button onclick="sipNotifSegarkan_()" style="border:0;background:none;color:#2563eb;font-size:11px;font-weight:700;cursor:pointer">Segarkan</button>'
+      + '<button onclick="sipNotifBacaSemua_()" style="border:0;background:none;color:#64748b;font-size:11px;font-weight:700;cursor:pointer">Tandai dibaca</button></div></div>'
+      + '<div style="max-height:330px;overflow-y:auto">' + body + '</div>';
+  };
+  window.sipNotifKlik_ = function (id) {
+    var read = sipNotifReadSet_(); read.add(id); sipNotifSimpanRead_(read); sipNotifBadge_();
+    var it = null;
+    for (var i = 0; i < sipNotif.items.length; i++) if (sipNotif.items[i].id === id) it = sipNotif.items[i];
+    if (it && it.tab && window.currentUser && currentUser.role !== 'Siswa') {
+      toggleNotifPanel();
+      try {
+        var el = document.querySelector("[onclick*='" + it.tab + "']");
+        showAdminTab(it.tab, el);
+      } catch (e) {}
+    } else {
+      sipNotifRender_();
+    }
+  };
+  window.sipNotifBacaSemua_ = function () {
+    var read = sipNotifReadSet_();
+    sipNotif.items.forEach(function (it) { read.add(it.id); });
+    sipNotifSimpanRead_(read); sipNotifBadge_(); sipNotifRender_();
+  };
+  window.sipNotifSegarkan_ = function () { sipLoadNotif_(function () { sipNotifRender_(); }); };
+  window.toggleNotifPanel = function (ev) {
+    if (ev && ev.stopPropagation) ev.stopPropagation();
+    var panel = document.getElementById('sip-notif-panel');
+    if (panel) { panel.parentNode.removeChild(panel); return; }
+    panel = document.createElement('div');
+    panel.id = 'sip-notif-panel';
+    panel.setAttribute('style', 'position:fixed;top:64px;right:14px;width:min(340px,92vw);background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 18px 50px rgba(2,6,23,.25);z-index:99998;overflow:hidden');
+    panel.addEventListener('click', function (e) { e.stopPropagation(); });
+    document.body.appendChild(panel);
+    sipNotifRender_();
+    if (Date.now() - sipNotif.at > 60000) sipNotifSegarkan_();
+    setTimeout(function () {
+      document.addEventListener('click', function tutupNotif(e) {
+        var p = document.getElementById('sip-notif-panel');
+        if (p && !p.contains(e.target)) p.parentNode.removeChild(p);
+        document.removeEventListener('click', tutupNotif);
+      });
+    }, 50);
+  };
+
   // [V3.9.2] Centang otomatis "Login sebagai Admin / Guru" saat User ID
   // berawalan ADM/GUR diketik; berawalan SIS -> centang dilepas otomatis.
   document.addEventListener('DOMContentLoaded', function () {
@@ -19281,5 +19408,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a49a791a2a388348',t:'MTc5MTg1MzkxNQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a49a9f5bc8e8ab56',t:'MTc5MTg1NTQ4Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
