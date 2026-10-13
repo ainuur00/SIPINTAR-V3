@@ -3037,6 +3037,162 @@ function sipPgwForm_(editId) {
       if (data && data.mapelTimSoal) String(data.mapelTimSoal).split(',').forEach(function (m) { var t = m.trim(); if (t) terpilihMapel[t] = true; });
 
       var guruUsers = window._pgwGuruUsers || [];
+      var tugasLi = R.tugas.map(function (t) { return '<li style="margin:2px 0">&bull; ' + t + '</li>'; }).join('');
+      var infoBox = '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;margin-bottom:10px">' +
+        '<p style="font-weight:700;color:#92400e;margin:0 0 4px"><i class="fas ' + R.ikon + '"></i> Tugas ' + R.judul + '</p>' +
+        '<ul style="color:#78350f;font-size:12px;margin:0;padding-left:4px;list-style:none">' + tugasLi + '</ul>' +
+        '<p style="color:#92400e;font-size:11px;margin:6px 0 0">Menu guru dengan peran ini: <b>' + R.menuGuru + '</b></p></div>';
+
+      // ---------- [V4.3] PENGAWAS & TIM SOAL: PEMETAAN KANAN-KIRI ----------
+      // Kiri = kelas/mapel ujian, kanan = guru penanggung jawabnya. Saat satu
+      // baris dicentang, barisnya WAJIB diberi guru dulu sebelum baris lain
+      // bisa dicentang. Setelah lengkap: pilih status AKTIF lalu Simpan.
+      if (roleKey === 'pengawas' || roleKey === 'timsoal') {
+        var daftarItem = (roleKey === 'pengawas' ? kelasList : mapelList).slice();
+        var labelItem = roleKey === 'pengawas' ? 'Kelas' : 'Mata Pelajaran';
+        var labelGuru = roleKey === 'pengawas' ? 'Pengawas' : 'Tim Pembuat Soal';
+        if (!guruUsers.length) { Swal.fire('Belum ada Guru', 'Tambahkan user ber-role Guru dulu di Manajemen User.', 'info'); return; }
+        if (!daftarItem.length) { Swal.fire('Data Master kosong', 'Isi daftar ' + labelItem.toLowerCase() + ' di Data Master terlebih dahulu.', 'info'); return; }
+        var listLama = (window._pgwList || []).filter(function (p) {
+          return roleKey === 'pengawas' ? p.izinUjian === true : p.izinBankSoal === true;
+        });
+        var petaLama = {};
+        listLama.forEach(function (p) {
+          String((roleKey === 'pengawas' ? p.kelas : p.mapelTimSoal) || '').split(',').forEach(function (k) {
+            var t = k.trim();
+            if (t && !petaLama[t.toLowerCase()]) petaLama[t.toLowerCase()] = String(p.userID);
+          });
+        });
+        var optsGuru = guruUsers.map(function (g) {
+          return '<option value="' + escapeHtmlProfil_(g.userID) + '">' + escapeHtmlProfil_(g.username + ' (' + g.userID + ')') + '</option>';
+        }).join('');
+        var rowsHtml = daftarItem.map(function (it) {
+          var pre = petaLama[String(it).toLowerCase()] || '';
+          return '<div class="pgw-map-row" style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-bottom:1px solid #e2e8f0">' +
+            '<label style="display:flex;align-items:center;gap:8px;flex:0 0 46%;font-weight:700;cursor:pointer;margin:0">' +
+            '<input type="checkbox" class="pgw-map-cek" data-item="' + escapeHtmlProfil_(it) + '"' + (pre ? ' checked' : '') + '> ' + escapeHtmlProfil_(it) + '</label>' +
+            '<div style="flex:1"><select class="pgw-map-guru"' + (pre ? '' : ' disabled') + ' style="width:100%;padding:7px 8px;border:1px solid #cbd5e1;border-radius:8px;background:#fff">' +
+            '<option value="">\u2014 pilih ' + labelGuru.toLowerCase() + ' \u2014</option>' + optsGuru + '</select></div></div>';
+        }).join('');
+        Swal.fire({
+          title: 'Pemetaan ' + labelItem + ' \u2192 ' + labelGuru,
+          width: 720,
+          html: '<div style="text-align:left;font-size:13px;max-height:62vh;overflow-y:auto;padding-right:4px">' +
+            infoBox +
+            '<p style="font-size:12px;color:#475569;margin:0 0 8px"><b>Cara mengisi:</b> centang ' + labelItem.toLowerCase() + ' di kolom <b>kiri</b>, lalu <b>langsung pilih ' + labelGuru.toLowerCase() + '</b> di kolom <b>kanan</b>. ' + labelItem + ' lain baru bisa dicentang setelah pasangan ini lengkap. Ulangi sampai semua target selesai, pilih status <b>AKTIF</b>, lalu Simpan.</p>' +
+            '<div style="display:flex;background:#1b3a6b;color:#fff;border-radius:10px 10px 0 0;padding:8px 10px;font-weight:800;font-size:12px"><div style="flex:0 0 46%">' + labelItem + ' Ujian</div><div style="flex:1">' + labelGuru + '</div></div>' +
+            '<div id="pgw-map-box" style="border:1px solid #cbd5e1;border-top:0;border-radius:0 0 10px 10px;max-height:34vh;overflow-y:auto">' + rowsHtml + '</div>' +
+            '<label style="font-weight:700;display:block;margin:12px 0 4px">Status penunjukan</label>' +
+            '<select id="pgw-status" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px">' +
+            '<option value="AKTIF" selected>AKTIF (guru bisa login)</option>' +
+            '<option value="NON-AKTIF">NON-AKTIF (guru tidak bisa login)</option></select>' +
+            '<p style="color:#64748b;font-size:11px;margin-top:8px">' + labelItem + ' yang tidak dicentang akan dilepas dari ' + labelGuru.toLowerCase() + ' lamanya. Guru yang tidak lagi memegang ' + labelItem.toLowerCase() + ' apa pun otomatis dicabut perannya.</p>' +
+            '</div>',
+          showCancelButton: true,
+          confirmButtonText: 'Simpan',
+          confirmButtonColor: '#2563eb',
+          cancelButtonText: 'Batal',
+          didOpen: function () {
+            var box = document.getElementById('pgw-map-box');
+            if (!box) return;
+            // isi ulang pilihan guru yang sudah terpasang
+            Array.prototype.forEach.call(box.querySelectorAll('.pgw-map-row'), function (row) {
+              var cek = row.querySelector('.pgw-map-cek');
+              var sel = row.querySelector('.pgw-map-guru');
+              var pre = petaLama[String(cek.getAttribute('data-item')).toLowerCase()];
+              if (pre) sel.value = pre;
+            });
+            function sinkron() {
+              var adaTunggak = false;
+              Array.prototype.forEach.call(box.querySelectorAll('.pgw-map-row'), function (row) {
+                var cek = row.querySelector('.pgw-map-cek');
+                var sel = row.querySelector('.pgw-map-guru');
+                sel.disabled = !cek.checked;
+                if (!cek.checked) { sel.value = ''; row.style.background = ''; }
+                else if (!sel.value) { adaTunggak = true; row.style.background = '#fef9c3'; }
+                else { row.style.background = '#ecfdf5'; }
+              });
+              Array.prototype.forEach.call(box.querySelectorAll('.pgw-map-cek'), function (c) {
+                if (!c.checked) c.disabled = adaTunggak;
+              });
+            }
+            box.addEventListener('change', function (ev) {
+              if (ev.target && ev.target.classList.contains('pgw-map-cek') && ev.target.checked) {
+                var row = ev.target.closest('.pgw-map-row');
+                var sel = row ? row.querySelector('.pgw-map-guru') : null;
+                if (sel) setTimeout(function () { sel.disabled = false; sel.focus(); }, 30);
+              }
+              sinkron();
+            });
+            sinkron();
+          },
+          preConfirm: function () {
+            var pairs = [];
+            var kurang = [];
+            Array.prototype.forEach.call(document.querySelectorAll('.pgw-map-row'), function (row) {
+              var cek = row.querySelector('.pgw-map-cek');
+              var sel = row.querySelector('.pgw-map-guru');
+              if (!cek || !cek.checked) return;
+              if (!sel || !sel.value) { kurang.push(cek.getAttribute('data-item')); return; }
+              pairs.push({ item: cek.getAttribute('data-item'), uid: sel.value });
+            });
+            if (kurang.length) { Swal.showValidationMessage(labelItem + ' ' + kurang.join(', ') + ' belum punya ' + labelGuru.toLowerCase() + '.'); return false; }
+            if (!pairs.length) { Swal.showValidationMessage('Centang minimal satu ' + labelItem.toLowerCase() + ' dan pilih ' + labelGuru.toLowerCase() + '-nya.'); return false; }
+            return { pairs: pairs, status: (document.getElementById('pgw-status') || {}).value || 'AKTIF' };
+          }
+        }).then(function (r) {
+          if (!r.isConfirmed) return;
+          var v = r.value;
+          var baruByGuru = {};
+          v.pairs.forEach(function (p) {
+            if (!baruByGuru[p.uid]) baruByGuru[p.uid] = [];
+            baruByGuru[p.uid].push(p.item);
+          });
+          var formKeys = {};
+          daftarItem.forEach(function (x) { formKeys[String(x).toLowerCase()] = true; });
+          var antre = [];
+          listLama.forEach(function (p) {
+            var lama = String((roleKey === 'pengawas' ? p.kelas : p.mapelTimSoal) || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+            var luar = lama.filter(function (x) { return !formKeys[x.toLowerCase()]; });
+            var baru = (baruByGuru[String(p.userID)] || []).concat(luar);
+            delete baruByGuru[String(p.userID)];
+            if (!baru.length) antre.push({ cabut: true, id: p.id, uid: p.userID, nama: p.nama });
+            else antre.push({ uid: p.userID, nama: p.nama, items: baru });
+          });
+          Object.keys(baruByGuru).forEach(function (uid) {
+            antre.push({ uid: uid, nama: uid, items: baruByGuru[uid] });
+          });
+          var hasil = { ok: 0, gagal: 0, pesan: '' };
+          var total = antre.length;
+          Swal.fire({ title: 'Menyimpan\u2026', html: '0/' + total, allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
+          function simpanSatu() {
+            if (!antre.length) {
+              if (hasil.ok && !hasil.gagal) Swal.fire('Tersimpan', 'Pemetaan ' + labelItem.toLowerCase() + ' \u2192 ' + labelGuru.toLowerCase() + ' tersimpan (' + hasil.ok + ' guru diproses).', 'success');
+              else if (hasil.ok) Swal.fire('Selesai (sebagian)', hasil.ok + ' tersimpan, ' + hasil.gagal + ' gagal. ' + hasil.pesan, 'warning');
+              else Swal.fire('Gagal', hasil.pesan || 'Tidak ada yang tersimpan.', 'error');
+              loadPengawasData();
+              return;
+            }
+            var t = antre.shift();
+            Swal.update({ html: (total - antre.length) + '/' + total + ' diproses\u2026' });
+            var payload = t.cabut
+              ? { id: t.id, userID: t.uid, fokusRole: roleKey, cabut: true }
+              : { userID: t.uid, fokusRole: roleKey, kelasList: roleKey === 'pengawas' ? t.items : [], mapelList: roleKey === 'timsoal' ? t.items : [], status: v.status };
+            google.script.run
+              .withSuccessHandler(function (res) {
+                if (res && res.success) hasil.ok++;
+                else { hasil.gagal++; hasil.pesan = (res && res.message) || hasil.pesan; }
+                simpanSatu();
+              })
+              .withFailureHandler(function (err) { hasil.gagal++; hasil.pesan = String(err); simpanSatu(); })
+              .savePengawas(payload, currentUser.userID, currentUser.token);
+          }
+          simpanSatu();
+        });
+        return;
+      }
+
+      // ---------- PANITIA: form lama (tanpa kelas/mapel) ----------
       var terpilihGuru = {};
       if (data && data.userID) terpilihGuru[String(data.userID)] = true;
       var gridGuru = guruUsers.map(function (g) {
@@ -3046,48 +3202,7 @@ function sipPgwForm_(editId) {
       var semuaGuru = guruUsers.length
         ? '<label style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;margin-bottom:6px;font-weight:700;color:#1d4ed8;cursor:pointer"><input type="checkbox" onchange="sipPgwToggleSemua_(this, \'pgw-guru\')"> Centang Semua Guru</label>'
         : '';
-
-      var tugasLi = R.tugas.map(function (t) { return '<li style="margin:2px 0">&bull; ' + t + '</li>'; }).join('');
-      var infoBox = '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;margin-bottom:10px">' +
-        '<p style="font-weight:700;color:#92400e;margin:0 0 4px"><i class="fas ' + R.ikon + '"></i> Tugas ' + R.judul + '</p>' +
-        '<ul style="color:#78350f;font-size:12px;margin:0;padding-left:4px;list-style:none">' + tugasLi + '</ul>' +
-        '<p style="color:#92400e;font-size:11px;margin:6px 0 0">Menu guru dengan peran ini: <b>' + R.menuGuru + '</b></p></div>';
-
-      var fieldHtml = '';
-      if (roleKey === 'pengawas') {
-        var gridKelas = kelasList.length
-          ? kelasList.map(function (k) {
-              var v = escapeHtmlProfil_(k);
-              var cek = terpilihKelas[k] ? ' checked' : '';
-              return '<label style="display:inline-flex;align-items:center;gap:6px;margin:4px 12px 4px 0;font-weight:600"><input type="checkbox" class="pgw-kelas" value="' + v + '"' + cek + '> ' + v + '</label>';
-            }).join('')
-          : '<p style="color:#64748b;font-size:11px">Data Master belum punya daftar kelas — ketik manual di kolom bawah.</p>';
-        var semuaKelas = kelasList.length
-          ? '<label style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;margin-bottom:6px;font-weight:700;color:#1d4ed8;cursor:pointer"><input type="checkbox" onchange="sipPgwToggleSemua_(this, \'pgw-kelas\')"> Centang Semua Kelas</label>'
-          : '';
-        fieldHtml = '<label style="font-weight:700;display:block;margin:12px 0 4px">Kelas yang diawasi <span style="color:#94a3b8;font-weight:400">(wajib)</span></label>' +
-          semuaKelas +
-          '<div style="border:1px solid #cbd5e1;border-radius:8px;padding:8px 10px">' + gridKelas + '</div>' +
-          '<input id="pgw-kelas-manual" placeholder="atau ketik manual: 7A, 7B" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px;margin-top:6px">';
-      } else if (roleKey === 'timsoal') {
-        var gridMapel = mapelList.length
-          ? mapelList.map(function (m) {
-              var v = escapeHtmlProfil_(m);
-              var cek = terpilihMapel[m] ? ' checked' : '';
-              return '<label style="display:inline-flex;align-items:center;gap:6px;margin:4px 12px 4px 0;font-weight:600"><input type="checkbox" class="pgw-mapel" value="' + v + '"' + cek + '> ' + v + '</label>';
-            }).join('')
-          : '<p style="color:#64748b;font-size:11px">Data Master belum punya daftar mapel — ketik manual di kolom bawah.</p>';
-        var semuaMapel = mapelList.length
-          ? '<label style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;margin-bottom:6px;font-weight:700;color:#1d4ed8;cursor:pointer"><input type="checkbox" onchange="sipPgwToggleSemua_(this, \'pgw-mapel\')"> Centang Semua Mapel</label>'
-          : '';
-        fieldHtml = '<label style="font-weight:700;display:block;margin:12px 0 4px">Mapel yang diampu <span style="color:#94a3b8;font-weight:400">(wajib)</span></label>' +
-          semuaMapel +
-          '<div style="border:1px solid #cbd5e1;border-radius:8px;padding:8px 10px">' + gridMapel + '</div>' +
-          '<input id="pgw-mapel-manual" placeholder="atau ketik manual: Matematika, IPA" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px;margin-top:6px"' + (data && data.mapelTimSoal && !mapelList.length ? ' value="' + escapeHtmlProfil_(data.mapelTimSoal) + '"' : '') + '>';
-      } else {
-        fieldHtml = '<p style="color:#64748b;font-size:12px;margin-top:10px"><i class="fas fa-circle-info"></i> Panitia tidak memerlukan kelas/mapel — tugas validasi profil, kartu ujian, dan validasi hasil berlaku untuk semua siswa.</p>';
-      }
-
+      var fieldHtml = '<p style="color:#64748b;font-size:12px;margin-top:10px"><i class="fas fa-circle-info"></i> Panitia tidak memerlukan kelas/mapel \u2014 tugas validasi profil, kartu ujian, dan validasi hasil berlaku untuk semua siswa.</p>';
       Swal.fire({
         title: data ? 'Ubah ' + R.judul : R.tombol,
         width: 640,
@@ -3103,7 +3218,7 @@ function sipPgwForm_(editId) {
           '<option value="AKTIF"' + (!data || data.status === 'AKTIF' ? ' selected' : '') + '>AKTIF (guru bisa login)</option>' +
           '<option value="NON-AKTIF"' + (data && data.status === 'NON-AKTIF' ? ' selected' : '') + '>NON-AKTIF (guru tidak bisa login)</option>' +
           '</select>' +
-          '<p style="color:#64748b;font-size:11px;margin-top:8px">Hanya peran <b>' + R.judul + '</b> yang disimpan dari form ini — peran lain milik guru yang sama tetap berlaku. Berlaku langsung pada login berikutnya.</p>' +
+          '<p style="color:#64748b;font-size:11px;margin-top:8px">Hanya peran <b>' + R.judul + '</b> yang disimpan dari form ini \u2014 peran lain milik guru yang sama tetap berlaku. Berlaku langsung pada login berikutnya.</p>' +
           '</div>',
         showCancelButton: true,
         confirmButtonText: 'Simpan',
@@ -3112,24 +3227,8 @@ function sipPgwForm_(editId) {
         preConfirm: function () {
           var gurus = Array.prototype.slice.call(document.querySelectorAll('.pgw-guru:checked')).map(function (el) { return el.value; });
           if (!gurus.length) { Swal.showValidationMessage('Centang minimal satu guru.'); return false; }
-          var kelasPilih = [];
-          var mapelPilih = [];
-          if (roleKey === 'pengawas') {
-            kelasPilih = Array.prototype.slice.call(document.querySelectorAll('.pgw-kelas:checked')).map(function (el) { return el.value; });
-            var kelasManual = ((document.getElementById('pgw-kelas-manual') || {}).value || '').trim();
-            if (kelasManual) kelasManual.split(',').forEach(function (k) { var t = k.trim(); if (t && kelasPilih.indexOf(t) < 0) kelasPilih.push(t); });
-            if (!kelasPilih.length) { Swal.showValidationMessage('Pengawas Ujian wajib memilih minimal satu kelas.'); return false; }
-          }
-          if (roleKey === 'timsoal') {
-            mapelPilih = Array.prototype.slice.call(document.querySelectorAll('.pgw-mapel:checked')).map(function (el) { return el.value; });
-            var mapelManual = ((document.getElementById('pgw-mapel-manual') || {}).value || '').trim();
-            if (mapelManual) mapelManual.split(',').forEach(function (m) { var t = m.trim(); if (t && mapelPilih.indexOf(t) < 0) mapelPilih.push(t); });
-            if (!mapelPilih.length) { Swal.showValidationMessage('Tim Pembuat Soal wajib memilih minimal satu mapel.'); return false; }
-          }
           return {
             gurus: gurus,
-            kelasList: kelasPilih,
-            mapelList: mapelPilih,
             status: (document.getElementById('pgw-status') || {}).value || 'AKTIF'
           };
         }
@@ -3138,7 +3237,7 @@ function sipPgwForm_(editId) {
         var v = r.value;
         var antre = v.gurus.slice();
         var hasil = { ok: 0, gagal: 0, pesan: '' };
-        Swal.fire({ title: 'Menyimpan…', html: '0/' + antre.length + ' guru', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
+        Swal.fire({ title: 'Menyimpan\u2026', html: '0/' + antre.length + ' guru', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
         function simpanSatu() {
           if (!antre.length) {
             if (hasil.ok && !hasil.gagal) Swal.fire('Tersimpan', hasil.pesan || ('Peran ' + R.judul + ' tersimpan untuk ' + hasil.ok + ' guru.'), 'success');
@@ -3148,7 +3247,7 @@ function sipPgwForm_(editId) {
             return;
           }
           var uid = antre.shift();
-          Swal.update({ html: (v.gurus.length - antre.length) + '/' + v.gurus.length + ' guru tersimpan…' });
+          Swal.update({ html: (v.gurus.length - antre.length) + '/' + v.gurus.length + ' guru tersimpan\u2026' });
           google.script.run
             .withSuccessHandler(function (res) {
               if (res && res.success) { hasil.ok++; hasil.pesan = res.message || hasil.pesan; }
@@ -3156,10 +3255,11 @@ function sipPgwForm_(editId) {
               simpanSatu();
             })
             .withFailureHandler(function (err) { hasil.gagal++; hasil.pesan = String(err); simpanSatu(); })
-            .savePengawas({ userID: uid, fokusRole: roleKey, kelasList: v.kelasList, mapelList: v.mapelList, status: v.status }, currentUser.userID, currentUser.token);
+            .savePengawas({ userID: uid, fokusRole: roleKey, kelasList: [], mapelList: [], status: v.status }, currentUser.userID, currentUser.token);
         }
         simpanSatu();
       });
+
     })
     .withFailureHandler(function (err) { Swal.close(); Swal.fire('Gagal', 'Data Master tidak dapat dimuat: ' + String(err), 'error'); })
     .getMasterData();
@@ -3792,7 +3892,7 @@ function renderSiswaNilai_() {
             escapeHtmlProfil_(it.jam || '-') + '</p>' +
           '</div>' +
           '<div class="px-5 py-4">' + sipNilaiRingSvg_(it.score, it.showNilai) + '</div>' +
-          '<div class="px-5 pb-5"></div></article>';
+          '<div class="px-5 pb-5"><button type="button" onclick="sipNilaiDetail_(\'' + escapeHtmlProfil_(it.responseId) + '\')" class="w-full px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 text-xs font-bold"><i class="fas fa-list-check mr-1"></i> Details — lihat jawabanmu benar / salah</button></div></article>';
       }).join('');
       box.innerHTML = '<div class="space-y-5 max-w-xl mx-auto">' +
         '<div class="text-center sm:text-left"><h2 class="font-bold text-slate-800 text-lg">Nilai & Hasil Belajar</h2>' +
@@ -3804,6 +3904,48 @@ function renderSiswaNilai_() {
       if (box) box.innerHTML = '<div class="bg-white rounded-2xl border border-slate-200 p-6 text-sm">Belum bisa memuat halaman ini.</div>';
     })
     .getSiswaNilaiRekomendasi(currentUser.userID, currentUser.token);
+}
+
+// [V4.3] Rincian jawaban siswa: nomor + ringkasan soal + jawaban + BENAR/SALAH.
+// Kunci jawaban TIDAK pernah dikirim server (lihat getDetailJawabanSiswa di GAS).
+function sipNilaiDetail_(responseId) {
+  if (!currentUser) return;
+  Swal.fire({ title: 'Memuat detail\u2026', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
+  google.script.run
+    .withSuccessHandler(function (res) {
+      if (!res || !res.success) {
+        Swal.fire('Belum tersedia', (res && res.message) || 'Detail jawaban belum dapat dimuat.', 'info');
+        return;
+      }
+      var items = res.items || [];
+      if (!items.length) { Swal.fire('Belum ada data', 'Rincian jawaban tidak ditemukan.', 'info'); return; }
+      var rows = items.map(function (it) {
+        var st = String(it.status || '').toUpperCase();
+        var badge;
+        if (st === 'BENAR') badge = '<span style="background:#dcfce7;color:#15803d;padding:2px 8px;border-radius:999px;font-weight:800;font-size:11px;white-space:nowrap"><i class="fas fa-check"></i> BENAR</span>';
+        else if (st === 'SALAH') badge = '<span style="background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:999px;font-weight:800;font-size:11px;white-space:nowrap"><i class="fas fa-times"></i> SALAH</span>';
+        else if (st.indexOf('SEBAGIAN') >= 0) badge = '<span style="background:#fef9c3;color:#a16207;padding:2px 8px;border-radius:999px;font-weight:800;font-size:11px;white-space:nowrap"><i class="fas fa-star-half-stroke"></i> BENAR SEBAGIAN</span>';
+        else badge = '<span style="background:#e0f2fe;color:#0369a1;padding:2px 8px;border-radius:999px;font-weight:800;font-size:11px;white-space:nowrap">' + escapeHtmlProfil_(it.status || '-') + '</span>';
+        return '<tr style="border-bottom:1px solid #e2e8f0;vertical-align:top">' +
+          '<td style="padding:7px 6px;text-align:center;font-weight:800">' + it.no + '</td>' +
+          '<td style="padding:7px 6px;text-align:left">' + escapeHtmlProfil_(it.soal || '-') + '</td>' +
+          '<td style="padding:7px 6px;text-align:left;color:#334155;font-weight:600">' + (it.jawaban ? escapeHtmlProfil_(it.jawaban) : '<span style="color:#94a3b8">(kosong)</span>') + '</td>' +
+          '<td style="padding:7px 6px;text-align:center">' + badge + '</td></tr>';
+      }).join('');
+      Swal.fire({
+        title: 'Rincian Jawaban' + (res.subject ? ' \u2014 ' + res.subject : ''),
+        width: 760,
+        html: '<div style="text-align:left;max-height:60vh;overflow-y:auto">' +
+          '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
+          '<thead><tr style="background:#1b3a6b;color:#fff"><th style="padding:8px 6px;width:38px">No</th><th style="padding:8px 6px;text-align:left">Ringkasan Soal</th><th style="padding:8px 6px;text-align:left">Jawaban Kamu</th><th style="padding:8px 6px;width:120px">Status</th></tr></thead>' +
+          '<tbody>' + rows + '</tbody></table>' +
+          '<p style="font-size:11px;color:#64748b;margin-top:10px"><i class="fas fa-lock"></i> Kunci jawaban tidak ditampilkan.</p></div>',
+        confirmButtonText: 'Tutup',
+        confirmButtonColor: '#1b3a6b'
+      });
+    })
+    .withFailureHandler(function (err) { Swal.fire('Gagal', String(err), 'error'); })
+    .getDetailJawabanSiswa(responseId, currentUser.userID, currentUser.token);
 }
 
 
@@ -15130,21 +15272,7 @@ function renderConfigPage(container) {
                     </div>
                 </div>
 
-                <!-- ✅ TAMBAHAN BARU: Toggle Tampilkan Hasil Ujian -->
-                <div class="pt-6 border-t border-slate-100">
-                    <label class="block text-xs font-bold text-slate-500 uppercase mb-3">Pengaturan Hasil Ujian</label>
-                    <div class="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200">
-                        <div>
-                            <p class="text-sm font-semibold text-slate-700">Tampilkan Hasil Ujian ke Siswa</p>
-                            <p class="text-xs text-slate-400 mt-0.5">Jika dinonaktifkan, siswa yang sudah selesai ujian tidak dapat melihat nilai dan pembahasan jawaban.</p>
-                        </div>
-                        <label class="relative inline-flex items-center cursor-pointer ml-4 shrink-0">
-                            <input type="checkbox" id="cfg-show-result" class="sr-only peer">
-                            <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                        </label>
-                    </div>
-                </div>
-                <!-- ✅ AKHIR TAMBAHAN BARU -->
+                <!-- [V4.3] Pengaturan Hasil Ujian DIHAPUS dari Konfigurasi — sudah ada per ujian (toggle "Tampilkan Nilai pada Siswa") di menu Jadwal Ujian -->
 
                 <div class="pt-6 border-t border-slate-100">
                     <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg transition transform active:scale-95 flex items-center gap-2">
@@ -15185,11 +15313,7 @@ function loadConfigToForm() {
             // 3. Isi Input Background & Update Preview
             document.getElementById('cfg-app-bg').value = res.data.app_background || '';
             updateBgPreview(res.data.app_background || '');
-            // Load nilai toggle Tampilkan Hasil Ujian
-            const showResultCheckbox = document.getElementById('cfg-show-result');
-            if (showResultCheckbox) {
-                showResultCheckbox.checked = String(res.data.show_exam_result).toLowerCase() === 'true';
-            }
+            // [V4.3] Toggle hasil ujian dihapus dari Konfigurasi (pindah ke Jadwal Ujian).
         }
     }).getAppConfig();
 }
@@ -15205,9 +15329,7 @@ function handleSaveConfig(e) {
 
     const fd = new FormData(e.target);
     const formObj = Object.fromEntries(fd.entries());
-    // Baca status checkbox secara manual (FormData tidak kirim value jika tidak dicentang)
-    const showResultCheckbox = document.getElementById('cfg-show-result');
-    formObj.showExamResult = (showResultCheckbox && showResultCheckbox.checked) ? 'true' : 'false';
+    // [V4.3] showExamResult tidak lagi dikirim dari Konfigurasi — pengaturan per ujian ada di menu Jadwal Ujian.
 
     google.script.run.withSuccessHandler(res => {
         btn.disabled = false;
@@ -19427,5 +19549,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a49c26776eab40b3',t:'MTc5MTg3MTUwMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a49c715fc9be0d78',t:'MTc5MTg3NDU3MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
