@@ -2944,7 +2944,7 @@ var SIP_PGW_ROLE_META = {
       'Mengoreksi jawaban esai siswa (menu Koreksi Jawaban)'
     ],
     menuGuru: 'Dashboard · Ujian — Pengawas · Koreksi Jawaban',
-    kolom: 'Kelas yang Diawasi'
+    kolom: 'Kelas & Mapel yang Diawasi'
   },
   timsoal: {
     judul: 'Tim Pembuat Soal',
@@ -3043,7 +3043,9 @@ function loadPengawasData() {
             '<span class="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-bold mr-1">Kartu Ujian</span>' +
             '<span class="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-bold">Validasi Hasil</span>';
         } else {
-          utama = '<span class="font-semibold text-slate-700">' + escapeHtmlProfil_(p.kelas || '—') + '</span>';
+          utama = '<span class="font-semibold text-slate-700">' + escapeHtmlProfil_(p.kelas || '—') + '</span>' +
+            '<div class="mt-1 text-[11px] text-slate-500"><i class="fas fa-book-open mr-1"></i>Mapel diawasi: <b>' +
+            escapeHtmlProfil_(p.mapelDiawasi || 'belum ada jadwal ujian') + '</b></div>';
         }
         var lain = [];
         if (roleKey !== 'pengawas' && p.izinUjian === true) lain.push('Pengawas' + (p.kelas ? ' (' + escapeHtmlProfil_(p.kelas) + ')' : ''));
@@ -19698,5 +19700,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4a2d2180fd1fdb4',t:'MTc5MTk0MTQ0Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4a35dd92b215f9c',t:'MTc5MTk0NzE3MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
