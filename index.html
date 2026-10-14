@@ -247,7 +247,7 @@
     .sip-nilai-materi-btn:hover{transform:translateY(-2px);background:#163057}
     .sip-nilai-focus{box-shadow:0 0 0 3px #38bdf8,0 12px 28px rgba(27,58,107,.16)}
     .sip-pf-frame{width:168px;height:224px;border-radius:10px;overflow:hidden;border:2px solid #1b3a6b;background:#7f1d1d;flex-shrink:0;position:relative}
-    .sip-pf-frame img{width:100%;height:100%;object-fit:contain;object-position:center;display:block;background:#7f1d1d}
+    .sip-pf-frame img{width:100%;height:100%;object-fit:cover;object-position:center top;display:block;background:#7f1d1d}
     .sip-pf-frame .sip-pf-ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fecaca;font-size:11px;text-align:center;padding:8px;pointer-events:none}
     .sip-pf-frame-head{width:42px;height:56px;border-radius:6px;border-width:1px;border-color:rgba(255,255,255,.45);background:#7f1d1d}
     .sip-pf-frame-head .sip-pf-ph{font-size:8px;color:#fecaca}
@@ -1703,7 +1703,7 @@
           <div id="siswa-tab-profil" class="siswa-tab hidden">
             <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 md:p-6">
               <h2 class="font-bold text-slate-800 mb-1">Profil Siswa</h2>
-              <p class="text-xs text-slate-500 mb-4">Lengkapi field profil. Nama dan kelas diisi Admin (terkunci). Foto boleh belakangan: pakaian bebas sopan, latar akan diubah merah otomatis. Password hanya diubah Admin.</p>
+              <p class="text-xs text-slate-500 mb-4">Lengkapi field profil. Nama dan kelas diisi Admin (terkunci). Foto profil WAJIB berlatar merah — sistem otomatis memotong foto agar pas bingkai 3×4. Password hanya diubah Admin.</p>
               <div id="siswa-hub-form"></div>
             </div>
           </div>
@@ -3707,11 +3707,12 @@ function profilFormHtml_(p, opts) {
         <input id="pf-noHPOrtu" ${dis} value="${escapeHtmlProfil_(p.noHPOrtu || '')}" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-200 text-sm">
       </label>
       <div class="md:col-span-2 rounded-xl border border-rose-200 bg-rose-50/70 p-3">
-        <p class="text-xs font-bold text-slate-700 mb-1">Foto profil (boleh belakangan)</p>
+        <p class="text-xs font-bold text-slate-700 mb-1">Foto Profil (WAJIB)</p>
         <ul class="text-[11px] text-slate-600 list-disc pl-4 space-y-0.5 mb-2">
-          <li>Tidak wajib sekarang. Profil tetap dapat disimpan tanpa foto.</li>
-          <li>Pakaian <b>bebas sopan</b> (sementara tidak wajib seragam). Latar merah <b>tidak perlu</b> — sistem mengubahnya otomatis.</li>
-          <li>Frame <b>3×4</b>, dari galeri HP. Jika hasil keliru, Admin akan mengedit atau minta foto ulang.</li>
+          <li><b>Wajib diunggah</b> — profil tidak dapat disimpan tanpa foto.</li>
+          <li>Latar belakang <b>WAJIB MERAH</b> — foto berlatar warna lain otomatis <b>ditolak</b> sistem.</li>
+          <li>Sistem otomatis <b>memotong &amp; menyesuaikan</b> foto agar pas bingkai <b>3×4</b>.</li>
+          <li>Format <b>JPG</b> dari galeri HP. Jika hasil keliru, Admin dapat meminta foto ulang.</li>
         </ul>
         <div class="flex items-start gap-3">
           <div class="sip-pf-frame" id="pf-foto-frame">
@@ -3721,7 +3722,7 @@ function profilFormHtml_(p, opts) {
           <div class="min-w-0 flex-1">
             <input type="hidden" id="pf-fotoUrl" value="${escapeHtmlProfil_(p.fotoUrl || '')}">
             ${ro ? '' : '<label class="inline-flex items-center px-3 py-2 rounded-lg bg-[#1b3a6b] text-white text-xs font-bold cursor-pointer"><i class="fas fa-images mr-1"></i> Pilih dari galeri<input id="pf-foto-file" type="file" accept=".jpg,.jpeg,image/jpeg" class="sr-only-foto" onchange="sipProfilPickFoto_(this)"></label>'}
-            <p id="pf-foto-msg" class="text-[11px] text-slate-500 mt-1">${p.fotoUrl ? 'Foto tampil di frame. Pilih dari galeri untuk mengganti.' : 'Foto belum wajib. Bisa diunggah nanti.'}</p>
+            <p id="pf-foto-msg" class="text-[11px] text-slate-500 mt-1">${p.fotoUrl ? 'Foto tampil di frame. Pilih dari galeri untuk mengganti.' : 'Foto WAJIB: JPG berlatar merah. Sistem otomatis memaskan ke bingkai 3×4.'}</p>
           </div>
         </div>
       </div>
@@ -3775,7 +3776,9 @@ function showStudentHub(optTab) {
     .withSuccessHandler(function (res) {
       window._siswaProfilCache = (res && res.profil) || null;
       // [V3.4] Status profil dari server: lengkap? terkunci? diminta revisi?
-      window._siswaProfilFilled = !!(res && res.success && res.filled);
+      // [V4.5] Profil tervalidasi (VALID) atau terkunci dianggap LENGKAP
+      var _vldOK = String((res && res.validasiProfil) || '').trim().toUpperCase() === 'VALID';
+      window._siswaProfilFilled = !!(res && res.success && (res.filled || res.locked || _vldOK));
       window._siswaProfilLocked = !!(res && res.success && res.locked);
       window._siswaProfilValidasi = (res && res.validasiProfil) || '';
       if (!res || !res.success) {
@@ -4255,6 +4258,31 @@ function sipLoadImageFileFallback_(file, onOk, onErr) {
   reader.readAsDataURL(file);
 }
 
+// [V4.5] Deteksi latar merah: sampel strip atas & kedua sisi atas foto.
+// Jika proporsi piksel merah terlalu rendah, foto dianggap TIDAK berlatar merah.
+function sipCekLatarMerah_(canvas) {
+  try {
+    var ctx = canvas.getContext('2d');
+    var w = canvas.width, h = canvas.height;
+    if (w < 16 || h < 16) return false;
+    var d = ctx.getImageData(0, 0, w, h).data;
+    var tot = 0, merah = 0;
+    function strip(x0, y0, x1, y1) {
+      for (var y = y0; y < y1; y += 3) {
+        for (var x = x0; x < x1; x += 3) {
+          var i = (y * w + x) * 4;
+          tot++;
+          if (sipIsRedPx_(d[i], d[i + 1], d[i + 2])) merah++;
+        }
+      }
+    }
+    strip(0, 0, w, Math.floor(h * 0.10));
+    strip(0, 0, Math.floor(w * 0.12), Math.floor(h * 0.55));
+    strip(w - Math.floor(w * 0.12), 0, w, Math.floor(h * 0.55));
+    return tot > 0 && (merah / tot) >= 0.45;
+  } catch (e) { return true; }
+}
+
 function sipApplyRedBackground_(canvas) {
   try {
     var ctx = canvas.getContext('2d');
@@ -4334,7 +4362,7 @@ function sipProfilPickFoto_(inp) {
   var file = inp.files[0];
   if (!/^image\/jpe?g$/i.test(file.type || '') && !/\.(jpe?g)$/i.test(file.name || '')) {
     inp.value = '';
-    Swal.fire('Foto ditolak', 'Foto profil wajib berformat JPG/JPEG — gunakan foto berlatar merah dan berseragam OSIS/sekolah. Sistem otomatis menyesuaikan foto ke bingkai 3×4.', 'error');
+    Swal.fire('Foto ditolak', 'Foto profil wajib berformat JPG/JPEG dan BERLATAR MERAH. Sistem otomatis memotong foto agar pas bingkai 3×4.', 'error');
     return;
   }
   if (file.size > 12 * 1024 * 1024) {
@@ -4342,7 +4370,7 @@ function sipProfilPickFoto_(inp) {
     Swal.fire('Foto ditolak', 'File asli terlalu besar (maks. 12 MB sebelum diproses).', 'error');
     return;
   }
-  if (msg) msg.textContent = 'Memproses foto (latar diubah merah)…';
+  if (msg) msg.textContent = 'Memeriksa latar merah & memproses foto…';
   function fail(t) {
     inp.value = '';
     _sipProfilFotoPending = null;
@@ -4362,19 +4390,26 @@ function sipProfilPickFoto_(inp) {
     var ctx = canvas.getContext('2d');
     ctx.fillStyle = '#b91c1c';
     ctx.fillRect(0, 0, outW, outH);
-    var scale = Math.min(outW / iw, outH / ih);
-    var dw = Math.round(iw * scale);
-    var dh = Math.round(ih * scale);
-    var dx = Math.round((outW - dw) / 2);
-    var dy = Math.round((outH - dh) / 2);
-    ctx.drawImage(src, 0, 0, iw, ih, dx, dy, dw, dh);
+    // [V4.5] COVER-CROP: foto dipotong otomatis agar PENUH mengisi bingkai 3×4
+    // (tidak ada lagi bar merah kiri-kanan). Bias ke atas agar kepala aman.
+    var scale = Math.max(outW / iw, outH / ih);
+    var sw2 = Math.min(iw, Math.round(outW / scale));
+    var sh2 = Math.min(ih, Math.round(outH / scale));
+    var sx = Math.max(0, Math.round((iw - sw2) / 2));
+    var sy = Math.max(0, Math.round((ih - sh2) * 0.25));
+    ctx.drawImage(src, sx, sy, sw2, sh2, 0, 0, outW, outH);
     if (isBmp && src.close) try { src.close(); } catch (eC2) {}
+    // [V4.5] ATURAN KETAT: latar belakang foto WAJIB MERAH — jika bukan, tolak.
+    if (!sipCekLatarMerah_(canvas)) {
+      fail('Foto ditolak: latar belakang WAJIB MERAH. Gunakan foto pas-foto berlatar merah, lalu unggah ulang.');
+      return;
+    }
     sipApplyRedBackground_(canvas);
     var q = 0.88;
     function finish(dataUrl, kb) {
       _sipProfilFotoPending = { dataUrl: dataUrl, name: 'foto-profil.jpg', type: 'image/jpeg' };
       sipSetSiswaFotoUI_(dataUrl);
-      if (msg) msg.textContent = 'Foto diproses (latar merah otomatis, ' + kb + ' KB). Menyimpan ke folder foto…';
+      if (msg) msg.textContent = 'Foto dipaskan ke bingkai 3×4 (' + kb + ' KB). Menyimpan ke folder foto…';
       sipAutoSimpanFotoProfil_(msg);
     }
     function encode() {
@@ -4457,7 +4492,7 @@ function saveHubProfil() {
     Swal.fire({
       icon: 'warning',
       title: 'Foto profil wajib diunggah',
-      html: '<p class="text-sm text-left">Unggah foto profil berformat <b>JPG/JPEG</b> dengan <b>latar merah</b> dan <b>berseragam OSIS/sekolah</b>. Sistem akan otomatis menyesuaikan foto ke bingkai 3×4.</p>'
+      html: '<p class="text-sm text-left">Unggah foto profil berformat <b>JPG/JPEG</b> dengan <b>latar belakang merah</b>. Sistem otomatis memotong foto agar pas bingkai 3×4.</p>'
     });
     return;
   }
@@ -19663,5 +19698,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a49cc03f99fff8e4',t:'MTc5MTg3NzgwMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4a2d2180fd1fdb4',t:'MTc5MTk0MTQ0Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
