@@ -7256,14 +7256,12 @@ Jawaban: A
                                <option value="w1000" selected>Besar</option>
                            </select>
                        </div>
-                       <div class="w-1/3 md:w-1/4">
-                           <select id="input-image-pos" title="Posisi letak gambar pada soal" class="w-full border border-slate-200 p-3 rounded-xl bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-blue-500 transition font-medium text-slate-700 cursor-pointer">
-                               <option value="akhir" selected>Akhir (bawah soal)</option>
-                               <option value="awal">Awal (atas soal)</option>
-                               <option value="tengah">Tengah</option>
-                               <option value="kiri">Kiri dari teks</option>
-                               <option value="kanan">Kanan dari teks</option>
-                           </select>
+                       <!-- [V4.7] Select posisi gambar DIHAPUS — posisi diatur lewat "Tanda 📷 di Teks" (default: bawah soal) -->
+                       <div class="w-full md:w-auto">
+                           <label class="w-full md:w-auto px-3 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-bold hover:bg-emerald-100 transition cursor-pointer inline-flex items-center justify-center" title="Unggah gambar dari perangkat — otomatis tersimpan ke folder 'Unggahan Gambar Soal' di Drive sistem">
+                               <i class="fas fa-cloud-arrow-up mr-1"></i> Unggah
+                               <input type="file" id="input-image-upload" accept="image/jpeg,image/png" class="sr-only-foto" onchange="sipUnggahGambarEditor_(this)">
+                           </label>
                        </div>
                        <div class="w-full md:w-auto">
                            <button type="button" id="btn-sisip-tanda-gambar" onclick="sipSisipTandaGambar_()" title="Klik titik di dalam teks soal (kotak Konten), lalu klik tombol ini agar gambar muncul tepat di titik itu" class="w-full md:w-auto px-3 py-2.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 text-sm font-bold hover:bg-blue-100 transition">
@@ -7551,6 +7549,48 @@ function addPairInput(qVal = '', optVal = '', keyVal = '', poin = 10) {
 /* ==========================================================================
    2. LOGIKA AUTOCOMPLETE GAMBAR (SOAL)
    ========================================================================== */
+
+// [V4.7] Unggah gambar langsung dari editor soal.
+// Tersimpan ke subfolder "Unggahan Gambar Soal" (dibuat OTOMATIS oleh sistem
+// di dalam folder Drive induk) + terdaftar di lembar 'Gambar', lalu link
+// langsung terpasang pada field gambar soal ini.
+function sipUnggahGambarEditor_(inp) {
+  if (!inp || !inp.files || !inp.files[0]) return;
+  var f = inp.files[0];
+  if (!/^image\/(jpe?g|png)$/i.test(f.type || '')) {
+    inp.value = '';
+    Swal.fire('Gambar ditolak', 'Gunakan gambar JPG atau PNG.', 'error');
+    return;
+  }
+  if (f.size > 4 * 1024 * 1024) {
+    inp.value = '';
+    Swal.fire('Gambar ditolak', 'Ukuran gambar maksimal 4 MB.', 'error');
+    return;
+  }
+  Swal.fire({ title: 'Mengunggah gambar\u2026', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
+  var rd = new FileReader();
+  rd.onload = function () {
+    google.script.run
+      .withSuccessHandler(function (res) {
+        inp.value = '';
+        if (!res || !res.success) {
+          Swal.fire('Gagal', (res && res.message) || 'Gambar tidak dapat diunggah.', 'error');
+          return;
+        }
+        var ac = document.getElementById('input-image-ac');
+        if (ac) ac.value = res.link || '';
+        try {
+          if (typeof allImagesData !== 'undefined' && allImagesData && allImagesData.push) {
+            allImagesData.push({ name: res.name || f.name, link: res.link, preview: res.link });
+          }
+        } catch (eA) {}
+        Swal.fire({ icon: 'success', title: 'Gambar terunggah', text: 'Tersimpan di folder "Unggahan Gambar Soal" pada Drive sistem dan sudah terpasang pada soal ini.', confirmButtonColor: '#1b3a6b' });
+      })
+      .withFailureHandler(function (err) { inp.value = ''; Swal.fire('Gagal', String(err), 'error'); })
+      .uploadGambarSoal(rd.result, f.name, currentUser.userID, currentUser.token);
+  };
+  rd.readAsDataURL(f);
+}
 
 function handleImageAutocomplete(input) {
   const term = input.value.toLowerCase().trim();
@@ -19700,5 +19740,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4a35dd92b215f9c',t:'MTc5MTk0NzE3MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4ac4a5eeb839d6f',t:'MTc5MjA0MDc0NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
