@@ -1837,7 +1837,7 @@
                 <i class="fas fa-chart-bar"></i> <span class="sidebar-text font-medium">Hasil & Nilai</span>
               </div>
               <div id="menu-pgw-ujian" class="sidebar-item" onclick="showAdminTab('dash-pgw-ujian', this)">
-                <i class="fas fa-user-shield"></i> <span class="sidebar-text font-medium">Ujian — Pengawas</span>
+                <i class="fas fa-user-shield"></i> <span class="sidebar-text font-medium">Sesi & PIN Ujian</span>
               </div>
               <div id="menu-pgw-koreksi" class="sidebar-item" onclick="showAdminTab('dash-pgw-koreksi', this)">
                 <i class="fas fa-pen-to-square"></i> <span class="sidebar-text font-medium">Koreksi Jawaban</span>
@@ -2885,7 +2885,9 @@ function initAdminPanel() {
       if (el) el.classList.add('hidden');
     });
     guruAllowedMenus.forEach(id => {
-      if ((id === 'menu-pgw-ujian' || id === 'menu-pgw-koreksi') && !izinUjianGuru) return;
+      if (id === 'menu-pgw-koreksi' && !izinUjianGuru) return;
+      // [V5.2] Sesi & PIN Ujian: pengawas (hanya lihat) ATAU panitia (atur PIN)
+      if (id === 'menu-pgw-ujian' && !izinUjianGuru && !izinPanitiaGuru) return;
       if ((id === 'menu-questions' || id === 'menu-exams') && !izinBankGuru) return;
       if ((id === 'menu-profil' || id === 'menu-kartu' || id === 'menu-results') && !izinPanitiaGuru) return;
       // [V3.9] Manajemen User (mode monitor) utk PENGAWAS; Folder Gambar utk TIM SOAL
@@ -3407,45 +3409,57 @@ function sipAturMapelDiawasi_(uid, sekarang) {
 }
 
 function renderPgwUjianPage(container) {
+  // [V5.2] PIN sesi bukan lagi wewenang pengawas.
+  // - Admin & Guru PANITIA : mengubah PIN sesi ujian di halaman ini.
+  // - Guru PENGAWAS        : hanya MELIHAT jadwal & PIN kelas/mapel yang diawasi;
+  //                          reset / melanjutkan ujian siswa lewat menu Manajemen User.
+  var pgwInfo = (currentUser && currentUser.pengawas) || {};
+  var canEdit = (currentUser && currentUser.role === 'Admin') || pgwInfo.izinPanitia === true;
   var kelasList = sipPgwKelasDiawasi_();
   var kelasLow = kelasList.map(function (k) { return k.toLowerCase(); });
-  // [V5.0] Saring juga berdasarkan MAPEL yang diawasi (bila Admin mengisinya)
-  var mapelDiawasi = String(((currentUser || {}).pengawas || {}).mapelDiawasi || '').toLowerCase()
+  var mapelDiawasi = String(pgwInfo.mapelDiawasi || '').toLowerCase()
     .split(',').map(function (s) { return s.trim(); }).filter(Boolean);
   var rows = (cachedExams || []).filter(function (e) {
+    if (canEdit) return true; // Admin / panitia: semua jadwal
     if (kelasLow.indexOf(String(e.class || '').trim().toLowerCase()) < 0) return false;
     if (!mapelDiawasi.length) return true;
     var sj = String(e.subject || '').trim().toLowerCase();
     return mapelDiawasi.some(function (m) { return sj.indexOf(m) >= 0 || m.indexOf(sj) >= 0; });
   });
+  var judul = canEdit ? 'Sesi & PIN Ujian' : 'Jadwal Ujian \u2014 Pengawas (hanya lihat)';
+  var ket = canEdit
+    ? 'Sebagai <b>' + (currentUser.role === 'Admin' ? 'Admin' : 'Guru Panitia') + '</b>, Anda menentukan <b>PIN sesi ujian</b> di halaman ini. Pengawas tidak lagi mengatur PIN.'
+    : 'PIN sesi kini ditentukan <b>Admin / Guru Panitia</b>. Sebagai pengawas, Anda cukup <b>melihat jadwal & PIN</b> kelas yang diawasi, lalu memakai menu <b>Manajemen User</b> untuk <b>mereset</b> atau <b>melanjutkan</b> ujian siswa.';
   var html = '<div class="fade-in w-full space-y-6">' +
     '<div class="dash-card p-6">' +
     '<div class="flex items-center gap-3 mb-1"><div class="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center text-white shadow-md"><i class="fas fa-user-shield"></i></div>' +
-    '<h2 class="text-xl font-bold text-slate-800 tracking-tight">Ujian — Pengawas</h2></div>' +
-    '<p class="text-slate-500 text-sm ml-14">Sebagai pengawas, Anda dapat <b>mengatur PIN sesi ujian</b> dan <b>memindahkan ujian ke kelas yang Anda awasi</b> (kelas ditentukan Admin). Jadwal, nama ujian, dan soal dikelola Admin / Tim Pembuat Soal.</p>' +
-    '<p class="text-xs text-slate-400 ml-14 mt-1"><i class="fas fa-users mr-1"></i>Kelas yang Anda awasi: <b>' + escapeHtmlProfil_(kelasList.join(', ') || '—') + '</b></p>' +
+    '<h2 class="text-xl font-bold text-slate-800 tracking-tight">' + judul + '</h2></div>' +
+    '<p class="text-slate-500 text-sm ml-14">' + ket + '</p>' +
+    (canEdit ? '' : '<p class="text-xs text-slate-400 ml-14 mt-1"><i class="fas fa-users mr-1"></i>Kelas yang Anda awasi: <b>' + escapeHtmlProfil_(kelasList.join(', ') || '\u2014') + '</b></p>') +
     '</div>';
-  if (!kelasList.length) {
+  if (!canEdit && !kelasList.length) {
     html += '<div class="dash-card p-6 text-slate-500 text-sm">Belum ada kelas yang ditugaskan. Hubungi Admin.</div>';
   } else if (!rows.length) {
-    html += '<div class="dash-card p-6 text-slate-500 text-sm">Belum ada ujian untuk kelas yang Anda awasi (' + escapeHtmlProfil_(kelasList.join(', ')) + ').</div>';
+    html += '<div class="dash-card p-6 text-slate-500 text-sm">Belum ada jadwal ujian' + (canEdit ? '' : ' untuk kelas yang Anda awasi (' + escapeHtmlProfil_(kelasList.join(', ')) + ')') + '.</div>';
   } else {
     html += '<div class="dash-card p-6 overflow-x-auto"><table class="w-full text-sm">' +
       '<thead><tr class="text-left text-slate-500 border-b border-slate-200">' +
       '<th class="py-2 pr-4">Ujian / Mapel</th><th class="py-2 pr-4">Jadwal</th><th class="py-2 pr-4">Status</th>' +
-      '<th class="py-2 pr-4">Kelas</th><th class="py-2 pr-4">PIN Sesi</th><th class="py-2">Aksi</th></tr></thead><tbody>';
+      '<th class="py-2 pr-4">Kelas</th><th class="py-2 pr-4">PIN Sesi</th>' + (canEdit ? '<th class="py-2">Aksi</th>' : '') + '</tr></thead><tbody>';
     rows.forEach(function (e) {
       var tgl = '';
       try { tgl = new Date(e.date || e.startDate).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); } catch (eT) {}
+      var pinSel = canEdit
+        ? '<input id="pgwk-pin-' + escapeHtmlProfil_(e.id) + '" type="text" inputmode="numeric" maxlength="8" placeholder="PIN baru" value="' + escapeHtmlProfil_(e.pin || '') + '" class="w-24 px-2 py-1.5 rounded-lg border border-slate-200 text-xs font-mono">'
+        : '<span class="font-mono bg-yellow-50 text-yellow-800 px-2 py-1 rounded-md border border-yellow-200 text-xs font-bold tracking-widest">' + escapeHtmlProfil_(e.pin || '-') + '</span>';
       html += '<tr class="border-b border-slate-100">' +
         '<td class="py-3 pr-4 font-bold text-slate-700">' + escapeHtmlProfil_(e.subject || '-') + '</td>' +
         '<td class="py-3 pr-4 text-slate-500 text-xs">' + escapeHtmlProfil_(tgl || '-') + '</td>' +
         '<td class="py-3 pr-4"><span class="px-2 py-1 rounded-md text-xs font-bold ' + (String(e.status).toLowerCase() === 'aktif' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-slate-100 text-slate-500 border border-slate-200') + '">' + escapeHtmlProfil_(e.status || '-') + '</span></td>' +
-        '<td class="py-3 pr-4"><select id="pgwk-kelas-' + escapeHtmlProfil_(e.id) + '" class="px-2 py-1.5 rounded-lg border border-slate-200 text-xs">' +
-        kelasList.map(function (k) { return '<option value="' + escapeHtmlProfil_(k) + '"' + (String(e.class).toLowerCase() === k.toLowerCase() ? ' selected' : '') + '>' + escapeHtmlProfil_(k) + '</option>'; }).join('') +
-        '</select></td>' +
-        '<td class="py-3 pr-4"><input id="pgwk-pin-' + escapeHtmlProfil_(e.id) + '" type="text" inputmode="numeric" maxlength="8" value="' + escapeHtmlProfil_(String(e.pin || '')) + '" placeholder="PIN sesi ujian" title="PIN sesi ujian saat ini — ubah lalu klik Simpan" class="px-2 py-1.5 rounded-lg border border-amber-300 bg-amber-50 text-xs w-24 font-mono font-bold text-slate-700"></td>' +
-        '<td class="py-3"><button type="button" onclick="sipPgwSimpanPinKelas_(\'' + escapeHtmlProfil_(e.id) + '\')" class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold"><i class="fas fa-save mr-1"></i>Simpan</button></td></tr>';
+        '<td class="py-3 pr-4 text-slate-600 text-xs font-bold">' + escapeHtmlProfil_(e.class || '-') + '</td>' +
+        '<td class="py-3 pr-4">' + pinSel + '</td>' +
+        (canEdit ? '<td class="py-3"><button type="button" onclick="sipPgwSimpanPinKelas_(\'' + escapeHtmlProfil_(e.id) + '\')" class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold"><i class="fas fa-save mr-1"></i>Simpan PIN</button></td>' : '') +
+        '</tr>';
     });
     html += '</tbody></table></div>';
   }
@@ -3454,28 +3468,22 @@ function renderPgwUjianPage(container) {
 }
 
 function sipPgwSimpanPinKelas_(examId) {
-  var kelasEl = document.getElementById('pgwk-kelas-' + examId);
+  // [V5.2] Hanya PIN yang disimpan dari halaman ini (Admin / Guru Panitia).
   var pinEl = document.getElementById('pgwk-pin-' + examId);
-  var payload = { examId: examId };
-  if (kelasEl) payload.kelas = kelasEl.value;
-  if (pinEl && pinEl.value.trim()) payload.pin = pinEl.value.trim();
-  if (payload.pin === undefined && payload.kelas === undefined) {
-    Swal.fire('Tidak ada perubahan', 'Isi PIN dan/atau pilih kelas.', 'info');
-    return;
-  }
-  Swal.fire({ title: 'Menyimpan…', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
+  var pin = pinEl ? String(pinEl.value || '').trim() : '';
+  if (!pin) { Swal.fire('PIN kosong', 'Isi PIN sesi (4-8 digit angka) terlebih dahulu.', 'info'); return; }
+  Swal.fire({ title: 'Menyimpan\u2026', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
   google.script.run
     .withSuccessHandler(function (res) {
       if (res && res.success) {
-        Swal.fire('Tersimpan', res.message || '', 'success');
+        try { (cachedExams || []).forEach(function (e) { if (String(e.id) === String(examId)) e.pin = pin; }); } catch (eC) {}
+        Swal.fire('Tersimpan', res.message || 'PIN diperbarui.', 'success');
         var el = document.querySelector("[onclick*='dash-pgw-ujian']");
         showAdminTab('dash-pgw-ujian', el);
-      } else {
-        Swal.fire('Gagal', (res && res.message) || 'Gagal menyimpan.', 'error');
-      }
+      } else Swal.fire('Gagal', (res && res.message) || '', 'error');
     })
     .withFailureHandler(function (err) { Swal.fire('Gagal', String(err), 'error'); })
-    .pengawasSetPinKelas(payload, currentUser.userID, currentUser.token);
+    .pengawasSetPinKelas({ examId: examId, pin: pin }, currentUser.userID, currentUser.token);
 }
 
 // ================= [PENGAWAS] KOREKSI JAWABAN (ESAI) =================
@@ -3554,7 +3562,7 @@ function showAdminTab(tabId, el) {
     // [V3] Izin harus EKSPLISIT true dari penunjukan Admin
     if (_pgwIzinTab.izinUjian === true) allowedGuruTabs.push('dash-pgw-ujian', 'dash-pgw-koreksi', 'dash-users');
     if (_pgwIzinTab.izinBankSoal === true) allowedGuruTabs.push('dash-questions', 'dash-exams', 'dash-images');
-    if (_pgwIzinTab.izinPanitia === true) allowedGuruTabs.push('dash-profil', 'dash-kartu', 'dash-results', 'dash-capaian');
+    if (_pgwIzinTab.izinPanitia === true) allowedGuruTabs.push('dash-profil', 'dash-kartu', 'dash-results', 'dash-capaian', 'dash-pgw-ujian');
     if (!allowedGuruTabs.includes(tabId)) {
       Swal.fire({
         title: 'Akses Ditolak',
@@ -3618,7 +3626,7 @@ function showAdminTab(tabId, el) {
     renderPengawasPage(content, 'panitia');
 
   } else if (tabId === 'dash-pgw-ujian') {
-    title.innerText = 'Ujian — Pengawas';
+    title.innerText = (currentUser && (currentUser.role === 'Admin' || ((currentUser.pengawas || {}).izinPanitia === true))) ? 'Sesi & PIN Ujian' : 'Jadwal Ujian (Pengawas)';
     renderPgwUjianPage(content);
 
   } else if (tabId === 'dash-pgw-koreksi') {
@@ -5873,7 +5881,7 @@ function sipPodiumColsHtml_(list) {
       '<div class="sip-podium-crown">' + mahkota[i] + '</div>' +
       '<div class="sip-podium-ava">' + ava + '</div>' +
       '<div class="sip-podium-nama">' + escapeHtmlProfil_(it.nama || it.userID) + '</div>' +
-      '<div class="sip-podium-sub">' + escapeHtmlProfil_(it.kelas || '') + ' \u00b7 ' + it.jumlahUjian + ' ujian</div>' +
+      '<div class="sip-podium-sub">' + escapeHtmlProfil_(it.kelas || '') + (it.jumlahUjian > 1 ? ' \u00b7 ' + it.jumlahUjian + ' ujian' : '') + '</div>' +
       '<div class="sip-podium-bar"><div class="text-[9px] font-bold opacity-80">' + label[i] + '</div>' + it.nilai + '</div>' +
       '</div>';
   }
@@ -5896,6 +5904,25 @@ function sipTogglePeringkat_(hostId, aktif) {
     })
     .withFailureHandler(function (err) { Swal.fire('Gagal', String(err), 'error'); })
     .setPeringkatEnabled(aktif === true, currentUser.userID, currentUser.token);
+}
+// [V5.2] Peringkat 3 besar untuk SATU jadwal ujian (modal dari menu Jadwal Ujian)
+function sipLihatPeringkatUjian_(examId, label) {
+  Swal.fire({ title: 'Memuat peringkat\u2026', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
+  google.script.run
+    .withSuccessHandler(function (res) {
+      if (!res || !res.success) { Swal.fire('Info', (res && res.message) || 'Belum ada data.', 'info'); return; }
+      if (!res.list || !res.list.length) { Swal.fire('Belum Ada Hasil', 'Belum ada siswa yang menyelesaikan ujian ini.', 'info'); return; }
+      Swal.fire({
+        title: 'Peringkat \u2014 ' + (label || res.mapel || 'Ujian'),
+        width: 640,
+        html: '<div class="sip-podium-card" style="text-align:left">' +
+          (res.enabled ? '' : '<p class="text-[11px]" style="color:#f6c453;margin:0"><i class="fas fa-eye-slash mr-1"></i>Peringkat masih disembunyikan dari guru & siswa (belum diizinkan).</p>') +
+          '<div class="sip-podium-wrap">' + sipPodiumColsHtml_(res.list) + '</div></div>',
+        showConfirmButton: true, confirmButtonText: 'Tutup', confirmButtonColor: '#1b3a6b'
+      });
+    })
+    .withFailureHandler(function (err) { Swal.fire('Gagal', String(err), 'error'); })
+    .getPeringkatUjian(examId, currentUser.userID, currentUser.token);
 }
 function sipRenderPeringkatPodium_(hostId) {
   var host = document.getElementById(hostId);
@@ -6436,6 +6463,9 @@ function renderExamForm(container) {
             </td>
             <td class="p-4 pr-6 text-right">
                 <div class="flex justify-end gap-2 opacity-80 group-hover:opacity-100 transition">
+                    <button onclick="sipLihatPeringkatUjian_('${exam.id}', '${String(exam.subject || '').replace(/["']/g, '')}')" class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white transition flex items-center justify-center shadow-sm border border-amber-100" title="Peringkat 3 Besar ujian ini">
+                         <i class="fas fa-trophy text-xs"></i>
+                    </button>
                     <button onclick='openExamModal(${JSON.stringify(exam)})' class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white transition flex items-center justify-center shadow-sm border border-indigo-100" title="Edit">
                          <i class="fas fa-pen-to-square text-xs"></i>
                     </button>
@@ -6450,8 +6480,12 @@ function renderExamForm(container) {
 
   html += `</tbody></table></div></div></div>`;
 
+  // [V5.2] Podium peringkat per mapel di bagian atas menu Jadwal Ujian
+  html = `<div id="sip-podium-exams" class="mb-6"></div>` + html;
+
   // Inject HTML
   container.innerHTML = html;
+  try { sipRenderPeringkatPodium_('sip-podium-exams'); } catch (ePodX) {}
 
   // --- 4. INIT MODAL (Cek agar tidak duplikat) ---
   if (!document.getElementById('examModal')) {
@@ -19908,5 +19942,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4cd7c3aee435ff3',t:'MTc5MjM4ODgxNw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4ce17475b3d6097',t:'MTc5MjM5NTE2Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
