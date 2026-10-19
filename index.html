@@ -248,6 +248,23 @@
     .sip-nilai-focus{box-shadow:0 0 0 3px #38bdf8,0 12px 28px rgba(27,58,107,.16)}
     .sip-pf-frame{width:168px;height:224px;border-radius:10px;overflow:hidden;border:2px solid #1b3a6b;background:#7f1d1d;flex-shrink:0;position:relative}
     .sip-pf-frame img{width:100%;height:100%;object-fit:cover;object-position:center top;display:block;background:#7f1d1d}
+    /* [V5.0] Pastikan foto MENUTUP SELURUH frame: menu profil & header aplikasi */
+    #pf-foto-preview,#siswa-eb-head-foto{width:100%!important;height:100%!important;object-fit:cover!important;object-position:center top!important;display:block}
+    /* [V5.0] Podium peringkat 3 besar */
+    .sip-podium-card{background:linear-gradient(135deg,#0f2a54,#1b3a6b 55%,#27497f);border-radius:18px;padding:20px 16px 0;color:#fff;overflow:hidden;position:relative;border:1px solid rgba(246,196,83,.35)}
+    .sip-podium-wrap{display:flex;align-items:flex-end;justify-content:center;gap:10px;margin-top:14px}
+    .sip-podium-col{flex:1;max-width:150px;text-align:center;animation:sipPodiumUp .6s ease both}
+    .sip-podium-col:nth-child(1){animation-delay:.15s}.sip-podium-col:nth-child(3){animation-delay:.3s}
+    .sip-podium-ava{width:62px;height:62px;border-radius:50%;margin:0 auto 6px;border:3px solid rgba(255,255,255,.85);overflow:hidden;background:#13315f;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:22px;color:#f6c453}
+    .sip-podium-ava img{width:100%;height:100%;object-fit:cover;object-position:center top}
+    .sip-podium-bar{border-radius:12px 12px 0 0;padding:10px 0 14px;font-weight:900;font-size:18px;text-shadow:0 1px 2px rgba(0,0,0,.35)}
+    .sip-podium-1 .sip-podium-bar{background:linear-gradient(180deg,#fbbf24,#b45309)}
+    .sip-podium-2 .sip-podium-bar{background:linear-gradient(180deg,#cbd5e1,#64748b);margin-top:24px}
+    .sip-podium-3 .sip-podium-bar{background:linear-gradient(180deg,#d97706,#7c2d12);margin-top:40px}
+    .sip-podium-nama{font-size:12px;font-weight:800;line-height:1.2;margin-bottom:2px;word-break:break-word}
+    .sip-podium-sub{font-size:10px;opacity:.8;margin-bottom:6px}
+    .sip-podium-crown{font-size:20px;line-height:1;margin-bottom:2px}
+    @keyframes sipPodiumUp{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:translateY(0)}}
     .sip-pf-frame .sip-pf-ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fecaca;font-size:11px;text-align:center;padding:8px;pointer-events:none}
     .sip-pf-frame-head{width:42px;height:56px;border-radius:6px;border-width:1px;border-color:rgba(255,255,255,.45);background:#7f1d1d}
     .sip-pf-frame-head .sip-pf-ph{font-size:8px;color:#fecaca}
@@ -1713,6 +1730,7 @@
             <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 md:p-6 max-w-xl">
               <h2 class="font-bold text-slate-800 mb-1">Modul Ujian</h2>
               <p class="text-xs text-slate-500 mb-4" id="siswa-hub-exam-meta">Masukkan PIN sesi ujian dari pengawas, lalu masuk ruang ujian.</p>
+              <div id="sip-podium-siswa" class="mb-4"></div>
               <label class="block text-xs font-bold text-red-600 uppercase tracking-wide mb-1">PIN Sesi Ujian</label>
               <div class="relative mb-4">
                 <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-red-500"><i class="fas fa-key"></i></span>
@@ -2876,6 +2894,11 @@ function initAdminPanel() {
       const el = document.getElementById(id);
       if (el) el.classList.remove('hidden');
     });
+    // [V5.0] Panitia juga memegang menu Capaian Pembelajaran
+    if (izinPanitiaGuru) {
+      const elCap = document.getElementById('menu-capaian');
+      if (elCap) elCap.classList.remove('hidden');
+    }
     // [V3.1] Panitia butuh Modul Data (Profil Siswa & Kartu Ujian); Modul Sistem tetap khusus Admin
     const elModData = document.getElementById('mod-data');
     if (elModData) elModData.classList.toggle('hidden', !(izinPanitiaGuru || izinUjianGuru));
@@ -3045,7 +3068,11 @@ function loadPengawasData() {
         } else {
           utama = '<span class="font-semibold text-slate-700">' + escapeHtmlProfil_(p.kelas || '—') + '</span>' +
             '<div class="mt-1 text-[11px] text-slate-500"><i class="fas fa-book-open mr-1"></i>Mapel diawasi: <b>' +
-            escapeHtmlProfil_(p.mapelDiawasi || 'belum ada jadwal ujian') + '</b></div>';
+            escapeHtmlProfil_(p.mapelDiawasi || 'belum ada jadwal ujian') + '</b>' +
+            (currentUser && currentUser.role === 'Admin'
+              ? ' <button type="button" class="ml-1 text-[10px] font-bold text-blue-600 underline" onclick="sipAturMapelDiawasi_(\'' + escapeHtmlProfil_(p.userID) + '\',\'' + escapeHtmlProfil_(p.mapelDiawasiManual || '') + '\')">atur</button>'
+              : '') +
+            '</div>';
         }
         var lain = [];
         if (roleKey !== 'pengawas' && p.izinUjian === true) lain.push('Pengawas' + (p.kelas ? ' (' + escapeHtmlProfil_(p.kelas) + ')' : ''));
@@ -3355,11 +3382,41 @@ function sipPgwKelasDiawasi_() {
   return String(izin.kelas || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
 }
 
+// [V5.0] Admin menetapkan mapel ujian yang diawasi seorang pengawas
+function sipAturMapelDiawasi_(uid, sekarang) {
+  Swal.fire({
+    title: 'Mapel ujian yang diawasi',
+    input: 'text',
+    inputValue: sekarang || '',
+    inputPlaceholder: 'Contoh: Matematika, IPA',
+    html: '<p class="text-xs text-slate-500">Pisahkan dengan koma. <b>Kosongkan</b> = pengawas boleh semua mapel pada kelas pasangannya.</p>',
+    showCancelButton: true,
+    confirmButtonText: 'Simpan',
+    confirmButtonColor: '#1b3a6b',
+    cancelButtonText: 'Batal'
+  }).then(function (r) {
+    if (!r.isConfirmed) return;
+    google.script.run
+      .withSuccessHandler(function (res) {
+        if (res && res.success) { Swal.fire('Tersimpan', res.message || '', 'success'); try { loadPengawasData(); } catch (eL) {} }
+        else Swal.fire('Gagal', (res && res.message) || '', 'error');
+      })
+      .withFailureHandler(function (err) { Swal.fire('Gagal', String(err), 'error'); })
+      .setMapelDiawasi(uid, r.value || '', currentUser.userID, currentUser.token);
+  });
+}
+
 function renderPgwUjianPage(container) {
   var kelasList = sipPgwKelasDiawasi_();
   var kelasLow = kelasList.map(function (k) { return k.toLowerCase(); });
+  // [V5.0] Saring juga berdasarkan MAPEL yang diawasi (bila Admin mengisinya)
+  var mapelDiawasi = String(((currentUser || {}).pengawas || {}).mapelDiawasi || '').toLowerCase()
+    .split(',').map(function (s) { return s.trim(); }).filter(Boolean);
   var rows = (cachedExams || []).filter(function (e) {
-    return kelasLow.indexOf(String(e.class || '').trim().toLowerCase()) >= 0;
+    if (kelasLow.indexOf(String(e.class || '').trim().toLowerCase()) < 0) return false;
+    if (!mapelDiawasi.length) return true;
+    var sj = String(e.subject || '').trim().toLowerCase();
+    return mapelDiawasi.some(function (m) { return sj.indexOf(m) >= 0 || m.indexOf(sj) >= 0; });
   });
   var html = '<div class="fade-in w-full space-y-6">' +
     '<div class="dash-card p-6">' +
@@ -3497,7 +3554,7 @@ function showAdminTab(tabId, el) {
     // [V3] Izin harus EKSPLISIT true dari penunjukan Admin
     if (_pgwIzinTab.izinUjian === true) allowedGuruTabs.push('dash-pgw-ujian', 'dash-pgw-koreksi', 'dash-users');
     if (_pgwIzinTab.izinBankSoal === true) allowedGuruTabs.push('dash-questions', 'dash-exams', 'dash-images');
-    if (_pgwIzinTab.izinPanitia === true) allowedGuruTabs.push('dash-profil', 'dash-kartu', 'dash-results');
+    if (_pgwIzinTab.izinPanitia === true) allowedGuruTabs.push('dash-profil', 'dash-kartu', 'dash-results', 'dash-capaian');
     if (!allowedGuruTabs.includes(tabId)) {
       Swal.fire({
         title: 'Akses Ditolak',
@@ -3756,6 +3813,8 @@ function showStudentHub(optTab) {
   try { switchPage('page-siswa-hub'); } catch (eSw) {}
   // [V4.0] muat notifikasi lonceng siswa (di latar)
   try { setTimeout(function () { sipLoadNotif_(); }, 1500); } catch (eNtS) {}
+  // [V5.0] Podium peringkat 3 besar di dashboard siswa
+  try { setTimeout(function () { sipRenderPeringkatPodium_('sip-podium-siswa'); }, 400); } catch (ePodS) {}
   if (typeof sipRestoreSiswaNavMin_ === 'function') sipRestoreSiswaNavMin_();
   if (typeof sipIsiTooltipMenu_ === 'function') sipIsiTooltipMenu_();
   if (typeof sipRestoreSiswaMods_ === 'function') sipRestoreSiswaMods_();
@@ -5794,6 +5853,46 @@ function renderMasterDataPage(container) {
    1. DASHBOARD OVERVIEW
    ========================================================================== */
 
+// [V5.0] Podium Peringkat 3 Besar (dashboard SEMUA user: Admin, Guru, Siswa).
+// Sumber: rata-rata nilai dari hasil ujian siswa; menampilkan Nama Lengkap + Foto Profil.
+function sipRenderPeringkatPodium_(hostId) {
+  var host = document.getElementById(hostId);
+  if (!host || !currentUser) return;
+  google.script.run
+    .withSuccessHandler(function (res) {
+      var h = document.getElementById(hostId);
+      if (!h) return;
+      var list = (res && res.list) || [];
+      if (!res || !res.success || !list.length) { h.innerHTML = ''; return; }
+      var urut = [list[1], list[0], list[2]];
+      var cls = ['sip-podium-2', 'sip-podium-1', 'sip-podium-3'];
+      var mahkota = ['\ud83e\udd48', '\ud83d\udc51', '\ud83e\udd49'];
+      var label = ['Peringkat 2', 'Peringkat 1', 'Peringkat 3'];
+      var cols = '';
+      for (var i = 0; i < 3; i++) {
+        var it = urut[i];
+        if (!it) { cols += '<div class="sip-podium-col"></div>'; continue; }
+        var src = it.foto ? (typeof sipProfilFotoSrc_ === 'function' ? sipProfilFotoSrc_(it.foto) : it.foto) : '';
+        var ava = src
+          ? '<img src="' + escapeHtmlProfil_(src) + '" referrerpolicy="no-referrer" alt="">'
+          : escapeHtmlProfil_((it.nama || '?').charAt(0).toUpperCase());
+        cols += '<div class="sip-podium-col ' + cls[i] + '">' +
+          '<div class="sip-podium-crown">' + mahkota[i] + '</div>' +
+          '<div class="sip-podium-ava">' + ava + '</div>' +
+          '<div class="sip-podium-nama">' + escapeHtmlProfil_(it.nama || it.userID) + '</div>' +
+          '<div class="sip-podium-sub">' + escapeHtmlProfil_(it.kelas || '') + ' \u00b7 ' + it.jumlahUjian + ' ujian</div>' +
+          '<div class="sip-podium-bar"><div class="text-[9px] font-bold opacity-80">' + label[i] + '</div>' + it.nilai + '</div>' +
+          '</div>';
+      }
+      h.innerHTML = '<div class="sip-podium-card">' +
+        '<p class="text-xs font-bold uppercase tracking-widest" style="color:#f6c453"><i class="fas fa-trophy mr-1"></i>Peringkat 3 Besar</p>' +
+        '<p class="text-[11px]" style="opacity:.7">Rata-rata nilai dari seluruh hasil ujian yang dikerjakan siswa.</p>' +
+        '<div class="sip-podium-wrap">' + cols + '</div></div>';
+    })
+    .withFailureHandler(function () { var h = document.getElementById(hostId); if (h) h.innerHTML = ''; })
+    .getPeringkatTop3(currentUser.userID, currentUser.token);
+}
+
 function renderAdminHome(container) {
   const totalExams = cachedExams.length;
   const activeExams = cachedExams.filter(e => e.status === 'Aktif' || e.status === 'Open').length;
@@ -6025,6 +6124,15 @@ function renderAdminHome(container) {
       .withFailureHandler(function () {})
       .getPengawasSaya(currentUser.userID, currentUser.token);
   }
+
+  // [V5.0] Podium peringkat 3 besar di dashboard Admin & Guru
+  try {
+    var _podA = document.createElement('div');
+    _podA.id = 'sip-podium-admin';
+    _podA.className = 'w-full';
+    (container.firstElementChild || container).appendChild(_podA);
+    sipRenderPeringkatPodium_('sip-podium-admin');
+  } catch (ePod) {}
 }
 
 function handleUpdateDashboardData() {
@@ -8894,10 +9002,8 @@ function renderInternalTable() {
               <div class="text-lg font-black ${scoreColor} tracking-tight">${r.score}</div>
           </td>
           <td class="p-5 text-center">${statusBadge}</td>
-          <td class="p-5 text-center">${validasiSelectHtml_(r)}</td>
-          <td class="p-5 text-center">${capaianTercapaiHtml_(r)}</td>
-          <td class="p-5 text-xs text-slate-600">${validasiCatatanHtml_(r)}</td>
-          <td class="p-5 text-xs text-slate-600">${rekomendasiHtml_(r)}</td>
+          <td class="p-5 text-center">${validasiSelectHtml_(r)}<div class="mt-1">${validasiCatatanHtml_(r)}</div></td>
+          <td class="p-5 text-xs text-slate-600">${capaianTercapaiHtml_(r)}<div class="mt-1">${rekomendasiHtml_(r)}</div></td>
           <td class="p-5 text-right w-36">${actionBtn}</td>
        </tr>`;
   }).join('');
@@ -8913,10 +9019,8 @@ function renderInternalTable() {
                           <th class="py-4 px-5 w-40">Waktu Submit</th>
                           <th class="py-4 px-5 w-24">Nilai</th>
                           <th class="py-4 px-5 text-center w-32">Status</th>
-                          <th class="py-4 px-5 text-center w-36">Validasi</th>
-                          <th class="py-4 px-5 text-center w-40">Capaian tercapai</th>
-                          <th class="py-4 px-5 w-40">Keterangan</th>
-                          <th class="py-4 px-5">Rekomendasi</th>
+                          <th class="py-4 px-5 text-center w-44">Validasi & Keterangan</th>
+                          <th class="py-4 px-5 w-56">Capaian & Rekomendasi</th>
                           <th class="py-4 px-5 text-right w-36">Aksi</th>
                       </tr>
                   </thead>
@@ -19752,5 +19856,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4cbbd984c1afdec',t:'MTc5MjM3MDUyMg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4cd67469f87b865',t:'MTc5MjM4Nzk1OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
