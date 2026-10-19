@@ -5853,8 +5853,50 @@ function renderMasterDataPage(container) {
    1. DASHBOARD OVERVIEW
    ========================================================================== */
 
-// [V5.0] Podium Peringkat 3 Besar (dashboard SEMUA user: Admin, Guru, Siswa).
-// Sumber: rata-rata nilai dari hasil ujian siswa; menampilkan Nama Lengkap + Foto Profil.
+// [V5.1] Podium Peringkat 3 Besar PER MAPEL — tampil hanya bila Admin mengizinkan.
+// Admin melihat sakelar Izinkan/Sembunyikan; user lain tidak melihat apa pun saat disembunyikan.
+var _sipPodiumData = {};
+function sipPodiumColsHtml_(list) {
+  var urut = [list[1], list[0], list[2]];
+  var cls = ['sip-podium-2', 'sip-podium-1', 'sip-podium-3'];
+  var mahkota = ['\ud83e\udd48', '\ud83d\udc51', '\ud83e\udd49'];
+  var label = ['Peringkat 2', 'Peringkat 1', 'Peringkat 3'];
+  var cols = '';
+  for (var i = 0; i < 3; i++) {
+    var it = urut[i];
+    if (!it) { cols += '<div class="sip-podium-col"></div>'; continue; }
+    var src = it.foto ? (typeof sipProfilFotoSrc_ === 'function' ? sipProfilFotoSrc_(it.foto) : it.foto) : '';
+    var ava = src
+      ? '<img src="' + escapeHtmlProfil_(src) + '" referrerpolicy="no-referrer" alt="">'
+      : escapeHtmlProfil_((it.nama || '?').charAt(0).toUpperCase());
+    cols += '<div class="sip-podium-col ' + cls[i] + '">' +
+      '<div class="sip-podium-crown">' + mahkota[i] + '</div>' +
+      '<div class="sip-podium-ava">' + ava + '</div>' +
+      '<div class="sip-podium-nama">' + escapeHtmlProfil_(it.nama || it.userID) + '</div>' +
+      '<div class="sip-podium-sub">' + escapeHtmlProfil_(it.kelas || '') + ' \u00b7 ' + it.jumlahUjian + ' ujian</div>' +
+      '<div class="sip-podium-bar"><div class="text-[9px] font-bold opacity-80">' + label[i] + '</div>' + it.nilai + '</div>' +
+      '</div>';
+  }
+  return cols;
+}
+function sipPodiumPilihMapel_(hostId) {
+  var sel = document.getElementById(hostId + '-mapel');
+  var wrap = document.getElementById(hostId + '-wrap');
+  var d = _sipPodiumData[hostId];
+  if (!sel || !wrap || !d) return;
+  var g = null;
+  for (var i = 0; i < d.groups.length; i++) if (d.groups[i].mapel === sel.value) { g = d.groups[i]; break; }
+  wrap.innerHTML = g ? sipPodiumColsHtml_(g.list) : '';
+}
+function sipTogglePeringkat_(hostId, aktif) {
+  google.script.run
+    .withSuccessHandler(function (res) {
+      if (res && res.success) sipRenderPeringkatPodium_(hostId);
+      else Swal.fire('Gagal', (res && res.message) || '', 'error');
+    })
+    .withFailureHandler(function (err) { Swal.fire('Gagal', String(err), 'error'); })
+    .setPeringkatEnabled(aktif === true, currentUser.userID, currentUser.token);
+}
 function sipRenderPeringkatPodium_(hostId) {
   var host = document.getElementById(hostId);
   if (!host || !currentUser) return;
@@ -5862,32 +5904,42 @@ function sipRenderPeringkatPodium_(hostId) {
     .withSuccessHandler(function (res) {
       var h = document.getElementById(hostId);
       if (!h) return;
-      var list = (res && res.list) || [];
-      if (!res || !res.success || !list.length) { h.innerHTML = ''; return; }
-      var urut = [list[1], list[0], list[2]];
-      var cls = ['sip-podium-2', 'sip-podium-1', 'sip-podium-3'];
-      var mahkota = ['\ud83e\udd48', '\ud83d\udc51', '\ud83e\udd49'];
-      var label = ['Peringkat 2', 'Peringkat 1', 'Peringkat 3'];
-      var cols = '';
-      for (var i = 0; i < 3; i++) {
-        var it = urut[i];
-        if (!it) { cols += '<div class="sip-podium-col"></div>'; continue; }
-        var src = it.foto ? (typeof sipProfilFotoSrc_ === 'function' ? sipProfilFotoSrc_(it.foto) : it.foto) : '';
-        var ava = src
-          ? '<img src="' + escapeHtmlProfil_(src) + '" referrerpolicy="no-referrer" alt="">'
-          : escapeHtmlProfil_((it.nama || '?').charAt(0).toUpperCase());
-        cols += '<div class="sip-podium-col ' + cls[i] + '">' +
-          '<div class="sip-podium-crown">' + mahkota[i] + '</div>' +
-          '<div class="sip-podium-ava">' + ava + '</div>' +
-          '<div class="sip-podium-nama">' + escapeHtmlProfil_(it.nama || it.userID) + '</div>' +
-          '<div class="sip-podium-sub">' + escapeHtmlProfil_(it.kelas || '') + ' \u00b7 ' + it.jumlahUjian + ' ujian</div>' +
-          '<div class="sip-podium-bar"><div class="text-[9px] font-bold opacity-80">' + label[i] + '</div>' + it.nilai + '</div>' +
-          '</div>';
+      if (!res || !res.success) { h.innerHTML = ''; return; }
+      var isAdmin = currentUser.role === 'Admin';
+      if (!res.enabled) {
+        h.innerHTML = isAdmin
+          ? '<div class="sip-podium-card" style="padding-bottom:16px">' +
+            '<p class="text-xs font-bold uppercase tracking-widest" style="color:#f6c453"><i class="fas fa-trophy mr-1"></i>Peringkat 3 Besar per Mapel</p>' +
+            '<p class="text-[11px] mt-1" style="opacity:.75">Peringkat saat ini <b>disembunyikan</b> dari seluruh user (guru & siswa). Tekan tombol di bawah bila Anda mengizinkan peringkat tampil.</p>' +
+            '<button type="button" onclick="sipTogglePeringkat_(\'' + hostId + '\', true)" class="mt-3 px-4 py-2 rounded-xl text-xs font-bold" style="background:#f6c453;color:#1b3a6b"><i class="fas fa-eye mr-1"></i>Izinkan &amp; Tampilkan Peringkat</button>' +
+            '</div>'
+          : '';
+        return;
       }
+      var groups = (res.groups || []).filter(function (g) { return g && g.list && g.list.length; });
+      if (!groups.length) {
+        h.innerHTML = isAdmin
+          ? '<div class="sip-podium-card" style="padding-bottom:16px">' +
+            '<p class="text-xs font-bold uppercase tracking-widest" style="color:#f6c453"><i class="fas fa-trophy mr-1"></i>Peringkat 3 Besar per Mapel</p>' +
+            '<p class="text-[11px] mt-1" style="opacity:.75">Peringkat diizinkan, tetapi belum ada hasil ujian yang bisa diperingkat.</p>' +
+            '<button type="button" onclick="sipTogglePeringkat_(\'' + hostId + '\', false)" class="mt-3 px-3 py-1.5 rounded-lg text-[10px] font-bold" style="background:rgba(255,255,255,.15);color:#fff"><i class="fas fa-eye-slash mr-1"></i>Sembunyikan</button>' +
+            '</div>'
+          : '';
+        return;
+      }
+      _sipPodiumData[hostId] = { groups: groups };
+      var opts = groups.map(function (g) {
+        return '<option value="' + escapeHtmlProfil_(g.mapel) + '" style="color:#1b3a6b">' + escapeHtmlProfil_(g.mapel) + '</option>';
+      }).join('');
       h.innerHTML = '<div class="sip-podium-card">' +
-        '<p class="text-xs font-bold uppercase tracking-widest" style="color:#f6c453"><i class="fas fa-trophy mr-1"></i>Peringkat 3 Besar</p>' +
-        '<p class="text-[11px]" style="opacity:.7">Rata-rata nilai dari seluruh hasil ujian yang dikerjakan siswa.</p>' +
-        '<div class="sip-podium-wrap">' + cols + '</div></div>';
+        '<div class="flex items-center justify-between gap-2 flex-wrap">' +
+        '<div><p class="text-xs font-bold uppercase tracking-widest" style="color:#f6c453"><i class="fas fa-trophy mr-1"></i>Peringkat 3 Besar per Mapel</p>' +
+        '<p class="text-[11px]" style="opacity:.7">Rata-rata nilai hasil ujian pada mata pelajaran terpilih.</p></div>' +
+        '<div class="flex items-center gap-2">' +
+        '<select id="' + hostId + '-mapel" onchange="sipPodiumPilihMapel_(\'' + hostId + '\')" class="text-xs font-bold rounded-lg px-2 py-1.5" style="background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(246,196,83,.5)">' + opts + '</select>' +
+        (isAdmin ? '<button type="button" onclick="sipTogglePeringkat_(\'' + hostId + '\', false)" title="Sembunyikan peringkat dari semua user" class="px-2.5 py-1.5 rounded-lg text-[10px] font-bold" style="background:rgba(255,255,255,.15);color:#fff"><i class="fas fa-eye-slash"></i></button>' : '') +
+        '</div></div>' +
+        '<div class="sip-podium-wrap" id="' + hostId + '-wrap">' + sipPodiumColsHtml_(groups[0].list) + '</div></div>';
     })
     .withFailureHandler(function () { var h = document.getElementById(hostId); if (h) h.innerHTML = ''; })
     .getPeringkatTop3(currentUser.userID, currentUser.token);
@@ -19856,5 +19908,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4cd67469f87b865',t:'MTc5MjM4Nzk1OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4cd7c3aee435ff3',t:'MTc5MjM4ODgxNw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
