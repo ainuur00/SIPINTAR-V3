@@ -2603,7 +2603,7 @@ function handleLogin(e) {
       if (res && res.success) {
         // === SIMPAN SESI KE LOCAL STORAGE ===
         try {
-          localStorage.setItem('sipadu_session', JSON.stringify({
+          localStorage.setItem('sipintar_session', JSON.stringify({
             userID: res.userID,
             token: res.token,
             role: res.role,
@@ -2673,7 +2673,7 @@ function startAdminSessionTimer() {
     adminSessionTimer = null;
   }
   adminSessionTimer = setInterval(function() {
-    const savedSession = localStorage.getItem('sipadu_session');
+    const savedSession = localStorage.getItem('sipintar_session');
     if (!savedSession) return;
     try {
       const sess = JSON.parse(savedSession);
@@ -2695,7 +2695,7 @@ function forceLogoutSession() {
   if (typeof disableAntiCheat === 'function') disableAntiCheat();
   if (currentUser && currentUser.userID) google.script.run.logoutUser(currentUser.userID);
 
-  localStorage.removeItem('sipadu_session');
+  localStorage.removeItem('sipintar_session');
   currentUser = null;
   currentExam = null;
   if (typeof questions !== 'undefined') questions = [];
@@ -2771,7 +2771,7 @@ function logout() {
       }
 
       // 2. Hapus Sesi Browser
-      localStorage.removeItem('sipadu_session');
+      localStorage.removeItem('sipintar_session');
 
       // 3. Logout di Server (Background process)
       if (typeof currentUser !== 'undefined' && currentUser && currentUser.userID) {
@@ -3824,7 +3824,7 @@ function startSiswaExamRelogin_() {
   try { sessionStorage.setItem('sipintar_exam_relogin', uid || '1'); } catch (eS) {}
   window._siswaExamGateOk = false;
   window._pendingExamData = null;
-  try { localStorage.removeItem('sipadu_session'); } catch (eL) {}
+  try { localStorage.removeItem('sipintar_session'); } catch (eL) {}
   if (currentUser && currentUser.userID) {
     try { google.script.run.logoutUser(currentUser.userID); } catch (eO) {}
   }
@@ -4999,7 +4999,7 @@ function renderKartuUjianPage(container) {
         <div class="flex flex-col md:flex-row md:items-start justify-between gap-3">
           <div>
             <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2"><i class="fas fa-id-badge text-teal-600"></i> Kartu Ujian</h2>
-            <p class="text-sm text-slate-500 mt-1">Template memuat nama, User ID, password (hanya Admin yang boleh ubah), kelas, mata ujian, tanggal, dan sesi/waktu. Ekspor per kelas disimpan ke folder Drive <b>SIPINTAR_Kartu_Ujian</b> (8–10 kartu per lembar).</p>
+            <p class="text-sm text-slate-500 mt-1">Template memuat nama, User ID, password (hanya Admin yang boleh ubah), kelas, mata ujian, tanggal, dan sesi/waktu. Ekspor per kelas disimpan ke folder Drive <b>SIPINTAR - Kartu Ujian</b> (8–10 kartu per lembar).</p>
           </div>
           <a id="kartu-folder-link" href="#" target="_blank" class="hidden px-3 py-2 rounded-xl bg-white border border-slate-200 text-sm font-bold text-teal-700"><i class="fab fa-google-drive mr-1"></i> Buka Folder</a>
         </div>
@@ -5361,7 +5361,7 @@ function exportKartuToFolder_(format) {
     Swal.fire({ icon: 'info', title: 'Pilih siswa / kelas', text: 'Centang siswa atau pilih kelas lalu ekspor.' });
     return;
   }
-  Swal.fire({ title: 'Menyimpan ke folder Kartu Ujian…', html: 'File Excel/PDF akan masuk folder Drive SIPINTAR_Kartu_Ujian.', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
+  Swal.fire({ title: 'Menyimpan ke folder Kartu Ujian…', html: 'File Excel/PDF akan masuk folder Drive SIPINTAR - Kartu Ujian.', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
   google.script.run
     .withSuccessHandler(function (res) {
       if (!res || !res.success) {
@@ -7258,7 +7258,7 @@ Jawaban: A
                        </div>
                        <!-- [V4.7] Select posisi gambar DIHAPUS — posisi diatur lewat "Tanda 📷 di Teks" (default: bawah soal) -->
                        <div class="w-full md:w-auto">
-                           <label class="w-full md:w-auto px-3 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-bold hover:bg-emerald-100 transition cursor-pointer inline-flex items-center justify-center" title="Unggah gambar dari perangkat — otomatis tersimpan ke folder 'Unggahan Gambar Soal' di Drive sistem">
+                           <label class="w-full md:w-auto px-3 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-bold hover:bg-emerald-100 transition cursor-pointer inline-flex items-center justify-center" title="Unggah gambar dari perangkat — otomatis tersimpan ke folder 'SIPINTAR - Unggahan Gambar Soal' di Drive sistem">
                                <i class="fas fa-cloud-arrow-up mr-1"></i> Unggah
                                <input type="file" id="input-image-upload" accept="image/jpeg,image/png" class="sr-only-foto" onchange="sipUnggahGambarEditor_(this)">
                            </label>
@@ -7551,7 +7551,7 @@ function addPairInput(qVal = '', optVal = '', keyVal = '', poin = 10) {
    ========================================================================== */
 
 // [V4.7] Unggah gambar langsung dari editor soal.
-// Tersimpan ke subfolder "Unggahan Gambar Soal" (dibuat OTOMATIS oleh sistem
+// Tersimpan ke subfolder "SIPINTAR - Unggahan Gambar Soal" (dibuat OTOMATIS oleh sistem
 // di dalam folder Drive induk) + terdaftar di lembar 'Gambar', lalu link
 // langsung terpasang pada field gambar soal ini.
 function sipUnggahGambarEditor_(inp) {
@@ -7584,7 +7584,7 @@ function sipUnggahGambarEditor_(inp) {
             allImagesData.push({ name: res.name || f.name, link: res.link, preview: res.link });
           }
         } catch (eA) {}
-        Swal.fire({ icon: 'success', title: 'Gambar terunggah', text: 'Tersimpan di folder "Unggahan Gambar Soal" pada Drive sistem dan sudah terpasang pada soal ini.', confirmButtonColor: '#1b3a6b' });
+        Swal.fire({ icon: 'success', title: 'Gambar terunggah', text: 'Tersimpan di folder "SIPINTAR - Unggahan Gambar Soal" pada Drive sistem dan sudah terpasang pada soal ini.', confirmButtonColor: '#1b3a6b' });
       })
       .withFailureHandler(function (err) { inp.value = ''; Swal.fire('Gagal', String(err), 'error'); })
       .uploadGambarSoal(rd.result, f.name, currentUser.userID, currentUser.token);
@@ -9803,7 +9803,7 @@ function returnToLoginSilent() {
     _lobbyCountdownTimer = null;
   }
   if (typeof stopMathGame === 'function') stopMathGame();
-  localStorage.removeItem('sipadu_session');
+  localStorage.removeItem('sipintar_session');
   if (currentUser && currentUser.userID) {
     try { google.script.run.logoutUser(currentUser.userID); } catch (e) {}
   }
@@ -11176,7 +11176,7 @@ function kickStudentSessionSilent() {
     _examStrictMode = false;
     if (typeof disableAntiCheat === 'function') disableAntiCheat();
     if (typeof timerInterval !== 'undefined' && timerInterval) clearInterval(timerInterval);
-    localStorage.removeItem('sipadu_session');
+    localStorage.removeItem('sipintar_session');
     if (currentUser && currentUser.userID) {
         try { google.script.run.logoutUser(currentUser.userID); } catch (e) {}
     }
@@ -11635,7 +11635,7 @@ function refreshMusicFolderPage() {
       window._examMusicFolderUrl = res.folderUrl || '';
       if (link) {
         link.innerHTML = res.folderUrl
-          ? 'Folder Drive: <a class="text-violet-600 font-bold underline" href="' + res.folderUrl + '" target="_blank" rel="noopener">Buka SIPINTAR_Musik</a>'
+          ? 'Folder Drive: <a class="text-violet-600 font-bold underline" href="' + res.folderUrl + '" target="_blank" rel="noopener">Buka SIPINTAR - Musik</a>'
           : '';
       }
       const files = res.files || [];
@@ -12513,9 +12513,21 @@ function submitEssayGrade() {
         }
     }).saveEssayGrade(currentGradingId, score);
 }
+// [V4.9] Migrasi sesi lama: kunci 'sipadu_session' -> 'sipintar_session'
+// agar pengguna yang masih login TIDAK terlempar keluar setelah pembaruan.
+(function () {
+  try {
+    const lama = localStorage.getItem('sipadu_session');
+    if (lama && !localStorage.getItem('sipintar_session')) {
+      localStorage.setItem('sipintar_session', lama);
+    }
+    if (lama) localStorage.removeItem('sipadu_session');
+  } catch (eMig) {}
+})();
+
 function checkSavedSession() {
     // 1. Cek apakah ada data sesi di LocalStorage browser
-    const savedSession = localStorage.getItem('sipadu_session');
+    const savedSession = localStorage.getItem('sipintar_session');
 
     if (savedSession) {
         try {
@@ -12523,7 +12535,7 @@ function checkSavedSession() {
 
             // Jika data tidak lengkap, anggap invalid
         if (!sess.userID || !sess.token) {
-            localStorage.removeItem('sipadu_session');
+            localStorage.removeItem('sipintar_session');
             return;
         }
 
@@ -12531,7 +12543,7 @@ function checkSavedSession() {
         if ((sess.role === 'Admin' || sess.role === 'Guru') && sess.loginTime) {
             const elapsed = Date.now() - sess.loginTime;
             if (elapsed >= ADMIN_SESSION_DURATION_MS) {
-                localStorage.removeItem('sipadu_session');
+                localStorage.removeItem('sipintar_session');
                 document.getElementById('page-login').classList.remove('hidden');
                 Swal.fire({
                     icon: 'warning',
@@ -12578,13 +12590,13 @@ function checkSavedSession() {
                         
                         // Demi keamanan ujian, kita hapus sesi siswa agar login manual ulang
                         // (Anda bisa mengubah ini jika ingin siswa langsung masuk)
-                        localStorage.removeItem('sipadu_session');
+                        localStorage.removeItem('sipintar_session');
                         document.getElementById('page-login').classList.remove('hidden');
                     }
 
                 } else {
                     // === TOKEN INVALID / EXPIRED ===
-                    localStorage.removeItem('sipadu_session'); // Bersihkan data sampah
+                    localStorage.removeItem('sipintar_session'); // Bersihkan data sampah
                     document.getElementById('page-login').classList.remove('hidden');
                     
                     // Opsional: Beritahu user sesi habis
@@ -12600,7 +12612,7 @@ function checkSavedSession() {
         } catch (e) {
             // Jika JSON error
             console.error("Error parsing session:", e);
-            localStorage.removeItem('sipadu_session');
+            localStorage.removeItem('sipintar_session');
             document.getElementById('page-login').classList.remove('hidden');
         }
     } else {
@@ -14855,7 +14867,7 @@ function handleToggleUser(uid, rawStatus) {
         // Atur lebar kolom agar rapi
         ws['!cols'] = [{wch:25}, {wch:15}, {wch:10}, {wch:15}, {wch:15}, {wch:15}];
         XLSX.utils.book_append_sheet(wb, ws, "TemplateUser");
-        XLSX.writeFile(wb, "Template_Import_User_SIPADU_V2.xlsx");
+        XLSX.writeFile(wb, "Template_Import_User_SIPINTAR_V2.xlsx");
     }
 
     // --- FUNGSI PROSES IMPORT ---
@@ -18869,7 +18881,7 @@ function sipKisiMuatExam_() {
       }
       if (fbar) {
         fbar.innerHTML = res.folderUrl
-          ? '<p class="text-xs text-slate-500"><i class="fas fa-folder-open mr-1"></i>Backup unduhan: <a class="text-blue-700 font-bold" target="_blank" rel="noopener" href="' + escapeHtmlProfil_(res.folderUrl) + '">folder SIPINTAR-KISI-KISI</a></p>'
+          ? '<p class="text-xs text-slate-500"><i class="fas fa-folder-open mr-1"></i>Backup unduhan: <a class="text-blue-700 font-bold" target="_blank" rel="noopener" href="' + escapeHtmlProfil_(res.folderUrl) + '">folder SIPINTAR - Kisi-Kisi</a></p>'
           : '';
       }
       if (!res.ada) {
@@ -18964,7 +18976,7 @@ function sipKisiUnduh_(fmt) {
       Swal.fire({
         icon: 'success',
         title: 'Berkas siap',
-        html: '<p class="text-sm">' + escapeHtmlProfil_(res.fileName || '') + ' — juga tersimpan di folder SIPINTAR-KISI-KISI.</p>' +
+        html: '<p class="text-sm">' + escapeHtmlProfil_(res.fileName || '') + ' — juga tersimpan di folder SIPINTAR - Kisi-Kisi.</p>' +
           '<a class="inline-block mt-2 px-3 py-1.5 rounded-lg bg-[#1b3a6b] text-white text-xs font-bold" target="_blank" rel="noopener" href="' + escapeHtmlProfil_(res.download || res.url) + '">Unduh ' + (fmt === 'doc' ? 'DOC' : 'PDF') + '</a>'
       });
     })
@@ -19740,5 +19752,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4ac4a5eeb839d6f',t:'MTc5MjA0MDc0NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4cbbd984c1afdec',t:'MTc5MjM3MDUyMg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
