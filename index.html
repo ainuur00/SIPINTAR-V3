@@ -1878,6 +1878,9 @@
               <div id="menu-kartu" class="sidebar-item" onclick="showAdminTab('dash-kartu', this)">
                 <i class="fas fa-id-badge"></i> <span class="sidebar-text font-medium">Kartu Ujian</span>
               </div>
+              <div id="menu-hadir" class="sidebar-item" onclick="showAdminTab('dash-hadir', this)">
+                <i class="fas fa-clipboard-user"></i> <span class="sidebar-text font-medium">Daftar Hadir</span>
+              </div>
             </div>
           </div>
 
@@ -2868,9 +2871,9 @@ function initAdminPanel() {
  
   // ── LOGIKA VISIBILITAS MENU BERDASARKAN ROLE ──────────────────────
   // [PENGAWAS] Guru (pengawas) hanya melihat: Dashboard, Jadwal Ujian, Bank Soal, Hasil & Nilai
-  const guruAllowedMenus = ['menu-home', 'menu-profil-guru', 'menu-pgw-ujian', 'menu-pgw-koreksi', 'menu-questions', 'menu-exams', 'menu-results', 'menu-profil', 'menu-kartu', 'menu-users', 'menu-images'];
+  const guruAllowedMenus = ['menu-home', 'menu-profil-guru', 'menu-pgw-ujian', 'menu-pgw-koreksi', 'menu-questions', 'menu-exams', 'menu-results', 'menu-profil', 'menu-kartu', 'menu-hadir', 'menu-users', 'menu-images'];
   const adminOnlyMenus = ['menu-kisi', 'menu-ai-generator', 'menu-hermes', 'menu-capaian',
-    'menu-report-template', 'menu-users', 'menu-profil', 'menu-kartu',
+    'menu-report-template', 'menu-users', 'menu-profil', 'menu-kartu', 'menu-hadir',
     'menu-images', 'menu-music', 'menu-config',
     'menu-master-data', 'menu-pengawas', 'menu-timsoal', 'menu-panitia', 'menu-exams', 'menu-results',
     'menu-pgw-ujian', 'menu-pgw-koreksi'];
@@ -2892,7 +2895,7 @@ function initAdminPanel() {
       // [V5.2] Sesi & PIN Ujian: pengawas (hanya lihat) ATAU panitia (atur PIN)
       if (id === 'menu-pgw-ujian' && !izinUjianGuru && !izinPanitiaGuru) return;
       if ((id === 'menu-questions' || id === 'menu-exams') && !izinBankGuru) return;
-      if ((id === 'menu-profil' || id === 'menu-kartu' || id === 'menu-results') && !izinPanitiaGuru) return;
+      if ((id === 'menu-profil' || id === 'menu-kartu' || id === 'menu-hadir' || id === 'menu-results') && !izinPanitiaGuru) return;
       // [V3.9] Manajemen User (mode monitor) utk PENGAWAS; Folder Gambar utk TIM SOAL
       if (id === 'menu-users' && !izinUjianGuru) return;
       if (id === 'menu-images' && !izinBankGuru) return;
@@ -3411,6 +3414,131 @@ function sipAturMapelDiawasi_(uid, sekarang) {
   });
 }
 
+// [V5.4] DAFTAR HADIR PESERTA UJIAN
+// Alur: ADMIN mengisi kop & judul; ADMIN + PANITIA mengunduh PDF sebagai
+// kelengkapan administrasi; unduhan tercatat otomatis per ujian.
+function renderDaftarHadirPage(container) {
+  var isAdmin = currentUser && currentUser.role === 'Admin';
+  var opsi = (cachedExams || []).map(function (e) {
+    return '<option value="' + escapeHtmlProfil_(e.id) + '">' + escapeHtmlProfil_((e.subject || '-') + ' \u2014 ' + (e.class || '-') + ' (' + (e.status || '-') + ')') + '</option>';
+  }).join('');
+  container.innerHTML = '<div class="fade-in w-full space-y-6">' +
+    '<div class="dash-card p-6">' +
+    '<div class="flex items-center gap-3 mb-1"><div class="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center text-white shadow-md"><i class="fas fa-clipboard-user"></i></div>' +
+    '<h2 class="text-xl font-bold text-slate-800 tracking-tight">Daftar Hadir Peserta Ujian</h2></div>' +
+    '<p class="text-slate-500 text-sm ml-14">' + (isAdmin
+      ? 'Isi <b>kop (header)</b> dan <b>judul</b> di bawah, pilih ujian, lalu unduh PDF. Panitia juga wajib mengunduh PDF ini sebagai kelengkapan administrasi.'
+      : 'Kop & judul diisi oleh <b>Admin</b>. Sebagai <b>Panitia</b>, Anda <b>wajib mengunduh PDF</b> daftar hadir setiap ujian sebagai syarat kelengkapan administrasi.') + '</p>' +
+    '</div>' +
+    (isAdmin
+      ? '<div class="dash-card p-6"><p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3"><i class="fas fa-heading mr-1"></i>Kop & Judul Daftar Hadir (khusus Admin)</p>' +
+        '<div class="grid grid-cols-1 md:grid-cols-2 gap-3">' +
+        '<div class="md:col-span-2"><label class="text-xs font-bold text-slate-500">Judul Daftar Hadir</label><input id="hadir-judul" class="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm" placeholder="cth: DAFTAR HADIR PESERTA SUMATIF AKHIR SEMESTER"></div>' +
+        '<div><label class="text-xs font-bold text-slate-500">Kop baris 1 (instansi)</label><input id="hadir-kop1" class="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm" placeholder="cth: PEMERINTAH KOTA SURAKARTA"></div>' +
+        '<div><label class="text-xs font-bold text-slate-500">Kop baris 2</label><input id="hadir-kop2" class="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm" placeholder="cth: DINAS PENDIDIKAN"></div>' +
+        '<div><label class="text-xs font-bold text-slate-500">Kop baris 3 (sekolah)</label><input id="hadir-kop3" class="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm" placeholder="cth: SMP NEGERI 26 SURAKARTA"></div>' +
+        '<div><label class="text-xs font-bold text-slate-500">Kop baris 4 (alamat)</label><input id="hadir-kop4" class="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm" placeholder="cth: Jl. ..., Telp ..."></div>' +
+        '</div>' +
+        '<button type="button" onclick="sipHadirSimpanCfg_()" class="mt-4 px-5 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-bold"><i class="fas fa-save mr-1"></i>Simpan Kop & Judul</button></div>'
+      : '') +
+    '<div class="dash-card p-6"><p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3"><i class="fas fa-file-pdf mr-1"></i>Buat & Unduh Daftar Hadir (PDF)</p>' +
+    '<div class="grid grid-cols-1 md:grid-cols-3 gap-3">' +
+    '<div class="md:col-span-2"><label class="text-xs font-bold text-slate-500">Pilih Ujian</label><select id="hadir-exam" class="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm">' + (opsi || '<option value="">(belum ada jadwal ujian)</option>') + '</select></div>' +
+    '<div><label class="text-xs font-bold text-slate-500">Sesi (opsional)</label><input id="hadir-sesi" class="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm" placeholder="cth: Sesi 1"></div>' +
+    '</div>' +
+    '<div class="mt-4 flex items-center gap-3 flex-wrap">' +
+    '<button type="button" onclick="sipHadirTampil_()" class="px-5 py-2.5 rounded-xl bg-slate-700 text-white text-sm font-bold"><i class="fas fa-eye mr-1"></i>Pratinjau</button>' +
+    '<button type="button" onclick="sipHadirUnduhPdf_()" class="px-5 py-2.5 rounded-xl bg-red-600 text-white text-sm font-bold"><i class="fas fa-file-pdf mr-1"></i>Unduh PDF</button>' +
+    '<span id="hadir-unduh-info" class="text-[11px] text-slate-400"></span>' +
+    '</div></div>' +
+    '<div id="hadir-hasil"></div>' +
+    '</div>';
+  google.script.run
+    .withSuccessHandler(function (res) {
+      if (!res || !res.success) return;
+      window._hadirCfg = res.config || {};
+      if (isAdmin) {
+        ['judul', 'kop1', 'kop2', 'kop3', 'kop4'].forEach(function (k) {
+          var el = document.getElementById('hadir-' + k);
+          if (el) el.value = (res.config && res.config[k]) || '';
+        });
+      }
+    })
+    .withFailureHandler(function () {})
+    .getDaftarHadirConfig(currentUser.userID, currentUser.token);
+}
+function sipHadirSimpanCfg_() {
+  var v = function (id) { var el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; };
+  google.script.run
+    .withSuccessHandler(function (res) {
+      if (res && res.success) Swal.fire('Tersimpan', res.message || '', 'success');
+      else Swal.fire('Gagal', (res && res.message) || '', 'error');
+    })
+    .withFailureHandler(function (err) { Swal.fire('Gagal', String(err), 'error'); })
+    .saveDaftarHadirConfig({ judul: v('hadir-judul'), kop1: v('hadir-kop1'), kop2: v('hadir-kop2'), kop3: v('hadir-kop3'), kop4: v('hadir-kop4') }, currentUser.userID, currentUser.token);
+}
+function sipHadirTampil_() {
+  var examId = (document.getElementById('hadir-exam') || {}).value;
+  if (!examId) { Swal.fire('Pilih ujian', 'Pilih jadwal ujian terlebih dahulu.', 'info'); return; }
+  var box = document.getElementById('hadir-hasil');
+  if (box) box.innerHTML = '<div class="dash-card p-6 text-slate-500 text-sm">Memuat\u2026</div>';
+  google.script.run
+    .withSuccessHandler(function (res) {
+      var b = document.getElementById('hadir-hasil');
+      if (!b) return;
+      if (!res || !res.success) { b.innerHTML = '<div class="dash-card p-6 text-rose-600 text-sm font-bold">' + escapeHtmlProfil_((res && res.message) || 'Gagal.') + '</div>'; return; }
+      var cfg = res.config || {}, ex = res.exam || {}, rows = res.rows || [];
+      var sesi = String((document.getElementById('hadir-sesi') || {}).value || '').trim();
+      var waktu = '';
+      try { waktu = new Date(ex.date).toLocaleString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch (eW) { waktu = ex.date || '-'; }
+      var sesiWaktu = (sesi ? sesi + ' \u2014 ' : '') + waktu + (ex.duration ? ' (' + ex.duration + ' menit)' : '');
+      var info = document.getElementById('hadir-unduh-info');
+      if (info) info.innerHTML = res.unduhInfo
+        ? '<i class="fas fa-check-circle text-emerald-500 mr-1"></i>Terakhir diunduh: ' + escapeHtmlProfil_(res.unduhInfo)
+        : '<i class="fas fa-circle-exclamation text-amber-500 mr-1"></i>Belum pernah diunduh (wajib bagi Panitia).';
+      var kop = ['kop1', 'kop2', 'kop3', 'kop4'].map(function (k, i) {
+        var t = String(cfg[k] || '').trim();
+        return t ? '<div class="' + (i === 0 ? 'font-black text-sm' : 'text-xs') + '">' + escapeHtmlProfil_(t) + '</div>' : '';
+      }).join('');
+      var baris = rows.length ? rows.map(function (r, i) {
+        return '<tr class="border-b border-slate-100">' +
+          '<td class="py-2 px-2 text-center">' + escapeHtmlProfil_(r.absen || '-') + '</td>' +
+          '<td class="py-2 px-2">' + escapeHtmlProfil_(r.nama) + '</td>' +
+          '<td class="py-2 px-2 text-center">' + escapeHtmlProfil_(r.kelas) + '</td>' +
+          '<td class="py-2 px-2 text-center">' + escapeHtmlProfil_(ex.subject || '') + '</td>' +
+          '<td class="py-2 px-2 text-center text-xs">' + escapeHtmlProfil_(sesiWaktu) + '</td>' +
+          '<td class="py-2 px-2 text-xs text-slate-400' + (i % 2 ? ' text-right' : '') + '">' + (i + 1) + '. ..........</td></tr>';
+      }).join('') : '<tr><td colspan="6" class="py-4 text-center text-slate-400">Belum ada siswa pada kelas ini.</td></tr>';
+      b.innerHTML = '<div class="dash-card p-6 overflow-x-auto">' +
+        (kop ? '<div class="text-center border-b-2 border-slate-700 pb-2 mb-3">' + kop + '</div>' : '') +
+        '<p class="text-center font-black underline mb-3">' + escapeHtmlProfil_(cfg.judul || 'DAFTAR HADIR PESERTA UJIAN') + '</p>' +
+        '<p class="text-xs text-slate-500 mb-3">Mapel: <b>' + escapeHtmlProfil_(ex.subject || '-') + '</b> \u00b7 Kelas: <b>' + escapeHtmlProfil_(ex.kelas || '-') + '</b> \u00b7 ' + escapeHtmlProfil_(sesiWaktu) + ' \u00b7 ' + rows.length + ' siswa</p>' +
+        '<table class="w-full text-sm"><thead><tr class="text-left text-slate-500 border-b-2 border-slate-300 text-xs">' +
+        '<th class="py-2 px-2 text-center">No. Absen</th><th class="py-2 px-2">Nama Peserta</th><th class="py-2 px-2 text-center">Kelas</th>' +
+        '<th class="py-2 px-2 text-center">Mata Pelajaran</th><th class="py-2 px-2 text-center">Sesi Ujian dan Waktu Ujian</th><th class="py-2 px-2">Tanda Tangan</th>' +
+        '</tr></thead><tbody>' + baris + '</tbody></table></div>';
+    })
+    .withFailureHandler(function (err) { var b = document.getElementById('hadir-hasil'); if (b) b.innerHTML = '<div class="dash-card p-6 text-rose-600 text-sm font-bold">' + escapeHtmlProfil_(String(err)) + '</div>'; })
+    .getDaftarHadirData(examId, currentUser.userID, currentUser.token);
+}
+function sipHadirUnduhPdf_() {
+  var examId = (document.getElementById('hadir-exam') || {}).value;
+  if (!examId) { Swal.fire('Pilih ujian', 'Pilih jadwal ujian terlebih dahulu.', 'info'); return; }
+  var sesi = String((document.getElementById('hadir-sesi') || {}).value || '').trim();
+  Swal.fire({ title: 'Membuat PDF\u2026', html: 'Menyusun daftar hadir di server', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
+  google.script.run
+    .withSuccessHandler(function (res) {
+      if (res && res.success && res.url) {
+        Swal.fire({ icon: 'success', title: 'PDF siap', html: 'Unduhan dimulai \u2014 simpan sebagai kelengkapan administrasi.<br><a href="' + res.url + '" target="_blank" class="text-blue-600 font-bold text-xs">Klik di sini bila unduhan tidak mulai otomatis</a>' });
+        try { window.open(res.url, '_blank'); } catch (eO) {}
+        var info = document.getElementById('hadir-unduh-info');
+        if (info) info.innerHTML = '<i class="fas fa-check-circle text-emerald-500 mr-1"></i>Baru saja diunduh.';
+      } else Swal.fire('Gagal', (res && res.message) || '', 'error');
+    })
+    .withFailureHandler(function (err) { Swal.fire('Gagal', String(err), 'error'); })
+    .generateDaftarHadirPDF(examId, sesi, currentUser.userID, currentUser.token);
+}
+
 // [V5.3] PROFIL GURU \u2014 data diri + foto, otomatis tersimpan ke folder Drive per guru
 function renderProfilGuruPage(container) {
   container.innerHTML = '<div class="fade-in w-full space-y-6"><div class="dash-card p-6 text-slate-500 text-sm">Memuat profil\u2026</div></div>';
@@ -3664,7 +3792,7 @@ function showAdminTab(tabId, el) {
     // [V3] Izin harus EKSPLISIT true dari penunjukan Admin
     if (_pgwIzinTab.izinUjian === true) allowedGuruTabs.push('dash-pgw-ujian', 'dash-pgw-koreksi', 'dash-users');
     if (_pgwIzinTab.izinBankSoal === true) allowedGuruTabs.push('dash-questions', 'dash-exams', 'dash-images');
-    if (_pgwIzinTab.izinPanitia === true) allowedGuruTabs.push('dash-profil', 'dash-kartu', 'dash-results', 'dash-capaian', 'dash-pgw-ujian');
+    if (_pgwIzinTab.izinPanitia === true) allowedGuruTabs.push('dash-profil', 'dash-kartu', 'dash-hadir', 'dash-results', 'dash-capaian', 'dash-pgw-ujian');
     if (!allowedGuruTabs.includes(tabId)) {
       Swal.fire({
         title: 'Akses Ditolak',
@@ -3726,6 +3854,10 @@ function showAdminTab(tabId, el) {
   } else if (tabId === 'dash-panitia') {
     title.innerText = 'Panitia Ujian';
     renderPengawasPage(content, 'panitia');
+
+  } else if (tabId === 'dash-hadir') {
+    title.innerText = 'Daftar Hadir Peserta Ujian';
+    renderDaftarHadirPage(content);
 
   } else if (tabId === 'dash-profil-guru') {
     title.innerText = 'Profil Saya';
@@ -20048,5 +20180,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4d472056a17821f',t:'MTc5MjQ2MTc5OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4d48f96fe34797f',t:'MTc5MjQ2MzAxMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
