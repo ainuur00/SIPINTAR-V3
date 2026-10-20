@@ -1845,9 +1845,6 @@
               <div id="menu-pgw-koreksi" class="sidebar-item" onclick="showAdminTab('dash-pgw-koreksi', this)">
                 <i class="fas fa-pen-to-square"></i> <span class="sidebar-text font-medium">Koreksi Jawaban</span>
               </div>
-              <div id="menu-capaian" class="sidebar-item" onclick="showAdminTab('dash-capaian', this)">
-                <i class="fas fa-bullseye"></i> <span class="sidebar-text font-medium">Capaian Pembelajaran</span>
-              </div>
             </div>
           </div>
 
@@ -2872,7 +2869,7 @@ function initAdminPanel() {
   // ── LOGIKA VISIBILITAS MENU BERDASARKAN ROLE ──────────────────────
   // [PENGAWAS] Guru (pengawas) hanya melihat: Dashboard, Jadwal Ujian, Bank Soal, Hasil & Nilai
   const guruAllowedMenus = ['menu-home', 'menu-profil-guru', 'menu-pgw-ujian', 'menu-pgw-koreksi', 'menu-questions', 'menu-exams', 'menu-results', 'menu-profil', 'menu-kartu', 'menu-hadir', 'menu-users', 'menu-images'];
-  const adminOnlyMenus = ['menu-questions', 'menu-kisi', 'menu-ai-generator', 'menu-hermes', 'menu-capaian',
+  const adminOnlyMenus = ['menu-questions', 'menu-kisi', 'menu-ai-generator', 'menu-hermes',
     'menu-report-template', 'menu-users', 'menu-profil', 'menu-kartu', 'menu-hadir',
     'menu-images', 'menu-music', 'menu-config',
     'menu-master-data', 'menu-pengawas', 'menu-timsoal', 'menu-panitia', 'menu-exams', 'menu-results',
@@ -2906,11 +2903,6 @@ function initAdminPanel() {
       const el = document.getElementById(id);
       if (el) el.classList.remove('hidden');
     });
-    // [V5.0] Panitia juga memegang menu Capaian Pembelajaran
-    if (izinPanitiaGuru) {
-      const elCap = document.getElementById('menu-capaian');
-      if (elCap) elCap.classList.remove('hidden');
-    }
     // [V3.1] Panitia butuh Modul Data (Profil Siswa & Kartu Ujian); Modul Sistem tetap khusus Admin
     const elModData = document.getElementById('mod-data');
     if (elModData) elModData.classList.toggle('hidden', !(izinPanitiaGuru || izinUjianGuru));
@@ -2998,11 +2990,11 @@ var SIP_PGW_ROLE_META = {
     judul: 'Panitia Ujian',
     ikon: 'fa-user-tie',
     tombol: 'Tunjuk Panitia',
-    deskripsi: 'Bertugas pada <b>administrasi ujian</b>: memvalidasi profil siswa, mencetak kartu ujian, dan memvalidasi hasil & capaian belajar.',
+    deskripsi: 'Bertugas pada <b>administrasi ujian</b>: memvalidasi profil siswa, mencetak kartu ujian, dan memvalidasi hasil belajar.',
     tugas: [
       'Validasi profil siswa — VALID / REVISI (menu Profil Siswa)',
       'Mencetak & membagikan kartu ujian (menu Kartu Ujian)',
-      'Validasi hasil belajar & capaian siswa (menu Hasil & Nilai)'
+      'Validasi hasil belajar siswa (menu Hasil & Nilai)'
     ],
     menuGuru: 'Dashboard · Profil Siswa · Kartu Ujian · Hasil & Nilai',
     kolom: 'Tugas Panitia'
@@ -3808,7 +3800,7 @@ function showAdminTab(tabId, el) {
     // [V3] Izin harus EKSPLISIT true dari penunjukan Admin
     if (_pgwIzinTab.izinUjian === true) allowedGuruTabs.push('dash-pgw-ujian', 'dash-pgw-koreksi', 'dash-users');
     if (_pgwIzinTab.izinBankSoal === true) allowedGuruTabs.push('dash-questions', 'dash-exams', 'dash-images');
-    if (_pgwIzinTab.izinPanitia === true) allowedGuruTabs.push('dash-profil', 'dash-kartu', 'dash-hadir', 'dash-results', 'dash-capaian', 'dash-pgw-ujian');
+    if (_pgwIzinTab.izinPanitia === true) allowedGuruTabs.push('dash-profil', 'dash-kartu', 'dash-hadir', 'dash-results', 'dash-pgw-ujian');
     if (!allowedGuruTabs.includes(tabId)) {
       Swal.fire({
         title: 'Akses Ditolak',
@@ -3887,9 +3879,6 @@ function showAdminTab(tabId, el) {
     title.innerText = 'Koreksi Jawaban';
     renderPgwKoreksiPage(content);
 
-  } else if (tabId === 'dash-capaian') {
-    title.innerText = 'Capaian Pembelajaran';
-    renderCapaianPage(content);
 
   } else if (tabId === 'dash-report-template') {
     title.innerText = 'Template Laporan';
@@ -5720,15 +5709,13 @@ function validasiSelectHtml_(r) {
     return '<span class="text-slate-300 text-[10px]">-</span>';
   }
   const saved = r.validasi || '';
-  const st = saved || r.autoValidasi || '';
+  const st = saved || '';
   const color = st === 'Valid' ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
     : st === 'Revisi' ? 'border-amber-300 bg-amber-50 text-amber-800'
     : st === 'Tidak Valid' ? 'border-red-300 bg-red-50 text-red-700'
     : 'border-slate-200 bg-white text-slate-600';
   const sid = escapeHtmlProfil_(r.studentId || r.userID || '');
-  const hint = (!saved && r.autoValidasi)
-    ? '<div class="text-[9px] text-slate-400 mt-0.5">Usulan dari pekerjaan &amp; nilai</div>'
-    : '';
+  const hint = '';
   return `<select class="text-[10px] font-bold rounded-lg border px-1.5 py-1 ${color}"
       onchange="setRowValidasi('${escapeHtmlProfil_(r.responseId)}','${sid}', this.value)">
       <option value="" ${st === '' ? 'selected' : ''}>Belum</option>
@@ -5739,6 +5726,7 @@ function validasiSelectHtml_(r) {
 }
 
 function attachValidasiThenRender(eid) {
+  // [V5.7] Modul Capaian Pembelajaran dihapus — cukup muat status validasi.
   google.script.run
     .withSuccessHandler(function (map) {
       map = map || {};
@@ -5747,105 +5735,30 @@ function attachValidasiThenRender(eid) {
         r.validasi = v ? v.status : '';
         r.validasiCatatan = v ? v.catatan : '';
         r.validasiBy = v ? v.validatorID : '';
-        r.capaianTercapai = v ? (v.capaianTercapai || '') : '';
       });
-      google.script.run
-        .withSuccessHandler(function (an) {
-          const arr = (an && an.items) || [];
-          const by = {};
-          arr.forEach(function (it) { by[String(it.responseId)] = it; });
-          (allResultsData || []).forEach(function (r) {
-            const a = by[String(r.responseId)];
-            if (!a) return;
-            r.autoValidasi = a.autoValidasi || '';
-            r.rekomendasi = a.rekomendasi || '';
-            r.kesimpulan = a.kesimpulan || '';
-            r.kemampuan = a.kemampuan || [];
-            r.kerjaPersen = a.kerjaPersen;
-            r.jawabPersen = a.jawabPersen;
-            if (!r.validasiCatatan && a.validasiCatatan) r.validasiCatatan = a.validasiCatatan;
-          });
-          const q = (document.getElementById('result-search-input') || {}).value;
-          if (q) {
-            const qq = String(q).toLowerCase();
-            filteredResults = allResultsData.filter(function (r) {
-              return String(r.name || '').toLowerCase().indexOf(qq) !== -1 || String(r.studentId || '').toLowerCase().indexOf(qq) !== -1;
-            });
-          } else {
-            filteredResults = (allResultsData || []).slice();
-          }
-          renderInternalTable();
-        })
-        .withFailureHandler(function () {
-          const q = (document.getElementById('result-search-input') || {}).value;
-          filteredResults = (allResultsData || []).slice();
-          renderInternalTable();
-        })
-        .getHasilAnalisis(eid, currentUser.userID, currentUser.token);
+      const q = (document.getElementById('result-search-input') || {}).value;
+      if (q) {
+        const qq = String(q).toLowerCase();
+        filteredResults = allResultsData.filter(function (r) {
+          return String(r.name || '').toLowerCase().indexOf(qq) !== -1 || String(r.studentId || '').toLowerCase().indexOf(qq) !== -1;
+        });
+      } else {
+        filteredResults = (allResultsData || []).slice();
+      }
+      renderInternalTable();
     })
     .withFailureHandler(function () { renderInternalTable(); })
     .getValidasiMap(eid, currentUser.userID, currentUser.token);
 }
 
-function capaianTercapaiHtml_(r) {
-  if (!r || !r.responseId) return '<span class="text-slate-300">-</span>';
-  var st0 = String(r.status || '').toLowerCase().trim();
-  var isCheat = st0 === 'curang';
-  var isDone = st0 === 'completed' || st0 === 'selesai' || st0 === 'waktu habis';
-  if (!isDone && !isCheat) return '<span class="text-slate-300 text-[10px]">-</span>';
-  var st = r.capaianTercapai || '';
-  var color = st === 'Ya' ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-    : st === 'Sebagian' ? 'border-amber-300 bg-amber-50 text-amber-800'
-    : st === 'Tidak' ? 'border-red-300 bg-red-50 text-red-700'
-    : 'border-slate-200 bg-white text-slate-600';
-  var rid = String(r.responseId || '').replace(/"/g, '');
-  var sid = String(r.studentId || r.userID || '').replace(/"/g, '');
-  return '<select class="text-[10px] font-bold rounded-lg border px-1.5 py-1 ' + color +
-    '" title="Divalidasi Admin/Panitia" data-rid="' + rid + '" data-sid="' + sid +
-    '" onchange="setCapaianTercapaiRow_(this.dataset.rid, this.dataset.sid, this.value)">' +
-    '<option value=""' + (st ? '' : ' selected') + '>-</option>' +
-    '<option value="Ya"' + (st === 'Ya' ? ' selected' : '') + '>Ya</option>' +
-    '<option value="Sebagian"' + (st === 'Sebagian' ? ' selected' : '') + '>Sebagian</option>' +
-    '<option value="Tidak"' + (st === 'Tidak' ? ' selected' : '') + '>Tidak</option></select>';
-}
-function setCapaianTercapaiRow_(responseId, studentId, capaian) {
-  var eid = (document.getElementById('select-result-exam') || {}).value || '';
-  google.script.run
-    .withSuccessHandler(function (res) {
-      if (!res || !res.success) {
-        Swal.fire({ icon: 'error', title: 'Gagal', text: (res && res.message) || '' });
-        return;
-      }
-      (allResultsData || []).forEach(function (r) {
-        if (String(r.responseId) === String(responseId)) r.capaianTercapai = capaian;
-      });
-      (filteredResults || []).forEach(function (r) {
-        if (String(r.responseId) === String(responseId)) r.capaianTercapai = capaian;
-      });
-    })
-    .setCapaianTercapai(responseId, eid, studentId, capaian, currentUser.userID, currentUser.token);
-}
 function validasiCatatanHtml_(r) {
   var cat = (r && r.validasiCatatan) ? String(r.validasiCatatan) : '';
   var sug = '';
-  if (!cat) {
-    if (r && r.kesimpulan) sug = r.kesimpulan;
-    else if (r && r.autoValidasi) sug = 'Usulan validasi (potret belajar saat ini, kemampuan masih dapat tumbuh): ' + r.autoValidasi;
-  }
   return '<div class="space-y-1">' +
     '<p class="text-[11px] leading-snug">' + escapeHtmlProfil_(cat || sug || '—') + '</p>' +
     '<button type="button" class="text-[10px] font-bold text-indigo-600" onclick="editValidasiCatatan_(\'' +
       escapeHtmlProfil_((r && r.responseId) || '') + '\',\'' + escapeHtmlProfil_((r && (r.studentId || r.userID)) || '') + '\',\'' +
       escapeHtmlProfil_((r && r.validasi) || '') + '\',\'' + String(cat).replace(/'/g, '') + '\')">Catatan</button></div>';
-}
-function rekomendasiHtml_(r) {
-  var t = (r && r.rekomendasi) ? String(r.rekomendasi) : 'Umpan balik pertumbuhan berdasarkan pekerjaan, nilai, dan capaian pembelajaran.';
-  var km = (r && r.kemampuan && r.kemampuan.length)
-    ? r.kemampuan.map(function (k) { return (k.teks || k.kode) + ' ' + k.persen + '%'; }).join(' | ')
-    : '';
-  var title = km ? (t + ' | Penguasaan: ' + km) : t;
-  var short = t.length > 120 ? t.slice(0, 118) + '…' : t;
-  return '<span title="' + escapeHtmlProfil_(title) + '">' + escapeHtmlProfil_(short) + '</span>';
 }
 function editValidasiCatatan_(responseId, studentId, status, catatan) {
   var eid = (document.getElementById('select-result-exam') || {}).value || '';
@@ -9343,7 +9256,6 @@ function renderInternalTable() {
           </td>
           <td class="p-5 text-center">${statusBadge}</td>
           <td class="p-5 text-center">${validasiSelectHtml_(r)}<div class="mt-1">${validasiCatatanHtml_(r)}</div></td>
-          <td class="p-5 text-xs text-slate-600">${capaianTercapaiHtml_(r)}<div class="mt-1">${rekomendasiHtml_(r)}</div></td>
           <td class="p-5 text-right w-36">${actionBtn}</td>
        </tr>`;
   }).join('');
@@ -9360,7 +9272,6 @@ function renderInternalTable() {
                           <th class="py-4 px-5 w-24">Nilai</th>
                           <th class="py-4 px-5 text-center w-32">Status</th>
                           <th class="py-4 px-5 text-center w-44">Validasi & Keterangan</th>
-                          <th class="py-4 px-5 w-56">Capaian & Rekomendasi</th>
                           <th class="py-4 px-5 text-right w-36">Aksi</th>
                       </tr>
                   </thead>
@@ -17515,13 +17426,6 @@ function renderAIGeneratorPage(container) {
           </div>
 
           <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Capaian / Tujuan Pembelajaran</label>
-            <select id="ai-capaian" class="w-full border border-slate-200 p-3 rounded-xl bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-indigo-500 transition cursor-pointer">
-              <option value="">— Tidak memakai CP (prompt bebas) —</option>
-            </select>
-            <p class="text-[11px] text-slate-400 mt-1">Isi CP di menu Capaian Pembelajaran. Soal akan disesuaikan dengan tujuan yang dipilih.</p>
-          </div>
-          <div>
             <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Materi / Topik</label>
             <input id="ai-topic" type="text" placeholder="Contoh: Teks eksposisi / Sistem pernapasan / Hak warga negara" class="w-full border border-slate-200 p-3 rounded-xl bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-indigo-500 transition">
             <div class="flex flex-wrap gap-1.5 mt-2" id="ai-subject-chips"></div>
@@ -17628,7 +17532,6 @@ function renderAIGeneratorPage(container) {
       }
     })
     .getAIConfig(currentUser.userID, currentUser.token);
-  sipFillAICapaian_();
 
   document.getElementById('ai-provider').addEventListener('change', updateAIProviderStatus);
 
@@ -17730,12 +17633,6 @@ function handleGenerateAI() {
     jumlah: parseInt(document.getElementById('ai-jumlah').value, 10) || 5,
     language: 'Indonesia',
     customPrompt: promptEl ? promptEl.value.trim() : '',
-    capaianText: (function () {
-      var sel = document.getElementById('ai-capaian');
-      if (!sel || !sel.value) return '';
-      var o = sel.options[sel.selectedIndex];
-      return o ? (o.getAttribute('data-text') || o.text) : '';
-    })(),
     // [BARU 2026] Opsi pembuatan gambar soal (hanya berlaku untuk Gemini)
     withImages: !!(withImagesEl && withImagesEl.checked && !withImagesEl.disabled && provider === 'gemini'),
     imageStyle: (document.getElementById('ai-image-style') || {}).value ? document.getElementById('ai-image-style').value.trim() : ''
@@ -18692,323 +18589,6 @@ function sipLoadCdn_(urls, checkFn) {
 }
 
 
-
-function sipFillAICapaian_() {
-  var sel = document.getElementById('ai-capaian');
-  if (!sel) return;
-  google.script.run
-    .withSuccessHandler(function (res) {
-      if (!sel) return;
-      var items = (res && res.items) || [];
-      var keep = '<option value="">— Tidak memakai CP (prompt bebas) —</option>';
-      sel.innerHTML = keep + items.map(function (it) {
-        var label = (it.kodeTP || it.kodeCP || it.id) + ' · ' + (it.teksTP || it.teksCP || '').slice(0, 80);
-        var text = [it.kodeCP, it.teksCP, it.kodeTP, it.teksTP, it.indikator].filter(Boolean).join(' | ');
-        return '<option value="' + escapeHtmlProfil_(it.id) + '" data-text="' + escapeHtmlProfil_(text) + '">' + escapeHtmlProfil_(label) + '</option>';
-      }).join('');
-    })
-    .listCapaianPembelajaran({}, currentUser.userID, currentUser.token);
-}
-
-function renderCapaianPage(container) {
-  if (!container) return;
-  window._sipCapaianItems = window._sipCapaianItems || [];
-  container.innerHTML =
-    '<div class="fade-in space-y-4">' +
-    '<div class="dash-card p-5">' +
-      '<h3 class="font-black text-slate-800">Capaian Pembelajaran</h3>' +
-      '<p class="text-xs text-slate-500 mt-1">Kode CP dan TP dibuat otomatis. Pilih kelas, simpan, lalu tautkan ke soal ujian kelas itu.</p>' +
-    '</div>' +
-    '<div class="dash-card p-5 grid md:grid-cols-2 gap-3">' +
-      '<label class="text-xs font-bold text-slate-600">Mata pelajaran<select id="cp-mapel" class="mt-1 w-full border rounded-xl px-3 py-2 text-sm font-normal"></select></label>' +
-      '<label class="text-xs font-bold text-slate-600">Kelas<select id="cp-kelas" class="mt-1 w-full border rounded-xl px-3 py-2 text-sm font-normal" onchange="sipPreviewKodeCapaian_()"></select></label>' +
-      '<label class="text-xs font-bold text-slate-600">Kode CP<input id="cp-kode-cp" class="mt-1 w-full border rounded-xl px-3 py-2 text-sm font-mono bg-slate-50" placeholder="Otomatis" readonly></label>' +
-      '<label class="text-xs font-bold text-slate-600">Kode TP<input id="cp-kode-tp" class="mt-1 w-full border rounded-xl px-3 py-2 text-sm font-mono bg-slate-50" placeholder="Otomatis" readonly></label>' +
-      '<textarea id="cp-teks-cp" class="border rounded-xl px-3 py-2 text-sm md:col-span-2" rows="2" placeholder="Rumusan CP"></textarea>' +
-      '<textarea id="cp-teks-tp" class="border rounded-xl px-3 py-2 text-sm md:col-span-2" rows="2" placeholder="Tujuan pembelajaran (wajib)"></textarea>' +
-      '<textarea id="cp-indikator" class="border rounded-xl px-3 py-2 text-sm md:col-span-2" rows="2" placeholder="Indikator (IP)"></textarea>' +
-      '<input type="hidden" id="cp-id" value="">' +
-      '<div class="md:col-span-2 flex flex-wrap gap-2">' +
-        '<button type="button" id="cp-btn-simpan" onclick="sipSaveCapaian_()" class="px-4 py-2 rounded-xl bg-[#1b3a6b] text-white text-sm font-bold">Simpan</button>' +
-        '<button type="button" onclick="sipResetCapaianForm_()" class="px-4 py-2 rounded-xl border text-sm font-bold">Batal</button>' +
-      '</div>' +
-    '</div>' +
-    '<div id="cp-list" class="dash-card p-5 text-sm text-slate-500">Memuat…</div>' +
-    '</div>';
-  sipCpFillSelects_(function () {
-    sipLoadCapaianList_();
-    sipPreviewKodeCapaian_();
-  });
-}
-
-function sipCpFillSelects_(cb) {
-  function fill(md) {
-    md = md || masterData || {};
-    masterData = { classes: md.classes || [], subjects: md.subjects || [] };
-    var mapelEl = document.getElementById('cp-mapel');
-    var kelasEl = document.getElementById('cp-kelas');
-    function toInput(el) {
-      if (!el || el.tagName === 'INPUT') return el;
-      var inp = document.createElement('input');
-      inp.id = el.id;
-      inp.className = 'mt-1 w-full border rounded-xl px-3 py-2 text-sm font-normal';
-      if (el.id === 'cp-kelas') inp.onchange = sipPreviewKodeCapaian_;
-      el.parentNode.replaceChild(inp, el);
-      return inp;
-    }
-    if (mapelEl) {
-      var sub = masterData.subjects || [];
-      if (!sub.length) toInput(mapelEl);
-      else {
-        mapelEl.innerHTML = '<option value="">— Pilih mapel —</option>' +
-          sub.map(function (s) { return '<option value="' + escapeHtmlProfil_(s) + '">' + escapeHtmlProfil_(s) + '</option>'; }).join('');
-      }
-    }
-    if (kelasEl) {
-      var cls = masterData.classes || [];
-      if (!cls.length) toInput(document.getElementById('cp-kelas'));
-      else {
-        kelasEl.innerHTML = '<option value="">— Pilih kelas —</option>' +
-          cls.map(function (c) { return '<option value="' + escapeHtmlProfil_(c) + '">' + escapeHtmlProfil_(c) + '</option>'; }).join('') +
-          '<option value="Semua">Semua</option>';
-      }
-    }
-    if (typeof cb === 'function') cb();
-  }
-  if (masterData && masterData.classes && masterData.classes.length) {
-    fill(masterData);
-    return;
-  }
-  google.script.run
-    .withSuccessHandler(function (md) { fill(md || {}); })
-    .withFailureHandler(function () { fill({ classes: [], subjects: [] }); })
-    .getMasterData();
-}
-
-function sipPreviewKodeCapaian_() {
-  var idEl = document.getElementById('cp-id');
-  if (idEl && idEl.value) return;
-  var kelas = ((document.getElementById('cp-kelas') || {}).value || '').trim();
-  var safe = String(kelas || 'X').replace(/[^A-Za-z0-9]+/g, '').toUpperCase() || 'X';
-  var items = window._sipCapaianItems || [];
-  function next(jenis) {
-    var prefix = jenis + '-' + safe + '-';
-    var max = 0;
-    items.forEach(function (it) {
-      var k = String((jenis === 'TP' ? it.kodeTP : it.kodeCP) || '').toUpperCase();
-      if (k.indexOf(prefix) !== 0) return;
-      var n = parseInt(k.slice(prefix.length), 10);
-      if (!isNaN(n) && n > max) max = n;
-    });
-    var v = String(max + 1);
-    return prefix + (v.length < 2 ? ('0' + v) : v);
-  }
-  var cp = document.getElementById('cp-kode-cp');
-  var tp = document.getElementById('cp-kode-tp');
-  if (cp) cp.value = next('CP');
-  if (tp) tp.value = next('TP');
-}
-
-function sipResetCapaianForm_() {
-  ['cp-id', 'cp-teks-cp', 'cp-teks-tp', 'cp-indikator'].forEach(function (id) {
-    var e = document.getElementById(id); if (e) e.value = '';
-  });
-  var m = document.getElementById('cp-mapel'); if (m) m.value = '';
-  var k = document.getElementById('cp-kelas'); if (k) k.value = '';
-  var btn = document.getElementById('cp-btn-simpan');
-  if (btn) btn.textContent = 'Simpan';
-  sipPreviewKodeCapaian_();
-}
-
-function sipLoadCapaianList_() {
-  var el = document.getElementById('cp-list');
-  google.script.run
-    .withSuccessHandler(function (res) {
-      if (!el) return;
-      var items = (res && res.items) || [];
-      window._sipCapaianItems = items;
-      sipPreviewKodeCapaian_();
-      if (!items.length) { el.innerHTML = '<p>Belum ada capaian. Isi formulir lalu simpan.</p>'; return; }
-      el.innerHTML = '<p class="text-xs font-bold uppercase text-slate-500 mb-3">Daftar CP / TP / IP</p>' +
-        items.map(function (it) {
-          var id = escapeHtmlProfil_(it.id);
-          return '<div class="border border-slate-200 rounded-xl p-3 mb-2">' +
-            '<div class="flex flex-wrap gap-2 items-center text-xs font-mono">' +
-              '<span class="px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 font-bold">' + escapeHtmlProfil_(it.kodeCP || '-') + '</span>' +
-              '<span class="px-2 py-0.5 rounded-lg bg-teal-50 text-teal-700 font-bold">' + escapeHtmlProfil_(it.kodeTP || '-') + '</span>' +
-              '<span class="text-slate-500 font-sans">' + escapeHtmlProfil_(it.kelas || '-') + ' · ' + escapeHtmlProfil_(it.mapel || '-') + '</span>' +
-            '</div>' +
-            '<p class="text-sm text-slate-700 mt-2"><b>TP.</b> ' + escapeHtmlProfil_((it.teksTP || '').slice(0, 180)) + '</p>' +
-            (it.indikator ? '<p class="text-xs text-slate-500 mt-1"><b>IP.</b> ' + escapeHtmlProfil_(it.indikator.slice(0, 140)) + '</p>' : '') +
-            '<div class="mt-2 flex flex-wrap gap-1">' +
-              '<button type="button" class="px-2 py-1 rounded-lg bg-[#1b3a6b] text-white text-[11px] font-bold" onclick="sipEditCapaian_(\'' + id + '\')">Edit</button>' +
-              '<button type="button" class="px-2 py-1 rounded-lg border text-[11px] font-bold" onclick="sipSalinCapaianField_(\'' + id + '\',\'cp\')">Salin CP</button>' +
-              '<button type="button" class="px-2 py-1 rounded-lg border text-[11px] font-bold" onclick="sipSalinCapaianField_(\'' + id + '\',\'tp\')">Salin TP</button>' +
-              '<button type="button" class="px-2 py-1 rounded-lg border text-[11px] font-bold" onclick="sipSalinCapaianField_(\'' + id + '\',\'ip\')">Salin IP</button>' +
-              '<button type="button" class="px-2 py-1 rounded-lg border text-[11px] font-bold" onclick="sipSalinCapaianField_(\'' + id + '\',\'tautan\')">Salin tautan</button>' +
-              '<button type="button" class="px-2 py-1 rounded-lg bg-emerald-600 text-white text-[11px] font-bold" onclick="sipTautkanCapaianKeSoal_(\'' + id + '\')">Ke soal</button>' +
-              '<button type="button" class="px-2 py-1 rounded-lg text-rose-600 text-[11px] font-bold" onclick="sipDelCapaian_(\'' + id + '\')">Hapus</button>' +
-            '</div></div>';
-        }).join('');
-    })
-    .withFailureHandler(function (err) { if (el) el.innerHTML = '<p class="text-rose-600">' + String(err) + '</p>'; })
-    .listCapaianPembelajaran({}, currentUser.userID, currentUser.token);
-}
-
-function sipCapaianById_(id) {
-  var items = window._sipCapaianItems || [];
-  for (var i = 0; i < items.length; i++) {
-    if (String(items[i].id) === String(id)) return items[i];
-  }
-  return null;
-}
-
-function sipEditCapaian_(id) {
-  var it = sipCapaianById_(id);
-  if (!it) return;
-  var setVal = function (eid, v) {
-    var e = document.getElementById(eid);
-    if (!e) return;
-    e.value = v || '';
-  };
-  function ensureOpt(eid, val) {
-    var e = document.getElementById(eid);
-    if (!e || !val) return;
-    if (!e.options) { e.value = val; return; }
-    var ok = false;
-    for (var i = 0; i < e.options.length; i++) { if (e.options[i].value === val) { ok = true; break; } }
-    if (!ok) { var o = document.createElement('option'); o.value = val; o.textContent = val; e.appendChild(o); }
-    e.value = val;
-  }
-  setVal('cp-id', it.id);
-  ensureOpt('cp-mapel', it.mapel);
-  ensureOpt('cp-kelas', it.kelas);
-  setVal('cp-kode-cp', it.kodeCP);
-  setVal('cp-kode-tp', it.kodeTP);
-  setVal('cp-teks-cp', it.teksCP);
-  setVal('cp-teks-tp', it.teksTP);
-  setVal('cp-indikator', it.indikator);
-  var btn = document.getElementById('cp-btn-simpan');
-  if (btn) btn.textContent = 'Simpan perubahan';
-  try { document.getElementById('cp-teks-tp').scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (eS) {}
-}
-
-function sipSalinTeks_(teks, label) {
-  teks = String(teks || '');
-  if (!teks) { Swal.fire('Kosong', (label || 'Teks') + ' belum ada.', 'info'); return; }
-  function ok() {
-    Swal.fire({ icon: 'success', title: 'Disalin', text: label || teks, timer: 1200, showConfirmButton: false });
-  }
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(teks).then(ok).catch(function () {
-      window.prompt('Salin tautan:', teks);
-    });
-  } else {
-    window.prompt('Salin tautan:', teks);
-  }
-}
-
-function sipSalinCapaianField_(id, jenis) {
-  var it = sipCapaianById_(id);
-  if (!it) return;
-  if (jenis === 'cp') sipSalinTeks_(it.kodeCP, 'Kode CP');
-  else if (jenis === 'tp') sipSalinTeks_(it.kodeTP, 'Kode TP');
-  else if (jenis === 'ip') sipSalinTeks_(it.indikator, 'IP');
-  else sipSalinTeks_((it.kodeCP || '') + ' | ' + (it.kodeTP || '') + (it.indikator ? ' | ' + it.indikator : ''), 'Tautan CP/TP/IP');
-}
-
-function sipTautkanCapaianKeSoal_(id) {
-  var it = sipCapaianById_(id);
-  if (!it) return;
-  var kelas = String(it.kelas || '').trim();
-  var kode = String(it.kodeTP || it.kodeCP || '').trim();
-  if (!kelas) { Swal.fire('Kelas kosong', 'Edit capaian dan pilih kelas.', 'info'); return; }
-  if (!kode) { Swal.fire('Kode kosong', 'Kode TP belum ada.', 'info'); return; }
-  Swal.fire({
-    title: 'Masukkan tautan ke soal?',
-    text: kode + ' akan dimasukkan ke soal ujian kelas ' + kelas + '.',
-    icon: 'question',
-    showCancelButton: true,
-    confirmButtonText: 'Masukkan'
-  }).then(function (r) {
-    if (!r.isConfirmed) return;
-    Swal.fire({ title: 'Menautkan…', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
-    google.script.run
-      .withSuccessHandler(function (res) {
-        Swal.close();
-        if (!res || !res.success) { Swal.fire('Gagal', (res && res.message) || '', 'error'); return; }
-        Swal.fire('Berhasil', res.message, 'success');
-      })
-      .withFailureHandler(function (err) { Swal.close(); Swal.fire('Gagal', String(err), 'error'); })
-      .tautkanSoalCapaianByKelas(kelas, kode, currentUser.userID, currentUser.token);
-  });
-}
-
-function sipSaveCapaian_() {
-  var payload = {
-    id: (document.getElementById('cp-id') || {}).value || '',
-    mapel: (document.getElementById('cp-mapel') || {}).value || '',
-    kelas: (document.getElementById('cp-kelas') || {}).value || '',
-    kodeCP: (document.getElementById('cp-kode-cp') || {}).value || '',
-    kodeTP: (document.getElementById('cp-kode-tp') || {}).value || '',
-    teksCP: (document.getElementById('cp-teks-cp') || {}).value || '',
-    teksTP: (document.getElementById('cp-teks-tp') || {}).value || '',
-    indikator: (document.getElementById('cp-indikator') || {}).value || ''
-  };
-  if (!payload.mapel) { Swal.fire('Lengkapi', 'Pilih mata pelajaran.', 'info'); return; }
-  if (!payload.kelas) { Swal.fire('Lengkapi', 'Pilih kelas.', 'info'); return; }
-  if (!payload.teksTP) { Swal.fire('Lengkapi', 'Tujuan pembelajaran wajib diisi.', 'info'); return; }
-  google.script.run
-    .withSuccessHandler(function (res) {
-      if (!res || !res.success) { Swal.fire('Gagal', (res && res.message) || '', 'error'); return; }
-      Swal.fire('Tersimpan', res.message, 'success');
-      sipResetCapaianForm_();
-      sipLoadCapaianList_();
-    })
-    .withFailureHandler(function (err) { Swal.fire('Gagal', String(err), 'error'); })
-    .saveCapaianPembelajaran(payload, currentUser.userID, currentUser.token);
-}
-
-function sipDelCapaian_(id) {
-  Swal.fire({ title: 'Hapus capaian?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Hapus', confirmButtonColor: '#b91c1c' })
-    .then(function (r) {
-      if (!r.isConfirmed) return;
-      google.script.run
-        .withSuccessHandler(function (res) {
-          if (!res || !res.success) { Swal.fire('Gagal', (res && res.message) || '', 'error'); return; }
-          sipLoadCapaianList_();
-        })
-        .deleteCapaianPembelajaran(id, currentUser.userID, currentUser.token);
-    });
-}
-
-function sipLoadSoalTautan_() {
-  var eid = (document.getElementById('cp-exam') || {}).value || '';
-  var box = document.getElementById('cp-soal-taut');
-  if (!eid) { if (box) box.innerHTML = 'Pilih ujian.'; return; }
-  if (box) box.innerHTML = 'Memuat soal…';
-  google.script.run
-    .withSuccessHandler(function (res) {
-      if (!box) return;
-      var items = (res && res.items) || [];
-      if (!items.length) { box.innerHTML = 'Tidak ada soal pada ujian ini.'; return; }
-      box.innerHTML = items.map(function (it) {
-        return '<div class="flex gap-2 items-center py-1 border-b border-slate-100"><span class="flex-1 text-xs">' +
-          escapeHtmlProfil_(it.type) + ' · ' + escapeHtmlProfil_(it.content) + '</span>' +
-          '<input class="border rounded-lg px-2 py-1 text-xs w-28" placeholder="Kode TP" value="' + escapeHtmlProfil_(it.tpKode || '') +
-          '" onchange="sipSetSoalTP_(\'' + escapeHtmlProfil_(it.id) + '\', this.value)"></div>';
-      }).join('');
-    })
-    .listSoalUntukTautan(eid, currentUser.userID, currentUser.token);
-}
-
-function sipSetSoalTP_(qid, kode) {
-  google.script.run
-    .withSuccessHandler(function (res) {
-      if (!res || !res.success) Swal.fire('Gagal', (res && res.message) || '', 'error');
-    })
-    .setSoalTPKode(qid, kode, currentUser.userID, currentUser.token);
-}
 
 function toggleSiswaMod(id) {
   var box = document.getElementById(id);
@@ -20198,5 +19778,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4d4b7c8afc035b2',t:'MTc5MjQ2NDY1Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4d4c9165b2f5ff8',t:'MTc5MjQ2NTM2NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
