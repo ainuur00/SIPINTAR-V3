@@ -2872,7 +2872,7 @@ function initAdminPanel() {
   // ── LOGIKA VISIBILITAS MENU BERDASARKAN ROLE ──────────────────────
   // [PENGAWAS] Guru (pengawas) hanya melihat: Dashboard, Jadwal Ujian, Bank Soal, Hasil & Nilai
   const guruAllowedMenus = ['menu-home', 'menu-profil-guru', 'menu-pgw-ujian', 'menu-pgw-koreksi', 'menu-questions', 'menu-exams', 'menu-results', 'menu-profil', 'menu-kartu', 'menu-hadir', 'menu-users', 'menu-images'];
-  const adminOnlyMenus = ['menu-kisi', 'menu-ai-generator', 'menu-hermes', 'menu-capaian',
+  const adminOnlyMenus = ['menu-questions', 'menu-kisi', 'menu-ai-generator', 'menu-hermes', 'menu-capaian',
     'menu-report-template', 'menu-users', 'menu-profil', 'menu-kartu', 'menu-hadir',
     'menu-images', 'menu-music', 'menu-config',
     'menu-master-data', 'menu-pengawas', 'menu-timsoal', 'menu-panitia', 'menu-exams', 'menu-results',
@@ -2880,6 +2880,10 @@ function initAdminPanel() {
   const guruOnlyMenus = ['menu-pgw-ujian', 'menu-pgw-koreksi'];
 
   if (currentUser && currentUser.role === 'Guru') {
+    // [V5.6] GARANSI: sembunyikan SEMUA menu sidebar lebih dulu. Guru tanpa
+    // penunjukan Admin hanya mendapat 2 menu: Dashboard & Profil Guru.
+    // Menu lain dibuka kembali HANYA lewat izin eksplisit di bawah.
+    document.querySelectorAll('#admin-sidebar .sidebar-item').forEach(function (itSb) { itSb.classList.add('hidden'); });
     const _pgwIzin = (currentUser && currentUser.pengawas) || {};
     // [V3] Izin harus EKSPLISIT dari penunjukan Admin. Guru tanpa penunjukan
     // (bukan Pengawas & bukan Tim Pembuat Soal) hanya melihat Dashboard.
@@ -20194,5 +20198,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4d4a66ddf985888',t:'MTc5MjQ2Mzk0NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4d4b7c8afc035b2',t:'MTc5MjQ2NDY1Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
