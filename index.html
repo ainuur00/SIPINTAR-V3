@@ -6582,12 +6582,11 @@ function renderExamForm(container) {
       const endDateDisplay = exam.endDateStr ? exam.endDateStr : '?';
 
       // [BARU] Chip modul Soal Acak (tampil bila ada jenis dengan jumlah acak > 0)
-      const rcCfg = exam.randomConfig || {};
-      const rcActiveTypes = Object.keys(rcCfg).filter(k => parseInt(rcCfg[k]) > 0);
-      const rcTotal = rcActiveTypes.reduce((s, k) => s + parseInt(rcCfg[k]), 0);
-      const rcLabelMap = { PG: 'PG', PG_KOMPLEKS: 'PGK', BS: 'B/S', JODOH: 'JODOH', Esai: 'URAIAN' };
-      const rcChip = rcActiveTypes.length
-        ? `<span class="sp-chip-random" title="Soal acak aktif: ${rcActiveTypes.map(k => rcCfg[k] + ' ' + (rcLabelMap[k] || k)).join(', ')}"><i class="fas fa-dice"></i> ${rcTotal} soal acak</span>`
+      const rcCfg = (exam.randomConfig && exam.randomConfig.materi) || {};
+      const rcActiveBab = Object.keys(rcCfg).filter(k => parseInt(rcCfg[k]) > 0);
+      const rcTotal = rcActiveBab.reduce((s, k) => s + parseInt(rcCfg[k]), 0);
+      const rcChip = rcActiveBab.length
+        ? `<span class="sp-chip-random" title="Soal acak per bab: ${rcActiveBab.map(k => rcCfg[k] + ' soal · ' + k).join(', ')}"><i class="fas fa-dice"></i> ${rcTotal} soal acak</span>`
         : '';
 
       html += `
@@ -7083,9 +7082,9 @@ function handleExamSubmit(e) {
   try {
     data.randomConfig = (typeof spReadConfig === 'function')
       ? spReadConfig('rc')
-      : { PG: 0, PG_KOMPLEKS: 0, BS: 0, JODOH: 0, Esai: 0 };
+      : { materi: {} };
   } catch (e) {
-    data.randomConfig = { PG: 0, PG_KOMPLEKS: 0, BS: 0, JODOH: 0, Esai: 0 };
+    data.randomConfig = { materi: {} };
   }
   if (typeof stashExamInfoCurrentType === 'function') stashExamInfoCurrentType();
   data.examInfo = _examInfoDraft || emptyExamInfoDraft();
@@ -7408,6 +7407,9 @@ function renderQuestionBank(container) {
                 </div>
 
                 <div class="flex-1 flex flex-col justify-center">
+                    <label class="block mb-2 text-sm font-bold text-slate-600">Materi / Bab (berlaku untuk semua soal di file) <span class="text-red-500">*</span></label>
+                    <input id="excel-materi" list="materi-datalist" type="text" placeholder="Contoh: Sistem Pernapasan"
+                      class="w-full border border-green-200 rounded-xl bg-white p-2.5 text-sm outline-none focus:ring-2 focus:ring-green-500 transition mb-4">
                     <label class="block mb-2 text-sm font-bold text-slate-600">Upload File (.xlsx)</label>
                     <input type="file" id="input-excel-file" accept=".xlsx, .xls" class="block w-full text-sm text-slate-500
                       file:mr-4 file:py-2.5 file:px-4
@@ -7517,6 +7519,15 @@ Jawaban: B</pre>
           </div>
         </div>
 
+        <!-- [V5.8] Materi/Bab untuk seluruh soal batch -->
+        <div class="mb-4">
+          <label class="block text-xs font-bold text-purple-700 uppercase mb-1">
+            <i class="fas fa-book-open mr-1"></i> Materi / Bab (berlaku untuk semua soal di bawah) <span class="text-red-500">*</span>
+          </label>
+          <input id="batch-materi" list="materi-datalist" type="text" placeholder="Contoh: Teks Eksposisi"
+            class="w-full border-2 border-purple-200 focus:border-purple-500 rounded-xl p-3 outline-none transition text-sm bg-white text-slate-800">
+        </div>
+
         <!-- Textarea Input -->
         <div class="mb-4">
           <label class="block text-xs font-bold text-purple-700 uppercase mb-1">
@@ -7561,6 +7572,13 @@ Jawaban: A
           <form onsubmit="handleAddQuestion(event)" class="space-y-5">
              <input type="hidden" name="examId" id="input-exam-id">
              <input type="hidden" name="questionId" id="input-question-id">
+
+             <div>
+                 <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Materi / Bab <span class="text-red-500">*</span></label>
+                 <input id="input-materi" list="materi-datalist" type="text" placeholder="Contoh: Bangun Ruang Sisi Datar" class="w-full border border-slate-200 p-3 rounded-xl bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-blue-500 transition">
+                 <datalist id="materi-datalist"></datalist>
+                 <p class="text-[11px] text-slate-400 mt-1">Wajib diisi — dipakai sistem untuk deskripsi kisi-kisi dan Soal Acak per bab/materi. Nilai ini tidak direset agar input soal satu bab lebih cepat.</p>
+             </div>
 
              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                <div>
@@ -8057,6 +8075,15 @@ function loadQuestionsTable(examId) {
 
     // SIMPAN DATA KE VARIABLE GLOBAL
     allQuestionsData = qs || [];
+    // [V5.8] isi datalist Materi/Bab agar penulisan bab konsisten
+    try {
+      const _dl = document.getElementById('materi-datalist');
+      if (_dl) {
+        const _set = {};
+        (qs || []).forEach(function (q) { const m = String(q.materi || '').trim(); if (m) _set[m] = true; });
+        _dl.innerHTML = Object.keys(_set).sort().map(function (m) { return '<option value="' + m.replace(/"/g, '&quot;') + '">'; }).join('');
+      }
+    } catch (eDl) {}
     filteredQuestions = qs || [];
     currentQPage = 1;
 
@@ -8317,6 +8344,9 @@ function renderQuestionsInternal() {
                     <button onclick="editQuestionAt(${qIdx})" class="qb-edit-btn w-8 h-8 rounded flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-blue-50 border border-transparent hover:border-blue-100 transition-all" title="Edit Soal">
                         <i class="fas fa-pencil-alt text-sm"></i>
                     </button>
+                    ${(currentUser && currentUser.role === 'Admin') ? `<button onclick="aiLevelSoalAt(${qIdx})" class="w-8 h-8 rounded flex items-center justify-center text-slate-500 hover:text-violet-600 hover:bg-violet-50 border border-transparent hover:border-violet-100 transition-all" title="AI: Perbaiki Level Kognitif Soal">
+                        <i class="fas fa-wand-magic-sparkles text-sm"></i>
+                    </button>` : ''}
                     <button onclick="showQuestionPreviewAt(${qIdx})" class="w-8 h-8 rounded flex items-center justify-center text-slate-500 hover:text-teal-600 hover:bg-teal-50 border border-transparent hover:border-teal-100 transition-all" title="Preview Soal">
                         <i class="fas fa-eye text-sm"></i>
                     </button>
@@ -8564,6 +8594,15 @@ function handleAddQuestion(e) {
   // D. LAINNYA (ESAI, DLL)
   else {
     data.options = [];
+  }
+
+  // [V5.8] Materi/Bab WAJIB diisi
+  const _matEl = document.getElementById('input-materi');
+  data.materi = _matEl ? _matEl.value.trim() : '';
+  if (!data.materi) {
+    Swal.fire('Materi/Bab Wajib Diisi', 'Isi kolom “Materi / Bab” — dipakai untuk deskripsi kisi-kisi dan soal acak per bab.', 'warning');
+    if (_matEl) _matEl.focus();
+    return;
   }
 
   // 5. LOGIKA SIMPAN KE SERVER (ADD atau UPDATE)
@@ -10369,7 +10408,7 @@ function initStudentExam(examData) {
           try {
             const _chip = document.getElementById('exam-random-chip');
             if (_chip) {
-              const _rc = res.randomConfig || {};
+              const _rc = (res.randomConfig && res.randomConfig.materi) || {};
               const _active = res.randomActive && Object.values(_rc).some(v => parseInt(v) > 0);
               _chip.classList.toggle('hidden', !_active);
             }
@@ -12185,8 +12224,9 @@ function resetQuestionForm() {
     // 1. Reset Hidden ID (Kecuali ExamID agar user tidak perlu pilih mapel lagi jika input beruntun)
     document.getElementById('input-question-id').value = '';
     
-    // 2. Reset Tipe Soal ke Default (PG)
-    document.getElementById('q-type-select').value = 'PG';
+    // 2. [V5.8] Jenis soal TIDAK direset — tetap pada pilihan terakhir user
+    //    sampai user sendiri yang mengubahnya (aturan Bank Soal manual).
+    const _tipeTetap = document.getElementById('q-type-select').value || 'PG';
     
     // -----------------------------------------------------------
     // [BARU] 3. RESET BOBOT NILAI (POINT)
@@ -12236,8 +12276,8 @@ function resetQuestionForm() {
     // 9. Reset Kunci Jawaban Text
     document.getElementById('correct-input').value = '';
 
-    // 10. Kembalikan Tampilan Input ke Mode PG
-    toggleOptionsInput('PG');
+    // 10. [V5.8] Tampilan input mengikuti jenis soal yang sedang terpilih
+    toggleOptionsInput(_tipeTetap);
 
     // 11. KEMBALIKAN TOMBOL KE MODE "SIMPAN" (BIRU)
     // Karena saat Edit tombol berubah jadi Orange/Update
@@ -12251,6 +12291,122 @@ function resetQuestionForm() {
 
 /* --- FUNGSI ISI FORM SAAT EDIT --- */
 /* --- FUNGSI ISI FORM SAAT EDIT (SUDAH DIPERBAIKI UNTUK PG KOMPLEKS) --- */
+/* ===== [V5.9] AI PERBAIKAN LEVEL KOGNITIF SOAL (khusus Admin) ===== */
+function aiLevelSoalAt(idx) {
+  const q = (filteredQuestions || [])[idx];
+  if (!q) { Swal.fire('Gagal', 'Data soal tidak ditemukan.', 'error'); return; }
+  if (!(currentUser && currentUser.role === 'Admin')) {
+    Swal.fire('Khusus Admin', 'Perbaikan soal dengan AI hanya untuk Administrator.', 'info');
+    return;
+  }
+  Swal.fire({
+    title: 'Perbaiki Level Kognitif (AI)',
+    html:
+      '<div class="text-left space-y-3">' +
+      '<p class="text-xs text-slate-500">AI menulis ulang <b>deskripsi soal</b> agar mencapai level kognitif target. Tipe soal, Materi/Bab, bobot, dan jumlah soal per bab <b>tidak berubah</b>. Hasil berupa usulan — Anda meninjau dulu sebelum diterapkan.</p>' +
+      '<label class="block text-xs font-bold text-slate-600">Level Kognitif Target' +
+      '<select id="swal-ai-level" class="mt-1 w-full border rounded-xl px-3 py-2 text-sm font-normal">' +
+      '<option value="C1">C1 — Mengingat (menyebutkan, mengidentifikasi)</option>' +
+      '<option value="C2">C2 — Memahami (menjelaskan, memberi contoh)</option>' +
+      '<option value="C3">C3 — Menerapkan (menghitung, menentukan)</option>' +
+      '<option value="C4" selected>C4 — Menganalisis (membandingkan, menyimpulkan)</option>' +
+      '<option value="C5">C5 — Mengevaluasi (menilai, mengkritisi)</option>' +
+      '<option value="C6">C6 — Mencipta (merancang, menyusun)</option>' +
+      '</select></label>' +
+      '<label class="block text-xs font-bold text-slate-600">Provider AI' +
+      '<select id="swal-ai-prov" class="mt-1 w-full border rounded-xl px-3 py-2 text-sm font-normal">' +
+      '<option value="gemini" selected>Google Gemini</option>' +
+      '<option value="openai">OpenAI (ChatGPT)</option>' +
+      '<option value="custom">Custom</option>' +
+      '</select></label>' +
+      '</div>',
+    showCancelButton: true,
+    confirmButtonText: '<i class="fas fa-wand-magic-sparkles"></i> Buat Perbaikan',
+    cancelButtonText: 'Batal',
+    confirmButtonColor: '#7c3aed',
+    preConfirm: function () {
+      return {
+        level: (document.getElementById('swal-ai-level') || {}).value || 'C4',
+        prov: (document.getElementById('swal-ai-prov') || {}).value || 'gemini'
+      };
+    }
+  }).then(function (r) {
+    if (!r.isConfirmed) return;
+    Swal.fire({
+      title: 'AI sedang memperbaiki soal...',
+      html: '<i class="fas fa-circle-notch fa-spin text-3xl text-violet-500"></i><p class="text-xs text-slate-400 mt-3">Menyesuaikan rumusan ke level ' + r.value.level + ' tanpa mengubah tipe & bab.</p>',
+      allowOutsideClick: false, showConfirmButton: false
+    });
+    google.script.run
+      .withSuccessHandler(function (res) {
+        if (!res || !res.success) {
+          Swal.fire('Gagal', (res && res.message) || 'AI tidak merespon.', 'error');
+          return;
+        }
+        aiLevelTampilkanUsulan_(res);
+      })
+      .withFailureHandler(function (err) {
+        Swal.fire('Error', (err && err.message) || String(err), 'error');
+      })
+      .perbaikiSoalLevelAI(q.id, r.value.level, r.value.prov, currentUser.userID, currentUser.token);
+  });
+}
+
+function aiLevelTampilkanUsulan_(res) {
+  const esc = function (s) { return String(s == null ? '' : s); };
+  let optHtml = '';
+  if (res.baru && res.baru.options && Array.isArray(res.baru.options) && res.baru.options.length) {
+    optHtml = '<p class="text-[11px] font-bold text-slate-500 uppercase mt-2 mb-1">Opsi baru</p><ol class="list-[upper-alpha] list-inside text-xs text-slate-600 space-y-0.5">' +
+      res.baru.options.map(function (o) {
+        const t = (o && typeof o === 'object') ? ((o.q || '') + ' = ' + (o.a || '')) : String(o);
+        return '<li>' + t.replace(/</g, '&lt;') + '</li>';
+      }).join('') + '</ol>';
+  }
+  Swal.fire({
+    title: 'Usulan Perbaikan AI',
+    html:
+      '<div class="text-left space-y-2 max-h-[55vh] overflow-y-auto">' +
+      '<p class="text-xs"><span class="font-bold text-slate-500">Level terdeteksi:</span> ' + esc(res.levelKini) +
+      ' <i class="fas fa-arrow-right mx-1 text-violet-500"></i> <span class="font-bold text-violet-700">' + esc(res.levelTarget) + '</span>' +
+      ' <span class="text-slate-400">| ' + esc(res.tipe) + ' · ' + esc(res.materi) + '</span></p>' +
+      '<p class="text-[11px] font-bold text-slate-500 uppercase">Soal lama</p>' +
+      '<div class="border rounded-xl p-3 text-xs bg-slate-50 text-slate-600">' + esc(res.lama && res.lama.content) + '</div>' +
+      '<p class="text-[11px] font-bold text-violet-600 uppercase">Soal baru (usulan AI)</p>' +
+      '<div class="border-2 border-violet-200 rounded-xl p-3 text-xs bg-violet-50 text-slate-700">' + esc(res.baru && res.baru.content) + '</div>' +
+      optHtml +
+      (res.baru && res.baru.correct ? '<p class="text-[11px] text-emerald-700 mt-1"><b>Kunci baru:</b> ' + String(JSON.stringify(res.baru.correct)).replace(/</g, '&lt;') + '</p>' : '') +
+      '</div>',
+    width: 700,
+    showCancelButton: true,
+    showDenyButton: true,
+    confirmButtonText: '<i class="fas fa-check"></i> Terapkan',
+    denyButtonText: '<i class="fas fa-rotate"></i> Coba Lagi',
+    cancelButtonText: 'Batal',
+    confirmButtonColor: '#059669',
+    denyButtonColor: '#7c3aed'
+  }).then(function (r2) {
+    if (r2.isDenied) {
+      const idx = (filteredQuestions || []).findIndex(function (x) { return String(x.id) === String(res.questionId); });
+      if (idx >= 0) aiLevelSoalAt(idx);
+      return;
+    }
+    if (!r2.isConfirmed) return;
+    Swal.fire({ title: 'Menerapkan...', html: '<i class="fas fa-circle-notch fa-spin text-2xl text-emerald-500"></i>', allowOutsideClick: false, showConfirmButton: false });
+    google.script.run
+      .withSuccessHandler(function (ok) {
+        if (ok && ok.success) {
+          Swal.fire({ icon: 'success', title: 'Diterapkan', text: ok.message, timer: 2200, showConfirmButton: false });
+          const eid = (document.getElementById('select-exam-q') || {}).value || (document.getElementById('input-exam-id') || {}).value;
+          if (eid && typeof loadQuestionsTable === 'function') loadQuestionsTable(eid);
+        } else {
+          Swal.fire('Gagal', (ok && ok.message) || 'Tidak tersimpan.', 'error');
+        }
+      })
+      .withFailureHandler(function (err) { Swal.fire('Error', (err && err.message) || String(err), 'error'); })
+      .terapkanSoalLevelAI(res.questionId, res.baru, currentUser.userID, currentUser.token);
+  });
+}
+
 function editQuestionAt(idx) {
     const q = (filteredQuestions || [])[idx];
     if (!q) { Swal.fire('Gagal', 'Data soal tidak ditemukan.', 'error'); return; }
@@ -12282,6 +12438,9 @@ function editQuestion(qStr) {
     document.getElementById('input-question-id').value = q.id;
     document.getElementById('input-exam-id').value = q.examId;
     document.querySelector('select[name="type"]').value = q.type;
+    // [V5.8] isi Materi/Bab dari data soal
+    const _matEd = document.getElementById('input-materi');
+    if (_matEd) _matEd.value = q.materi || '';
 
     // -----------------------------------------------------------
     // [BARU] 3. ISI BOBOT NILAI (POINT)
@@ -13040,6 +13199,12 @@ function processExcelImport() {
         Swal.fire('Peringatan', 'Pilih file Excel (.xlsx) dulu.', 'warning');
         return;
     }
+    // [V5.8] Materi/Bab wajib untuk impor Excel
+    const _matXl = ((document.getElementById('excel-materi') || {}).value || '').trim();
+    if (!_matXl) {
+        Swal.fire('Materi/Bab Wajib Diisi', 'Isi kolom “Materi / Bab” untuk seluruh soal pada file ini.', 'warning');
+        return;
+    }
 
     const file = fileInput.files[0];
     const reader = new FileReader();
@@ -13117,7 +13282,8 @@ function processExcelImport() {
                         options: options,
                         correct: key,
                         isRequired: isReq,
-                        image: ''
+                        image: '',
+                        materi: _matXl // [V5.8] Materi/Bab dari form impor
                     });
                 }
             });
@@ -13323,6 +13489,12 @@ function processBatchInput() {
     Swal.fire('Pilih Ujian', 'Silakan pilih mata pelajaran/ujian tujuan terlebih dahulu (dropdown di atas).', 'warning');
     return;
   }
+  // [V5.8] Materi/Bab wajib untuk batch
+  const _matBatch = ((document.getElementById('batch-materi') || {}).value || '').trim();
+  if (!_matBatch) {
+    Swal.fire('Materi/Bab Wajib Diisi', 'Isi kolom “Materi / Bab” untuk seluruh soal batch ini.', 'warning');
+    return;
+  }
 
   const { results, errors } = parseBatchText(raw);
 
@@ -13353,6 +13525,9 @@ function processBatchInput() {
 
 function doSaveBatchQuestions(questionsArr) {
   const examId = document.getElementById('select-exam-q').value;
+  // [V5.8] sematkan Materi/Bab ke setiap soal batch
+  const _matB = ((document.getElementById('batch-materi') || {}).value || '').trim();
+  (questionsArr || []).forEach(function (q) { if (!q.materi) q.materi = _matB; });
   if (!examId) {
     Swal.fire('Pilih Ujian', 'Silakan pilih mata pelajaran tujuan terlebih dahulu.', 'warning');
     return;
@@ -17795,6 +17970,10 @@ function handleSaveAIQuestions() {
   const examId = document.getElementById('ai-target-exam').value;
   if (!examId) { Swal.fire('Pilih Ujian', 'Pilih ujian tujuan terlebih dahulu.', 'warning'); return; }
   if (!_aiGeneratedQuestions.length) { Swal.fire('Kosong', 'Tidak ada soal untuk disimpan.', 'info'); return; }
+  // [V5.8] Materi/Topik AI menjadi Materi/Bab soal — wajib terisi
+  const _aiMat = ((document.getElementById('ai-topic') || {}).value || '').trim();
+  if (!_aiMat) { Swal.fire('Materi/Topik Wajib', 'Isi kolom “Materi / Topik” pada formulir AI — dipakai sebagai Materi/Bab soal untuk kisi-kisi & soal acak.', 'warning'); return; }
+  _aiGeneratedQuestions.forEach(function (q) { if (!q.materi) q.materi = _aiMat; });
 
   const btn = document.getElementById('btn-save-ai');
   btn.disabled = true;
@@ -18000,52 +18179,52 @@ function fixOrphanQuestions(fromNorm, toExamId) {
                    (2) Modal Soal Acak di Bank Soal (prefix 'rcm')
    - Server: getBankQuestionStats / saveRandomConfig (code.gs)
    ============================================================================ */
-const SP_TYPES_META = [
-  { key: 'PG',          label: 'Pilihan Ganda',          icon: 'fa-list-ul',      color: '#3b82f6', bg: 'rgba(59,130,246,.12)' },
-  { key: 'PG_KOMPLEKS', label: 'Pilihan Ganda Kompleks', icon: 'fa-list-check',   color: '#8b5cf6', bg: 'rgba(139,92,246,.12)' },
-  { key: 'BS',          label: 'Benar / Salah',          icon: 'fa-check-double', color: '#10b981', bg: 'rgba(16,185,129,.12)' },
-  { key: 'JODOH',       label: 'Menjodohkan',            icon: 'fa-link',         color: '#f59e0b', bg: 'rgba(245,158,11,.12)' },
-  { key: 'Esai',        label: 'Uraian (Esai)',          icon: 'fa-pen-nib',      color: '#f43f5e', bg: 'rgba(244,63,94,.12)' }
-];
+// [V5.8] Panel Soal Acak kini per BAB/MATERI (daftar bab dibaca dari bank soal).
+window._spMateriRows = window._spMateriRows || {};
 
 // Bangun HTML panel (baris per jenis soal + ringkasan)
 function spBuildPanelHTML(config, stats, prefix) {
-  const cfg = config || {};
+  const cfgM = (config && config.materi) ? config.materi : {};
+  const list = (stats && stats.list) ? stats.list : null;
+  let items = [];
+  if (list && list.length) {
+    items = list.map(function (s) {
+      const act = (s.activeCount || cfgM[s.materi] || 0);
+      return { materi: s.materi, count: s.count, avg: s.avgWeight, active: act };
+    });
+  } else {
+    items = Object.keys(cfgM).map(function (k) { return { materi: k, count: null, avg: null, active: cfgM[k] }; });
+  }
+  if (!items.length) {
+    window._spMateriRows[prefix] = [];
+    return '<p class="p-6 text-center text-sm text-slate-400">Bank soal ujian ini masih kosong — tulis soal (lengkap dengan Materi/Bab) terlebih dahulu.</p>';
+  }
+  window._spMateriRows[prefix] = items.map(function (it) { return it.materi; });
   let rows = '';
-  SP_TYPES_META.forEach(m => {
-    const s = stats ? stats[m.key] : null;
-    const available = s ? s.count : null;
-    const avg = (s && s.count > 0) ? (Math.round((s.totalWeight / s.count) * 100) / 100) : null;
-    let count = 0, active = false;
-    const rawVal = cfg[m.key];
-    if (rawVal !== undefined && rawVal !== null && rawVal !== '') {
-      const p = parseInt(rawVal, 10);
-      if (!isNaN(p) && p > 0) { count = p; active = true; }
-    }
-    const maxAttr = (available !== null && available > 0) ? 'max="' + available + '"' : '';
+  items.forEach(function (it, i) {
+    const active = it.active > 0;
+    const maxAttr = (it.count !== null && it.count > 0) ? 'max="' + it.count + '"' : '';
     let availBadge;
-    if (available === null) availBadge = '<span class="sp-badge" style="background:#f1f5f9;color:#64748b;">bank: belum ada data</span>';
-    else if (available === 0) availBadge = '<span class="sp-badge" style="background:#fef2f2;color:#dc2626;">bank kosong</span>';
-    else availBadge = '<span class="sp-badge" style="background:#ecfdf5;color:#059669;">' + available + ' soal tersedia</span>';
+    if (it.count === null) availBadge = '<span class="sp-badge" style="background:#f1f5f9;color:#64748b;">bank: belum ada data</span>';
+    else availBadge = '<span class="sp-badge" style="background:#ecfdf5;color:#059669;">' + it.count + ' soal tersedia</span>';
     const sub = active
-      ? '<p class="text-[11px] text-slate-400 mt-0.5">'
-        + (avg !== null ? 'Bobot dinormalisasi &asymp; <b>' + avg + '</b> per soal &rarr; total bobot sama untuk semua siswa' : 'Bobot dinormalisasi ke rata-rata bank')
-        + ((available !== null && available > 0 && count > available) ? ' <span class="text-red-400 font-bold">(melebihi bank, akan dibatasi)</span>' : '')
-        + '</p>'
-      : '<p class="text-[11px] text-slate-400 mt-0.5">Nonaktif &rarr; seluruh soal jenis ini tampil ke semua siswa</p>';
+      ? '<p class="text-[11px] text-slate-400 mt-0.5">Tiap siswa menerima <b>' + it.active + '</b> soal acak dari bab ini'
+        + ((it.count !== null && it.active > it.count) ? ' <span class="text-red-400 font-bold">(melebihi bank, akan dibatasi)</span>' : '')
+        + (it.avg ? ' · bobot dinormalisasi ≈ <b>' + it.avg + '</b>/soal' : '') + '</p>'
+      : '<p class="text-[11px] text-slate-400 mt-0.5">Nonaktif → seluruh soal bab ini tampil ke semua siswa</p>';
     rows += `
     <div class="sp-row">
-      <div class="sp-ico" style="background:${m.bg};color:${m.color}"><i class="fas ${m.icon}"></i></div>
+      <div class="sp-ico" style="background:rgba(59,130,246,.12);color:#3b82f6"><i class="fas fa-book-open"></i></div>
       <div class="flex-1 min-w-0">
         <div class="flex items-center gap-2 flex-wrap">
-          <span class="text-sm font-bold text-slate-700">${m.label}</span>
+          <span class="text-sm font-bold text-slate-700">${escapeHtmlProfil_(it.materi)}</span>
           ${availBadge}
         </div>
         ${sub}
       </div>
-      <input type="number" min="1" ${maxAttr} value="${count}" ${active ? '' : 'disabled'} class="sp-count-input" id="${prefix}-count-${m.key}" onchange="spOnCountChange('${prefix}','${m.key}',this)" oninput="spOnCountChange('${prefix}','${m.key}',this)" title="Jumlah soal acak untuk jenis ini">
-      <label class="relative inline-flex cursor-pointer shrink-0" title="Aktifkan Soal Acak untuk jenis ini">
-        <input type="checkbox" ${active ? 'checked' : ''} class="sr-only peer" id="${prefix}-toggle-${m.key}" onchange="spOnToggle('${prefix}','${m.key}',this)">
+      <input type="number" min="1" ${maxAttr} value="${it.active || 0}" ${active ? '' : 'disabled'} class="sp-count-input" id="${prefix}-count-${i}" data-materi="${escapeHtmlProfil_(it.materi)}" onchange="spOnCountChange('${prefix}','${i}',this)" oninput="spOnCountChange('${prefix}','${i}',this)" title="Jumlah soal acak bab ini per siswa">
+      <label class="relative inline-flex cursor-pointer shrink-0" title="Aktifkan Soal Acak untuk bab ini">
+        <input type="checkbox" ${active ? 'checked' : ''} class="sr-only peer" id="${prefix}-toggle-${i}" onchange="spOnToggle('${prefix}','${i}',this)">
         <div class="w-11 h-6 bg-slate-200 rounded-full peer peer-checked:bg-violet-600 transition-colors duration-200"></div>
         <div class="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow peer-checked:translate-x-5 transition-transform duration-200"></div>
       </label>
@@ -18087,16 +18266,16 @@ function spOnCountChange(prefix, key, el) {
 
 // Kumpulkan konfigurasi dari panel → { PG:n, PG_KOMPLEKS:n, BS:n, JODOH:n, Esai:n }
 function spReadConfig(prefix) {
-  const cfg = { PG: 0, PG_KOMPLEKS: 0, BS: 0, JODOH: 0, Esai: 0 };
-  SP_TYPES_META.forEach(m => {
-    const t = document.getElementById(prefix + '-toggle-' + m.key);
-    const c = document.getElementById(prefix + '-count-' + m.key);
+  // [V5.8] Kumpulkan konfigurasi per bab -> { materi: { "<bab>": n } }
+  const cfg = { materi: {} };
+  const rows = (window._spMateriRows && window._spMateriRows[prefix]) || [];
+  rows.forEach(function (label, i) {
+    const t = document.getElementById(prefix + '-toggle-' + i);
+    const c = document.getElementById(prefix + '-count-' + i);
     if (t && t.checked) {
       let v = c ? parseInt(c.value, 10) : 0;
       if (isNaN(v) || v < 1) v = 1;
-      cfg[m.key] = v;
-    } else {
-      cfg[m.key] = 0;
+      cfg.materi[label] = v;
     }
   });
   return cfg;
@@ -18107,11 +18286,11 @@ function spUpdateSummary(prefix) {
   const el = document.getElementById(prefix + '-summary');
   if (!el) return;
   const cfg = spReadConfig(prefix);
-  const parts = SP_TYPES_META.filter(m => cfg[m.key] > 0).map(m => cfg[m.key] + ' ' + m.label);
-  const total = SP_TYPES_META.reduce((s, m) => s + (cfg[m.key] || 0), 0);
+  const labels = Object.keys(cfg.materi);
+  const total = labels.reduce(function (s, k) { return s + cfg.materi[k]; }, 0);
   el.innerHTML = total > 0
-    ? `<i class="fas fa-bolt text-violet-500"></i> <b>${total} soal acak</b> per siswa &rarr; ${parts.join(' &middot; ')}. Kombinasi berbeda untuk tiap siswa, jumlah &amp; total bobot per jenis <b>sama</b>.`
-    : `<i class="fas fa-circle-info text-slate-400"></i> Soal acak nonaktif &mdash; semua soal pada bank tampil untuk seluruh siswa.`;
+    ? `<i class="fas fa-bolt text-violet-500"></i> <b>${total} soal acak</b> per siswa → ${labels.map(k => cfg.materi[k] + ' soal · ' + k).join(' &middot; ')}. Kombinasi tiap siswa bisa berbeda; jumlah soal &amp; total bobot per bab <b>sama</b>. Bab tanpa konfigurasi tampil semua (jumlah soal tidak berkurang).`
+    : `<i class="fas fa-circle-info text-slate-400"></i> Soal acak nonaktif — semua soal pada bank tampil untuk seluruh siswa.`;
 }
 
 /* ---- MODAL "SOAL ACAK" (dipanggil dari toolbar Bank Soal) ---- */
@@ -18130,7 +18309,7 @@ function openRandomConfigModal(prefillExamId) {
             <span class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-lg shrink-0"><i class="fas fa-dice"></i></span>
             <div>
               <h3 class="font-bold text-white text-lg leading-tight">Soal Acak &amp; Kombinasi Soal</h3>
-              <p class="text-[11px] opacity-80">Pilih jenis soal &amp; jumlah per siswa &mdash; kombinasi berbeda, jumlah &amp; bobot sama</p>
+              <p class="text-[11px] opacity-80">Pilih bab/materi &amp; jumlah soal per siswa &mdash; sesuai kisi-kisi, kombinasi berbeda, jumlah &amp; bobot sama</p>
             </div>
           </div>
           <button onclick="closeRandomConfigModal()" class="w-8 h-8 rounded-full bg-white/15 hover:bg-white/30 text-white flex items-center justify-center transition"><i class="fas fa-times"></i></button>
@@ -18203,12 +18382,13 @@ function rcModalExamChanged(examId) {
       if (res && res.success) {
         spRenderPanel('rcm', res.randomConfig, res.stats);
         if (info) {
-          const tot = SP_TYPES_META.reduce((s, m) => s + ((res.stats[m.key] || {}).count || 0), 0);
-          const active = SP_TYPES_META.filter(m => (res.randomConfig[m.key] || 0) > 0);
+          const tot = (res.stats && res.stats.total) || 0;
+          const cfgM = (res.randomConfig && res.randomConfig.materi) || {};
+          const activeLbl = Object.keys(cfgM);
           info.classList.remove('hidden');
           info.innerHTML = `<div class="flex items-center gap-3 bg-violet-50 border border-violet-200 rounded-xl px-4 py-3">
             <i class="fas fa-circle-info text-violet-500"></i>
-            <p class="text-xs text-violet-800">Bank soal ini berisi <b>${tot}</b> soal. ${active.length ? 'Soal acak aktif: <b>' + active.map(m => (res.randomConfig[m.key] || 0) + ' ' + m.label).join(', ') + '</b>.' : 'Soal acak belum aktif.'}</p>
+            <p class="text-xs text-violet-800">Bank soal ini berisi <b>${tot}</b> soal. ${activeLbl.length ? 'Soal acak per bab aktif: <b>' + activeLbl.map(k => cfgM[k] + ' soal · ' + k).join(', ') + '</b>.' : 'Soal acak belum aktif.'}</p>
           </div>`;
         }
       } else {
@@ -19778,5 +19958,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4d4c9165b2f5ff8',t:'MTc5MjQ2NTM2NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4e6d28edc69d8a3',t:'MTc5MjY1NDQ5Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
