@@ -2895,7 +2895,9 @@ function initAdminPanel() {
       if (id === 'menu-pgw-koreksi' && !izinUjianGuru) return;
       // [V5.2] Sesi & PIN Ujian: pengawas (hanya lihat) ATAU panitia (atur PIN)
       if (id === 'menu-pgw-ujian' && !izinUjianGuru && !izinPanitiaGuru) return;
-      if ((id === 'menu-questions' || id === 'menu-exams') && !izinBankGuru) return;
+      if (id === 'menu-questions' && !izinBankGuru) return;
+      // [V5.10] Jadwal Ujian: tim soal ATAU panitia (panitia = fitur penuh spt Admin)
+      if (id === 'menu-exams' && !izinBankGuru && !izinPanitiaGuru) return;
       if ((id === 'menu-profil' || id === 'menu-kartu' || id === 'menu-hadir' || id === 'menu-results') && !izinPanitiaGuru) return;
       // [V3.9] Manajemen User (mode monitor) utk PENGAWAS; Folder Gambar utk TIM SOAL
       if (id === 'menu-users' && !izinUjianGuru) return;
@@ -3800,7 +3802,7 @@ function showAdminTab(tabId, el) {
     // [V3] Izin harus EKSPLISIT true dari penunjukan Admin
     if (_pgwIzinTab.izinUjian === true) allowedGuruTabs.push('dash-pgw-ujian', 'dash-pgw-koreksi', 'dash-users');
     if (_pgwIzinTab.izinBankSoal === true) allowedGuruTabs.push('dash-questions', 'dash-exams', 'dash-images');
-    if (_pgwIzinTab.izinPanitia === true) allowedGuruTabs.push('dash-profil', 'dash-kartu', 'dash-hadir', 'dash-results', 'dash-pgw-ujian');
+    if (_pgwIzinTab.izinPanitia === true) allowedGuruTabs.push('dash-profil', 'dash-kartu', 'dash-hadir', 'dash-results', 'dash-pgw-ujian', 'dash-exams');
     if (!allowedGuruTabs.includes(tabId)) {
       Swal.fire({
         title: 'Akses Ditolak',
@@ -4031,8 +4033,8 @@ function profilFormHtml_(p, opts) {
           </div>
           <div class="min-w-0 flex-1">
             <input type="hidden" id="pf-fotoUrl" value="${escapeHtmlProfil_(p.fotoUrl || '')}">
-            ${ro ? '' : '<label class="inline-flex items-center px-3 py-2 rounded-lg bg-[#1b3a6b] text-white text-xs font-bold cursor-pointer"><i class="fas fa-images mr-1"></i> Pilih dari galeri<input id="pf-foto-file" type="file" accept=".jpg,.jpeg,image/jpeg" class="sr-only-foto" onchange="sipProfilPickFoto_(this)"></label>'}
-            <p id="pf-foto-msg" class="text-[11px] text-slate-500 mt-1">${p.fotoUrl ? 'Foto tampil di frame. Pilih dari galeri untuk mengganti.' : 'Foto WAJIB: JPG berlatar merah. Sistem otomatis memaskan ke bingkai 3×4.'}</p>
+            ${ro ? '' : '<label class="inline-flex items-center px-3 py-2 rounded-lg bg-[#1b3a6b] text-white text-xs font-bold cursor-pointer"><i class="fas fa-images mr-1"></i> Pilih dari galeri<input id="pf-foto-file" type="file" accept="' + ((typeof sipIsAkunDemoIHT_ === 'function' && sipIsAkunDemoIHT_(p)) ? '.jpg,.jpeg,.png,image/jpeg,image/png' : '.jpg,.jpeg,image/jpeg') + '" class="sr-only-foto" onchange="sipProfilPickFoto_(this)"></label>'}
+            <p id="pf-foto-msg" class="text-[11px] text-slate-500 mt-1">${p.fotoUrl ? 'Foto tampil di frame. Pilih dari galeri untuk mengganti.' : ((typeof sipIsAkunDemoIHT_ === 'function' && sipIsAkunDemoIHT_(p)) ? 'Akun presentasi (kelas IHT): foto profil OPSIONAL — boleh dikosongkan, atau unggah JPG/PNG apa pun tanpa aturan latar merah.' : 'Foto WAJIB: JPG berlatar merah. Sistem otomatis memaskan ke bingkai 3×4.')}</p>
           </div>
         </div>
       </div>
@@ -4454,6 +4456,18 @@ function sipSetSiswaFotoUI_(url) {
   }
 }
 
+// [V5.10] Akun presentasi IHT: kelas "IHT" atau nama/ID "Percobaan IHT"
+// — foto profil OPSIONAL dan aturan latar merah tidak diberlakukan.
+function sipIsAkunDemoIHT_(p) {
+  try {
+    var k = String((p && p.kelas) || (window._siswaProfilCache && window._siswaProfilCache.kelas) || '').trim().toUpperCase();
+    var gab = (String((currentUser && (currentUser.username || currentUser.name)) || '') + ' ' +
+               String((currentUser && currentUser.userID) || '') + ' ' +
+               String((p && p.namaLengkap) || '')).toLowerCase();
+    return k === 'IHT' || gab.indexOf('percobaan iht') !== -1;
+  } catch (e) { return false; }
+}
+
 function sipProfilMissingFields_(p) {
   var labels = {
     namaLengkap: 'Nama lengkap',
@@ -4672,9 +4686,13 @@ function sipProfilPickFoto_(inp) {
   var msg = document.getElementById('pf-foto-msg');
   if (!inp || !inp.files || !inp.files[0]) return;
   var file = inp.files[0];
-  if (!/^image\/jpe?g$/i.test(file.type || '') && !/\.(jpe?g)$/i.test(file.name || '')) {
+  var demoIHT = (typeof sipIsAkunDemoIHT_ === 'function') && sipIsAkunDemoIHT_(window._siswaProfilCache);
+  var okTipeFoto = demoIHT
+    ? (/^image\/(jpe?g|png)$/i.test(file.type || '') || /\.(jpe?g|png)$/i.test(file.name || ''))
+    : (/^image\/jpe?g$/i.test(file.type || '') || /\.(jpe?g)$/i.test(file.name || ''));
+  if (!okTipeFoto) {
     inp.value = '';
-    Swal.fire('Foto ditolak', 'Foto profil wajib berformat JPG/JPEG dan BERLATAR MERAH. Sistem otomatis memotong foto agar pas bingkai 3×4.', 'error');
+    Swal.fire('Foto ditolak', demoIHT ? 'Gunakan gambar JPG atau PNG.' : 'Foto profil wajib berformat JPG/JPEG dan BERLATAR MERAH. Sistem otomatis memotong foto agar pas bingkai 3\u00d74.', 'error');
     return;
   }
   if (file.size > 12 * 1024 * 1024) {
@@ -4712,11 +4730,12 @@ function sipProfilPickFoto_(inp) {
     ctx.drawImage(src, sx, sy, sw2, sh2, 0, 0, outW, outH);
     if (isBmp && src.close) try { src.close(); } catch (eC2) {}
     // [V4.5] ATURAN KETAT: latar belakang foto WAJIB MERAH — jika bukan, tolak.
-    if (!sipCekLatarMerah_(canvas)) {
+    // [V5.10] Akun presentasi IHT dikecualikan dari aturan latar merah.
+    if (!demoIHT && !sipCekLatarMerah_(canvas)) {
       fail('Foto ditolak: latar belakang WAJIB MERAH. Gunakan foto pas-foto berlatar merah, lalu unggah ulang.');
       return;
     }
-    sipApplyRedBackground_(canvas);
+    if (!demoIHT) sipApplyRedBackground_(canvas);
     var q = 0.88;
     function finish(dataUrl, kb) {
       _sipProfilFotoPending = { dataUrl: dataUrl, name: 'foto-profil.jpg', type: 'image/jpeg' };
@@ -4800,7 +4819,8 @@ function saveHubProfil() {
     return;
   }
   // [V3.1] Foto profil WAJIB: JPG/JPEG latar merah + seragam, otomatis dipaskan ke bingkai 3×4
-  if (!_sipProfilFotoPending && !String(payload.fotoUrl || '').trim()) {
+  // [V5.10] KECUALI akun presentasi IHT — foto opsional.
+  if (!sipIsAkunDemoIHT_(payload) && !_sipProfilFotoPending && !String(payload.fotoUrl || '').trim()) {
     Swal.fire({
       icon: 'warning',
       title: 'Foto profil wajib diunggah',
@@ -6755,6 +6775,13 @@ function initExamModalComponent() {
                                  <input type="text" id="exam-info-image" class="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm" placeholder="Ketik nama file gambar dari folder Drive, atau tempel link..."
                                         onkeyup="handleExamInfoImageAutocomplete(this)" onfocus="handleExamInfoImageAutocomplete(this)" onchange="previewExamInfoImage()">
                                  <div id="exam-info-ac-results" class="hidden absolute z-20 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto"></div>
+                                 <div class="flex items-center gap-2 mt-2">
+                                     <label class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold cursor-pointer shadow-sm">
+                                         <i class="fas fa-upload"></i> Unggah Gambar
+                                         <input type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" class="hidden" onchange="sipUnggahGambarCaraMenjawab_(this)">
+                                     </label>
+                                     <span class="text-[10px] text-slate-400">JPG/PNG maks 4 MB — tersimpan di folder Drive &quot;SIPINTAR-Tata Cara Menjawab&quot;.</span>
+                                 </div>
                                  <p class="text-[10px] text-slate-400 mt-1">Gambar contoh cara menjawab jenis soal yang dipilih.</p>
                                  <img id="exam-info-image-preview" referrerpolicy="no-referrer" class="hidden mt-2 max-h-36 rounded-lg border border-slate-200" alt="Preview">
                              </div>
@@ -7967,6 +7994,48 @@ function sipUnggahGambarEditor_(inp) {
       })
       .withFailureHandler(function (err) { inp.value = ''; Swal.fire('Gagal', String(err), 'error'); })
       .uploadGambarSoal(rd.result, f.name, currentUser.userID, currentUser.token);
+  };
+  rd.readAsDataURL(f);
+}
+
+// [V5.10] Unggah gambar TATA CARA MENJAWAB dari form Jadwal Ujian.
+// Tersimpan di folder Drive "SIPINTAR-Tata Cara Menjawab" lalu otomatis
+// terpasang pada field gambar cara menjawab.
+function sipUnggahGambarCaraMenjawab_(inp) {
+  if (!inp || !inp.files || !inp.files[0]) return;
+  var f = inp.files[0];
+  if (!/^image\/(jpe?g|png)$/i.test(f.type || '')) {
+    inp.value = '';
+    Swal.fire('Gambar ditolak', 'Gunakan gambar JPG atau PNG.', 'error');
+    return;
+  }
+  if (f.size > 4 * 1024 * 1024) {
+    inp.value = '';
+    Swal.fire('Gambar ditolak', 'Ukuran gambar maksimal 4 MB.', 'error');
+    return;
+  }
+  Swal.fire({ title: 'Mengunggah gambar\u2026', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
+  var rd = new FileReader();
+  rd.onload = function () {
+    google.script.run
+      .withSuccessHandler(function (res) {
+        inp.value = '';
+        if (!res || !res.success) {
+          Swal.fire('Gagal', (res && res.message) || 'Gambar tidak dapat diunggah.', 'error');
+          return;
+        }
+        var ac = document.getElementById('exam-info-image');
+        if (ac) ac.value = res.link || '';
+        try { if (typeof previewExamInfoImage === 'function') previewExamInfoImage(); } catch (eP) {}
+        try {
+          if (typeof allImagesData !== 'undefined' && allImagesData && allImagesData.push) {
+            allImagesData.push({ name: res.name || f.name, link: res.link, preview: res.link });
+          }
+        } catch (eA) {}
+        Swal.fire({ icon: 'success', title: 'Gambar terunggah', text: 'Tersimpan di folder \u201cSIPINTAR-Tata Cara Menjawab\u201d pada Drive sistem dan sudah terpasang pada field gambar cara menjawab.', confirmButtonColor: '#1b3a6b' });
+      })
+      .withFailureHandler(function (err) { inp.value = ''; Swal.fire('Gagal', String(err), 'error'); })
+      .uploadGambarCaraMenjawab(rd.result, f.name, currentUser.userID, currentUser.token);
   };
   rd.readAsDataURL(f);
 }
@@ -19958,5 +20027,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4e6d28edc69d8a3',t:'MTc5MjY1NDQ5Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4e702cc9fed3e23',t:'MTc5MjY1NjQ3Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
