@@ -7384,9 +7384,26 @@ function sipLoadMateriBab_(force, cb) {
 }
 
 function sipIsiMateriSelects_() {
+  const list = window._materiBabList || [];
+  // [V5.13] Kartu dropdown dihapus — daftar modul Materi & Bab tetap dipakai
+  // sebagai saran pengetikan (datalist) pada field Materi / Bab.
+  try {
+    const dl = document.getElementById('materi-datalist');
+    if (dl) {
+      const ada = {};
+      dl.querySelectorAll('option').forEach(function (o) { ada[o.value] = true; });
+      let tambah = '';
+      list.forEach(function (it) {
+        [it.bab, it.materi].forEach(function (v) {
+          v = String(v || '').trim();
+          if (v && !ada[v]) { ada[v] = true; tambah += '<option value="' + v.replace(/"/g, '&quot;') + '">'; }
+        });
+      });
+      if (tambah) dl.innerHTML += tambah;
+    }
+  } catch (eD) {}
   const sel = document.getElementById('select-materi-utama');
   if (!sel) return;
-  const list = window._materiBabList || [];
   const uniq = [];
   list.forEach(function (it) { if (uniq.indexOf(it.materi) === -1) uniq.push(it.materi); });
   const kini = sel.value;
@@ -7881,50 +7898,12 @@ Jawaban: A
              <input type="hidden" name="examId" id="input-exam-id">
              <input type="hidden" name="questionId" id="input-question-id">
 
-             <fieldset class="border border-slate-200 rounded-xl px-3.5 pt-1.5 pb-3 bg-gradient-to-b from-blue-50/40 to-white shadow-sm">
-                 <legend class="px-2 text-[11px] font-black text-blue-900 uppercase tracking-widest"><i class="fas fa-bullseye text-amber-500 mr-1"></i> Materi soal &amp; target kognitif</legend>
-                 <p class="text-[10px] text-slate-400 mb-2.5 leading-snug">Materi/bab wajib diisi untuk kisi-kisi dan pemilihan paket. Jenis soal tetap setelah simpan; ubah sendiri bila diperlukan.</p>
-                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2.5">
-                     <div>
-                         <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Materi utama <span class="text-red-500">*</span></label>
-                         <select id="select-materi-utama" onchange="sipMateriUtamaChange_()" class="w-full border border-slate-200 px-2.5 py-2 text-sm rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition cursor-pointer">
-                             <option value="">&#8212; Pilih materi &#8212;</option>
-                         </select>
-                     </div>
-                     <div>
-                         <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Bab / topik <span class="text-red-500">*</span></label>
-                         <select id="select-bab-topik" onchange="sipBabTopikChange_()" class="w-full border border-slate-200 px-2.5 py-2 text-sm rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition cursor-pointer">
-                             <option value="">&#8212; Pilih bab &#8212;</option>
-                         </select>
-                     </div>
-                 </div>
-                 <div class="mb-2.5">
-                     <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Materi / Bab tersimpan <span class="text-red-500">*</span></label>
-                     <input id="input-materi" list="materi-datalist" type="text" placeholder="Contoh: Bangun Ruang Sisi Datar" class="w-full border border-slate-200 px-2.5 py-2 text-sm rounded-lg bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition">
-                     <datalist id="materi-datalist"></datalist>
-                     <p class="text-[10px] text-slate-400 mt-1 leading-snug">Terisi otomatis dari pilihan di atas &#8212; boleh diketik manual. Dipakai untuk kisi-kisi dan Soal Acak per bab; tidak direset agar input satu bab lebih cepat. Kelola daftarnya di menu <b>Materi &amp; Bab</b>.</p>
-                 </div>
-                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3 items-end">
-                     <div>
-                         <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Target kognitif Admin</label>
-                         <select id="select-target-kognitif" class="w-full border border-slate-200 px-2.5 py-2 text-sm rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition cursor-pointer">
-                             <option value="">&#8212; Pilih jika menetapkan target / memakai AI &#8212;</option>
-                             <option value="C1">C1 &#8212; Mengingat</option>
-                             <option value="C2">C2 &#8212; Memahami</option>
-                             <option value="C3">C3 &#8212; Menerapkan</option>
-                             <option value="C4">C4 &#8212; Menganalisis</option>
-                             <option value="C5">C5 &#8212; Mengevaluasi</option>
-                             <option value="C6">C6 &#8212; Mencipta</option>
-                         </select>
-                     </div>
-                     <div>
-                         <button type="button" onclick="aiPerbaikiDrafSoal_()" class="w-full px-3 py-2 rounded-lg border border-blue-400 text-blue-700 bg-white hover:bg-blue-50 hover:border-blue-500 text-xs font-bold transition shadow-sm">
-                             <i class="fas fa-wand-magic-sparkles mr-1 text-amber-500"></i> Bantu perbaiki soal dengan AI
-                         </button>
-                     </div>
-                 </div>
-                 <p class="text-[10px] text-slate-400 mt-2.5 leading-snug border-t border-slate-100 pt-2"><i class="fas fa-circle-info text-blue-300 mr-1"></i>Target bukan hasil penilaian; AI memberi usulan, bukan jaminan level atau kebenaran kunci. Usulan diterapkan hanya ke draf &#8212; isi asli tetap sampai Anda menyetujuinya, lalu periksa dan tekan <b>Simpan Pertanyaan</b>. Analisis/persetujuan kisi-kisi tetap wajib setelah disimpan.</p>
-             </fieldset>
+             <div>
+                 <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Materi / Bab <span class="text-red-500">*</span></label>
+                 <input id="input-materi" list="materi-datalist" type="text" placeholder="Contoh: Bangun Ruang Sisi Datar" class="w-full border border-slate-200 p-3 rounded-xl bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-blue-500 transition">
+                 <datalist id="materi-datalist"></datalist>
+                 <p class="text-[10px] text-slate-400 mt-1">Wajib untuk kisi-kisi &amp; soal acak per bab. Saran pengetikan diambil dari menu <b>Materi &amp; Bab</b> dan soal tersimpan.</p>
+             </div>
 
              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                <div>
@@ -20514,5 +20493,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4ef6432d8e7de08',t:'MTc5Mjc0NDM0OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4ef9672fc28ce16',t:'MTc5Mjc0NjQwNg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
