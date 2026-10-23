@@ -1827,6 +1827,9 @@
               <div id="menu-questions" class="sidebar-item" onclick="showAdminTab('dash-questions', this)">
                 <i class="fas fa-book"></i> <span class="sidebar-text font-medium">Bank Soal</span>
               </div>
+              <div id="menu-materibab" class="sidebar-item" onclick="showAdminTab('dash-materibab', this)">
+                <i class="fas fa-layer-group"></i> <span class="sidebar-text font-medium">Materi &amp; Bab</span>
+              </div>
               <div id="menu-kisi" class="sidebar-item" onclick="showAdminTab('dash-kisi', this)">
                 <i class="fas fa-table-list"></i> <span class="sidebar-text font-medium">Kisi-Kisi Soal</span>
               </div>
@@ -2868,7 +2871,7 @@ function initAdminPanel() {
  
   // ── LOGIKA VISIBILITAS MENU BERDASARKAN ROLE ──────────────────────
   // [PENGAWAS] Guru (pengawas) hanya melihat: Dashboard, Jadwal Ujian, Bank Soal, Hasil & Nilai
-  const guruAllowedMenus = ['menu-home', 'menu-profil-guru', 'menu-pgw-ujian', 'menu-pgw-koreksi', 'menu-questions', 'menu-exams', 'menu-results', 'menu-profil', 'menu-kartu', 'menu-hadir', 'menu-users', 'menu-images'];
+  const guruAllowedMenus = ['menu-home', 'menu-profil-guru', 'menu-pgw-ujian', 'menu-pgw-koreksi', 'menu-questions', 'menu-materibab', 'menu-exams', 'menu-results', 'menu-profil', 'menu-kartu', 'menu-hadir', 'menu-users', 'menu-images'];
   const adminOnlyMenus = ['menu-questions', 'menu-kisi', 'menu-ai-generator', 'menu-hermes',
     'menu-report-template', 'menu-users', 'menu-profil', 'menu-kartu', 'menu-hadir',
     'menu-images', 'menu-music', 'menu-config',
@@ -2895,7 +2898,7 @@ function initAdminPanel() {
       if (id === 'menu-pgw-koreksi' && !izinUjianGuru) return;
       // [V5.2] Sesi & PIN Ujian: pengawas (hanya lihat) ATAU panitia (atur PIN)
       if (id === 'menu-pgw-ujian' && !izinUjianGuru && !izinPanitiaGuru) return;
-      if (id === 'menu-questions' && !izinBankGuru) return;
+      if ((id === 'menu-questions' || id === 'menu-materibab') && !izinBankGuru) return;
       // [V5.10] Jadwal Ujian: tim soal ATAU panitia (panitia = fitur penuh spt Admin)
       if (id === 'menu-exams' && !izinBankGuru && !izinPanitiaGuru) return;
       if ((id === 'menu-profil' || id === 'menu-kartu' || id === 'menu-hadir' || id === 'menu-results') && !izinPanitiaGuru) return;
@@ -3801,7 +3804,7 @@ function showAdminTab(tabId, el) {
     const allowedGuruTabs = ['dash-home', 'dash-profil-guru'];
     // [V3] Izin harus EKSPLISIT true dari penunjukan Admin
     if (_pgwIzinTab.izinUjian === true) allowedGuruTabs.push('dash-pgw-ujian', 'dash-pgw-koreksi', 'dash-users');
-    if (_pgwIzinTab.izinBankSoal === true) allowedGuruTabs.push('dash-questions', 'dash-exams', 'dash-images');
+    if (_pgwIzinTab.izinBankSoal === true) allowedGuruTabs.push('dash-questions', 'dash-materibab', 'dash-exams', 'dash-images');
     if (_pgwIzinTab.izinPanitia === true) allowedGuruTabs.push('dash-profil', 'dash-kartu', 'dash-hadir', 'dash-results', 'dash-pgw-ujian', 'dash-exams');
     if (!allowedGuruTabs.includes(tabId)) {
       Swal.fire({
@@ -3844,6 +3847,10 @@ function showAdminTab(tabId, el) {
   } else if (tabId === 'dash-questions') {
     title.innerText = 'Bank Soal';
     renderQuestionBank(content);
+
+  } else if (tabId === 'dash-materibab') {
+    title.innerText = 'Materi & Bab';
+    renderMateriBabPage(content);
 
   } else if (tabId === 'dash-ai-generator') {
     title.innerText = 'AI Generator Bank Soal';
@@ -4312,7 +4319,8 @@ function sipNilaiDetail_(responseId) {
           '<tbody>' + rows + '</tbody></table>' +
           '<p style="font-size:11px;color:#64748b;margin-top:10px"><i class="fas fa-lock"></i> Kunci jawaban tidak ditampilkan.</p></div>',
         confirmButtonText: 'Tutup',
-        confirmButtonColor: '#1b3a6b'
+        confirmButtonColor: '#1b3a6b',
+        didOpen: function () { try { sipTypesetMath_(Swal.getPopup()); } catch (eM) {} }
       });
     })
     .withFailureHandler(function (err) { Swal.fire('Gagal', String(err), 'error'); })
@@ -7284,6 +7292,279 @@ function refreshDashboard() {
    4. BANK SOAL & IMPORT
    ========================================================================== */
 
+/* ===== [V5.12] MODUL MATERI & BAB (Admin + Guru Tim Pembuat Soal) ===== */
+function renderMateriBabPage(container) {
+  container.innerHTML = '<div class="fade-in w-full space-y-6">' +
+    '<div class="dash-card p-6 border-blue-100">' +
+    '<h2 class="font-bold text-slate-800 flex items-center gap-2"><i class="fas fa-layer-group text-blue-600"></i> Materi &amp; Bab</h2>' +
+    '<p class="text-sm text-slate-500 mt-1">Daftar Materi utama dan Bab/topik dipakai pada form Bank Soal (dropdown), fitur <b>Bantu perbaiki soal dengan AI</b> (target level kognitif), kisi-kisi, dan Soal Acak per bab.</p>' +
+    '<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">' +
+    '<div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Materi utama</label>' +
+    '<input id="mb-materi" type="text" list="mb-materi-dl" placeholder="Contoh: Aljabar" class="w-full border border-slate-200 p-3 rounded-xl bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-blue-500 transition"><datalist id="mb-materi-dl"></datalist></div>' +
+    '<div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Bab / topik (boleh kosong)</label>' +
+    '<input id="mb-bab" type="text" placeholder="Contoh: Persamaan Linear Satu Variabel" class="w-full border border-slate-200 p-3 rounded-xl bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-blue-500 transition"></div>' +
+    '<div class="flex items-end"><button type="button" onclick="simpanMateriBab_()" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-xl font-bold shadow transition"><i class="fas fa-plus mr-1"></i> Tambah ke Daftar</button></div>' +
+    '</div>' +
+    '<p class="text-[11px] text-slate-400 mt-2">Materi tanpa bab juga boleh &#8212; soal akan memakai nama materi sebagai bab. Nilai yang tersimpan pada soal adalah <b>Bab/topik</b> (atau nama materi bila bab kosong).</p>' +
+    '</div>' +
+    '<div class="dash-card p-6 border-blue-100"><div id="mb-tabel"><p class="text-sm text-slate-400"><i class="fas fa-circle-notch fa-spin mr-2"></i>Memuat daftar\u2026</p></div></div>' +
+    '</div>';
+  sipLoadMateriBab_(true, sipRenderMateriBabTabel_);
+}
+
+function sipRenderMateriBabTabel_() {
+  const box = document.getElementById('mb-tabel');
+  if (!box) return;
+  const list = window._materiBabList || [];
+  const dl = document.getElementById('mb-materi-dl');
+  if (dl) {
+    const uniq = [];
+    list.forEach(function (it) { if (uniq.indexOf(it.materi) === -1) uniq.push(it.materi); });
+    dl.innerHTML = uniq.map(function (m) { return '<option value="' + String(m).replace(/"/g, '&quot;') + '">'; }).join('');
+  }
+  if (!list.length) {
+    box.innerHTML = '<p class="text-sm text-slate-400 italic">Belum ada data. Tambahkan Materi utama dan Bab/topik di atas.</p>';
+    return;
+  }
+  const grup = {};
+  list.forEach(function (it) { (grup[it.materi] = grup[it.materi] || []).push(it); });
+  let html = '<table class="w-full text-sm"><thead><tr class="bg-blue-50 text-slate-600"><th class="p-3 text-left rounded-l-lg">Materi utama</th><th class="p-3 text-left">Bab / topik</th><th class="p-3 text-center rounded-r-lg w-20">Hapus</th></tr></thead><tbody>';
+  Object.keys(grup).forEach(function (m) {
+    grup[m].forEach(function (it, i) {
+      html += '<tr class="border-b border-slate-100">' +
+        '<td class="p-3 font-bold text-slate-700">' + (i === 0 ? m.replace(/</g, '&lt;') : '') + '</td>' +
+        '<td class="p-3 text-slate-600">' + (it.bab ? it.bab.replace(/</g, '&lt;') : '<span class="text-slate-400 italic">(materi saja)</span>') + '</td>' +
+        '<td class="p-3 text-center"><button type="button" onclick="hapusMateriBab_(\'' + it.id + '\')" class="w-8 h-8 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition"><i class="fas fa-trash-alt text-sm"></i></button></td></tr>';
+    });
+  });
+  box.innerHTML = html + '</tbody></table>';
+}
+
+function simpanMateriBab_() {
+  const m = (document.getElementById('mb-materi') || {}).value || '';
+  const b = (document.getElementById('mb-bab') || {}).value || '';
+  if (!String(m).trim()) { Swal.fire('Lengkapi', 'Materi utama wajib diisi.', 'warning'); return; }
+  Swal.fire({ title: 'Menyimpan\u2026', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
+  google.script.run
+    .withSuccessHandler(function (res) {
+      if (!res || !res.success) { Swal.fire('Gagal', (res && res.message) || 'Tidak tersimpan.', 'error'); return; }
+      Swal.fire({ icon: 'success', title: 'Tersimpan', text: res.message, timer: 1600, showConfirmButton: false });
+      const eb = document.getElementById('mb-bab'); if (eb) eb.value = '';
+      sipLoadMateriBab_(true, sipRenderMateriBabTabel_);
+    })
+    .withFailureHandler(function (err) { Swal.fire('Error', String(err), 'error'); })
+    .saveMateriBab(m, b, currentUser.userID, currentUser.token);
+}
+
+function hapusMateriBab_(id) {
+  Swal.fire({ title: 'Hapus dari daftar?', text: 'Soal yang sudah tersimpan tidak berubah.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Hapus', cancelButtonText: 'Batal', confirmButtonColor: '#dc2626' }).then(function (r) {
+    if (!r.isConfirmed) return;
+    google.script.run
+      .withSuccessHandler(function (res) {
+        if (!res || !res.success) { Swal.fire('Gagal', (res && res.message) || 'Tidak terhapus.', 'error'); return; }
+        sipLoadMateriBab_(true, sipRenderMateriBabTabel_);
+      })
+      .withFailureHandler(function (err) { Swal.fire('Error', String(err), 'error'); })
+      .deleteMateriBab(id, currentUser.userID, currentUser.token);
+  });
+}
+
+// Muat daftar Materi & Bab (cache sesi) lalu isi dropdown form Bank Soal.
+function sipLoadMateriBab_(force, cb) {
+  if (!force && window._materiBabList) { sipIsiMateriSelects_(); if (cb) cb(); return; }
+  if (!(currentUser && (currentUser.role === 'Admin' || ((currentUser.pengawas || {}).izinBankSoal === true)))) return;
+  google.script.run
+    .withSuccessHandler(function (res) {
+      window._materiBabList = (res && res.success && res.list) || [];
+      sipIsiMateriSelects_();
+      if (cb) cb();
+    })
+    .withFailureHandler(function () { if (cb) cb(); })
+    .getMateriBabList(currentUser.userID, currentUser.token);
+}
+
+function sipIsiMateriSelects_() {
+  const sel = document.getElementById('select-materi-utama');
+  if (!sel) return;
+  const list = window._materiBabList || [];
+  const uniq = [];
+  list.forEach(function (it) { if (uniq.indexOf(it.materi) === -1) uniq.push(it.materi); });
+  const kini = sel.value;
+  sel.innerHTML = '<option value="">\u2014 Pilih materi \u2014</option>' +
+    uniq.map(function (m) { return '<option value="' + String(m).replace(/"/g, '&quot;') + '">' + String(m).replace(/</g, '&lt;') + '</option>'; }).join('');
+  if (kini && uniq.indexOf(kini) !== -1) sel.value = kini;
+  sipMateriUtamaChange_(true);
+}
+
+function sipMateriUtamaChange_(tanpaIsi) {
+  const sel = document.getElementById('select-materi-utama');
+  const selBab = document.getElementById('select-bab-topik');
+  if (!sel || !selBab) return;
+  const m = sel.value;
+  const list = (window._materiBabList || []).filter(function (it) { return it.materi === m; });
+  const babs = list.map(function (it) { return it.bab; }).filter(function (b) { return b; });
+  let html = '<option value="">\u2014 Pilih bab \u2014</option>';
+  if (m) html += '<option value="__MATERI__">(pakai nama materi saja)</option>';
+  html += babs.map(function (b) { return '<option value="' + String(b).replace(/"/g, '&quot;') + '">' + String(b).replace(/</g, '&lt;') + '</option>'; }).join('');
+  selBab.innerHTML = html;
+  if (!tanpaIsi && m && !babs.length) {
+    selBab.value = '__MATERI__';
+    sipBabTopikChange_();
+  }
+}
+
+function sipBabTopikChange_() {
+  const sel = document.getElementById('select-materi-utama');
+  const selBab = document.getElementById('select-bab-topik');
+  const inp = document.getElementById('input-materi');
+  if (!selBab || !inp) return;
+  const v = selBab.value;
+  if (!v) return;
+  inp.value = (v === '__MATERI__') ? ((sel && sel.value) || '') : v;
+}
+
+/* ===== [V5.12] AI PERBAIKAN DRAF SOAL (form Bank Soal, sebelum disimpan) ===== */
+function aiPerbaikiDrafSoal_() {
+  if (!(currentUser && (currentUser.role === 'Admin' || ((currentUser.pengawas || {}).izinBankSoal === true)))) {
+    Swal.fire('Akses dibatasi', 'Fitur AI ini untuk Admin atau Guru Tim Pembuat Soal.', 'info');
+    return;
+  }
+  const lvl = (document.getElementById('select-target-kognitif') || {}).value || '';
+  if (!lvl) { Swal.fire('Pilih target dulu', 'Pilih Target kognitif (C1\u2013C6) sebelum meminta bantuan AI.', 'warning'); return; }
+  try { if (typeof tinymce !== 'undefined' && tinymce.get('editor-content')) tinymce.get('editor-content').save(); } catch (eT) {}
+  const konten = (document.getElementById('editor-content') || {}).value || '';
+  if (!String(konten).replace(/<[^>]+>/g, ' ').trim()) {
+    Swal.fire('Draf masih kosong', 'Tulis dulu draf pertanyaan pada kotak Konten, baru minta bantuan AI.', 'warning');
+    return;
+  }
+  const tipe = (document.getElementById('q-type-select') || {}).value || 'PG';
+  const materi = (document.getElementById('input-materi') || {}).value || '';
+  let opts = [], correct = '';
+  if (tipe === 'PG' || tipe === 'PG_KOMPLEKS') {
+    for (let i = 0; i < 5; i++) {
+      try { if (typeof tinymce !== 'undefined' && tinymce.get('opt-' + i)) tinymce.get('opt-' + i).save(); } catch (eO) {}
+      const v = ((document.getElementById('opt-' + i) || {}).value || '').replace(/<p><br><\/p>|<p>&nbsp;<\/p>/g, '').trim();
+      if (v) opts.push(v);
+    }
+    correct = (document.getElementById('correct-input') || {}).value || '';
+  } else if (tipe === 'BS') {
+    const keys = {};
+    document.querySelectorAll('.bs-row').forEach(function (row) {
+      const t = (row.querySelector('.bs-text') || {}).value || '';
+      if (t.trim()) { keys[opts.length] = (row.querySelector('.bs-key') || {}).value || 'Benar'; opts.push(t); }
+    });
+    correct = JSON.stringify(keys);
+  } else if (tipe === 'JODOH') {
+    document.querySelectorAll('.pair-row').forEach(function (row) {
+      const q = ((row.querySelector('.pair-left') || {}).value || '').trim();
+      const a = ((row.querySelector('.pair-right') || {}).value || '').trim();
+      if (q && a) opts.push({ q: q, a: a });
+    });
+    correct = 'Auto-Check';
+  } else {
+    correct = (document.getElementById('correct-input') || {}).value || '';
+  }
+  Swal.fire({
+    title: 'AI sedang memperbaiki draf...',
+    html: '<i class="fas fa-circle-notch fa-spin text-3xl text-blue-500"></i><p class="text-xs text-slate-400 mt-3">Menyesuaikan rumusan ke level ' + lvl + ' tanpa mengubah jenis soal &amp; materi/bab.</p>',
+    allowOutsideClick: false, showConfirmButton: false
+  });
+  google.script.run
+    .withSuccessHandler(function (res) {
+      if (!res || !res.success) { Swal.fire('Gagal', (res && res.message) || 'AI tidak merespon.', 'error'); return; }
+      aiDrafTampilkanUsulan_(res);
+    })
+    .withFailureHandler(function (err) { Swal.fire('Error', (err && err.message) || String(err), 'error'); })
+    .perbaikiDraftSoalAI({ type: tipe, content: konten, options: opts, correct: correct, materi: materi }, lvl, 'gemini', currentUser.userID, currentUser.token);
+}
+
+function aiDrafTampilkanUsulan_(res) {
+  const esc = function (s) { return String(s == null ? '' : s); };
+  let optHtml = '';
+  if (res.baru && Array.isArray(res.baru.options) && res.baru.options.length) {
+    optHtml = '<p class="text-[11px] font-bold text-slate-500 uppercase mt-2 mb-1">Opsi baru</p><ol class="list-[upper-alpha] list-inside text-xs text-slate-600 space-y-0.5">' +
+      res.baru.options.map(function (o) {
+        const t = (o && typeof o === 'object') ? ((o.q || '') + ' = ' + (o.a || '')) : String(o);
+        return '<li>' + t.replace(/</g, '&lt;') + '</li>';
+      }).join('') + '</ol>';
+  }
+  Swal.fire({
+    title: 'Usulan Perbaikan Draf (AI)',
+    html:
+      '<div class="text-left space-y-2 max-h-[55vh] overflow-y-auto">' +
+      '<p class="text-xs"><span class="font-bold text-slate-500">Level terdeteksi:</span> ' + esc(res.levelKini) +
+      ' <i class="fas fa-arrow-right mx-1 text-blue-500"></i> <span class="font-bold text-blue-700">' + esc(res.levelTarget) + '</span>' +
+      ' <span class="text-slate-400">| ' + esc(res.tipe) + ' \u00b7 ' + esc(res.materi) + '</span></p>' +
+      '<p class="text-[11px] font-bold text-slate-500 uppercase">Draf saat ini</p>' +
+      '<div class="border rounded-xl p-3 text-xs bg-slate-50 text-slate-600">' + esc(res.lama && res.lama.content) + '</div>' +
+      '<p class="text-[11px] font-bold text-blue-600 uppercase">Usulan AI</p>' +
+      '<div class="border-2 border-blue-200 rounded-xl p-3 text-xs bg-blue-50 text-slate-700">' + esc(res.baru && res.baru.content) + '</div>' +
+      optHtml +
+      (res.baru && res.baru.correct ? '<p class="text-[11px] text-emerald-700 mt-1"><b>Kunci baru:</b> ' + String(JSON.stringify(res.baru.correct)).replace(/</g, '&lt;') + '</p>' : '') +
+      '<p class="text-[11px] text-slate-400 mt-1">Usulan diterapkan hanya ke draf pada form. Periksa sekali lagi dan tekan <b>Simpan Pertanyaan</b> bila sudah benar.</p>' +
+      '</div>',
+    width: 700,
+    showCancelButton: true,
+    showDenyButton: true,
+    confirmButtonText: '<i class="fas fa-check"></i> Terapkan ke Draf',
+    denyButtonText: '<i class="fas fa-rotate"></i> Coba Lagi',
+    cancelButtonText: 'Batal',
+    confirmButtonColor: '#1d4ed8',
+    denyButtonColor: '#7c3aed',
+    didOpen: function () { try { sipTypesetMath_(Swal.getPopup()); } catch (eM) {} }
+  }).then(function (r2) {
+    if (r2.isDenied) { aiPerbaikiDrafSoal_(); return; }
+    if (!r2.isConfirmed) return;
+    sipTerapkanDrafKeForm_(res);
+    Swal.fire({ icon: 'success', title: 'Diterapkan ke draf', html: '<p class="text-sm">Periksa isi form, lengkapi bila perlu, lalu tekan <b>Simpan Pertanyaan</b>.</p>', confirmButtonColor: '#1b3a6b' });
+  });
+}
+
+function sipTerapkanDrafKeForm_(res) {
+  const b = (res && res.baru) || {};
+  const tipe = (res && res.tipe) || 'PG';
+  try {
+    if (typeof tinymce !== 'undefined' && tinymce.get('editor-content')) tinymce.get('editor-content').setContent(b.content || '');
+    else { const ec = document.getElementById('editor-content'); if (ec) ec.value = b.content || ''; }
+  } catch (eC) {}
+  if ((tipe === 'PG' || tipe === 'PG_KOMPLEKS') && Array.isArray(b.options)) {
+    for (let i = 0; i < 5; i++) {
+      const val = b.options[i] ? String(b.options[i]) : '';
+      try {
+        if (typeof tinymce !== 'undefined' && tinymce.get('opt-' + i)) tinymce.get('opt-' + i).setContent(val);
+        else { const el = document.getElementById('opt-' + i); if (el) el.value = val; }
+      } catch (eO) {}
+    }
+    let k = b.correct;
+    if (Array.isArray(k)) k = k.join(', ');
+    const ci = document.getElementById('correct-input');
+    if (ci && k != null && k !== '') ci.value = String(k);
+  } else if (tipe === 'BS' && Array.isArray(b.options)) {
+    const cont = document.getElementById('bs-container');
+    if (cont) {
+      cont.innerHTML = '';
+      let keys = b.correct || {};
+      if (typeof keys === 'string') { try { keys = JSON.parse(keys); } catch (eK) { keys = {}; } }
+      b.options.forEach(function (stmt, idx) {
+        const kv = String((keys && keys[idx]) || 'Benar');
+        addBsRowInput(String(stmt), /salah/i.test(kv) ? 'Salah' : 'Benar', 10);
+      });
+    }
+  } else if (tipe === 'JODOH' && Array.isArray(b.options)) {
+    const cont = document.getElementById('pairs-container');
+    if (cont) {
+      cont.innerHTML = '';
+      b.options.forEach(function (p) {
+        if (p && typeof p === 'object') addPairInput(String(p.q || ''), String(p.a || ''), String(p.a || ''), 10);
+      });
+    }
+  } else if (tipe === 'Esai') {
+    const ci = document.getElementById('correct-input');
+    if (ci && b.correct != null && b.correct !== '') ci.value = (typeof b.correct === 'string') ? b.correct : JSON.stringify(b.correct);
+  }
+  try { if (typeof sipHitungTotalPoin_ === 'function') sipHitungTotalPoin_(); } catch (eH) {}
+}
+
 function renderQuestionBank(container) {
   // Siapkan opsi dropdown dari data ujian yang ada
   var _pgwMapel = (currentUser && currentUser.role === 'Guru' && currentUser.pengawas && String(currentUser.pengawas.mapelTimSoal || '').trim())
@@ -7600,12 +7881,51 @@ Jawaban: A
              <input type="hidden" name="examId" id="input-exam-id">
              <input type="hidden" name="questionId" id="input-question-id">
 
-             <div>
-                 <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Materi / Bab <span class="text-red-500">*</span></label>
-                 <input id="input-materi" list="materi-datalist" type="text" placeholder="Contoh: Bangun Ruang Sisi Datar" class="w-full border border-slate-200 p-3 rounded-xl bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-blue-500 transition">
-                 <datalist id="materi-datalist"></datalist>
-                 <p class="text-[11px] text-slate-400 mt-1">Wajib diisi — dipakai sistem untuk deskripsi kisi-kisi dan Soal Acak per bab/materi. Nilai ini tidak direset agar input soal satu bab lebih cepat.</p>
-             </div>
+             <fieldset class="border-2 border-blue-200 rounded-2xl p-4 bg-blue-50/20">
+                 <legend class="px-2 text-sm font-bold text-slate-700"><i class="fas fa-bullseye text-blue-600 mr-1"></i> Materi soal &amp; target kognitif</legend>
+                 <p class="text-[11px] text-slate-500 mb-3">Materi/bab wajib diisi untuk kisi-kisi dan pemilihan paket. Jenis soal tetap setelah simpan; ubah sendiri bila diperlukan.</p>
+                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                     <div>
+                         <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Materi utama <span class="text-red-500">*</span></label>
+                         <select id="select-materi-utama" onchange="sipMateriUtamaChange_()" class="w-full border border-slate-200 p-3 rounded-xl bg-white outline-none focus:ring-2 focus:ring-blue-500 transition cursor-pointer">
+                             <option value="">&#8212; Pilih materi &#8212;</option>
+                         </select>
+                     </div>
+                     <div>
+                         <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Bab / topik <span class="text-red-500">*</span></label>
+                         <select id="select-bab-topik" onchange="sipBabTopikChange_()" class="w-full border border-slate-200 p-3 rounded-xl bg-white outline-none focus:ring-2 focus:ring-blue-500 transition cursor-pointer">
+                             <option value="">&#8212; Pilih bab &#8212;</option>
+                         </select>
+                     </div>
+                 </div>
+                 <div class="mb-3">
+                     <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Materi / Bab tersimpan <span class="text-red-500">*</span></label>
+                     <input id="input-materi" list="materi-datalist" type="text" placeholder="Contoh: Bangun Ruang Sisi Datar" class="w-full border border-slate-200 p-3 rounded-xl bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-blue-500 transition">
+                     <datalist id="materi-datalist"></datalist>
+                     <p class="text-[11px] text-slate-400 mt-1">Terisi otomatis dari pilihan di atas &#8212; boleh juga diketik manual. Dipakai untuk kisi-kisi dan Soal Acak per bab; tidak direset agar input satu bab lebih cepat. Kelola daftarnya pada menu <b>Materi &amp; Bab</b>.</p>
+                 </div>
+                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                     <div>
+                         <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Target kognitif Admin</label>
+                         <select id="select-target-kognitif" class="w-full border border-slate-200 p-3 rounded-xl bg-white outline-none focus:ring-2 focus:ring-blue-500 transition cursor-pointer">
+                             <option value="">&#8212; Pilih jika menetapkan target / memakai AI &#8212;</option>
+                             <option value="C1">C1 &#8212; Mengingat</option>
+                             <option value="C2">C2 &#8212; Memahami</option>
+                             <option value="C3">C3 &#8212; Menerapkan</option>
+                             <option value="C4">C4 &#8212; Menganalisis</option>
+                             <option value="C5">C5 &#8212; Mengevaluasi</option>
+                             <option value="C6">C6 &#8212; Mencipta</option>
+                         </select>
+                     </div>
+                     <div>
+                         <button type="button" onclick="aiPerbaikiDrafSoal_()" class="w-full px-4 py-3 rounded-xl border-2 border-blue-500 text-blue-700 bg-white hover:bg-blue-50 text-sm font-bold transition">
+                             <i class="fas fa-wand-magic-sparkles mr-1"></i> Bantu perbaiki soal dengan AI
+                         </button>
+                     </div>
+                 </div>
+                 <div class="mt-3 bg-slate-100 rounded-xl p-3 text-[11px] text-slate-500">Target bukan hasil penilaian. AI memberi usulan, bukan jaminan level atau kebenaran kunci. Isi asli tetap sampai Anda menyetujui draf dan menekan Simpan.</div>
+                 <p class="text-[11px] text-slate-400 mt-2">Usulan diterapkan hanya ke draf. Periksa sekali lagi dan tekan Simpan Pertanyaan bila sudah benar. Analisis/persetujuan kisi-kisi tetap wajib setelah disimpan.</p>
+             </fieldset>
 
              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                <div>
@@ -8146,6 +8466,7 @@ function loadQuestionsTable(examId) {
     allQuestionsData = qs || [];
     // [V5.8] isi datalist Materi/Bab agar penulisan bab konsisten
     try {
+      try { sipLoadMateriBab_(); } catch (eMB) {} // [V5.12] isi dropdown Materi utama/Bab
       const _dl = document.getElementById('materi-datalist');
       if (_dl) {
         const _set = {};
@@ -8413,7 +8734,7 @@ function renderQuestionsInternal() {
                     <button onclick="editQuestionAt(${qIdx})" class="qb-edit-btn w-8 h-8 rounded flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-blue-50 border border-transparent hover:border-blue-100 transition-all" title="Edit Soal">
                         <i class="fas fa-pencil-alt text-sm"></i>
                     </button>
-                    ${(currentUser && currentUser.role === 'Admin') ? `<button onclick="aiLevelSoalAt(${qIdx})" class="w-8 h-8 rounded flex items-center justify-center text-slate-500 hover:text-violet-600 hover:bg-violet-50 border border-transparent hover:border-violet-100 transition-all" title="AI: Perbaiki Level Kognitif Soal">
+                    ${(currentUser && (currentUser.role === 'Admin' || ((currentUser.pengawas || {}).izinBankSoal === true))) ? `<button onclick="aiLevelSoalAt(${qIdx})" class="w-8 h-8 rounded flex items-center justify-center text-slate-500 hover:text-violet-600 hover:bg-violet-50 border border-transparent hover:border-violet-100 transition-all" title="AI: Perbaiki Level Kognitif Soal">
                         <i class="fas fa-wand-magic-sparkles text-sm"></i>
                     </button>` : ''}
                     <button onclick="showQuestionPreviewAt(${qIdx})" class="w-8 h-8 rounded flex items-center justify-center text-slate-500 hover:text-teal-600 hover:bg-teal-50 border border-transparent hover:border-teal-100 transition-all" title="Preview Soal">
@@ -10047,6 +10368,7 @@ function viewStudentAnswers(responseId) {
 
       html += '</div>';
       content.innerHTML = html;
+      sipTypesetMath_(content); // [V5.11] render rumus matematika
   };
 
   if (cachedAns && cachedAns.success) paintViewAnswers(cachedAns);
@@ -12364,8 +12686,8 @@ function resetQuestionForm() {
 function aiLevelSoalAt(idx) {
   const q = (filteredQuestions || [])[idx];
   if (!q) { Swal.fire('Gagal', 'Data soal tidak ditemukan.', 'error'); return; }
-  if (!(currentUser && currentUser.role === 'Admin')) {
-    Swal.fire('Khusus Admin', 'Perbaikan soal dengan AI hanya untuk Administrator.', 'info');
+  if (!(currentUser && (currentUser.role === 'Admin' || ((currentUser.pengawas || {}).izinBankSoal === true)))) {
+    Swal.fire('Akses dibatasi', 'Perbaikan soal dengan AI hanya untuk Admin atau Guru Tim Pembuat Soal.', 'info');
     return;
   }
   Swal.fire({
@@ -12452,7 +12774,8 @@ function aiLevelTampilkanUsulan_(res) {
     denyButtonText: '<i class="fas fa-rotate"></i> Coba Lagi',
     cancelButtonText: 'Batal',
     confirmButtonColor: '#059669',
-    denyButtonColor: '#7c3aed'
+    denyButtonColor: '#7c3aed',
+    didOpen: function () { try { sipTypesetMath_(Swal.getPopup()); } catch (eM) {} }
   }).then(function (r2) {
     if (r2.isDenied) {
       const idx = (filteredQuestions || []).findIndex(function (x) { return String(x.id) === String(res.questionId); });
@@ -12952,6 +13275,7 @@ function renderEssayGrading(res) {
     });
     html += '</div>';
     content.innerHTML = html;
+    sipTypesetMath_(content); // [V5.11] render rumus matematika
     if (scoreInput) scoreInput.disabled = false;
   }
   if (scoreInput) {
@@ -16672,7 +16996,7 @@ function showQuestionPreview(qStr) {
 
     // Gunakan helper function
     container.innerHTML = _renderSingleQuestionForPreview(q, 0);
-    MathJax.typesetPromise([container]);
+    sipTypesetMath_(container); // [V5.11] aman walau CDN MathJax gagal
     modal.classList.remove('hidden');
 }
 
@@ -16695,7 +17019,7 @@ function previewAllQuestions() {
     }).join('');
 
     container.innerHTML = allHtml;
-    MathJax.typesetPromise([container]);
+    sipTypesetMath_(container); // [V5.11] aman walau CDN MathJax gagal
     modal.classList.remove('hidden');
 }
 
@@ -20027,5 +20351,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4e702cc9fed3e23',t:'MTc5MjY1NjQ3Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4ecb5c4f966fdca',t:'MTc5MjcxNjIzMg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
