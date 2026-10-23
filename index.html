@@ -8033,7 +8033,10 @@ Jawaban: A
              <div id="pairs-area" class="hidden bg-slate-50 p-5 rounded-xl border border-slate-200">
                  <div class="flex justify-between items-center mb-3">
                    <p class="text-xs font-bold text-slate-500"><i class="fas fa-random"></i> PASANGAN (KIRI - KANAN)</p>
+                   <span class="flex items-center gap-2">
+                   <button type="button" onclick="sipOpenMathStudio_(1)" title="Klik dulu kolom yang dituju, lalu sisipkan simbol/equation matematika" class="text-indigo-600 text-xs font-bold bg-indigo-50 px-2 py-1 rounded border border-indigo-200 hover:bg-indigo-100 transition">&#8721; Matematika</button>
                    <button type="button" onclick="addPairInput()" class="text-blue-600 text-xs font-bold hover:underline bg-blue-50 px-2 py-1 rounded border border-blue-200 hover:bg-blue-100 transition">+ Tambah Baris</button>
+                </span>
                 </div>
                 <div id="pairs-container" class="space-y-2"></div>
              </div>
@@ -8041,7 +8044,10 @@ Jawaban: A
              <div id="bs-area" class="hidden bg-slate-50 p-5 rounded-xl border border-slate-200">
                  <div class="flex justify-between items-center mb-3">
                    <p class="text-xs font-bold text-slate-500"><i class="fas fa-tasks"></i> PERNYATAAN & KUNCI JAWABAN</p>
+                   <span class="flex items-center gap-2">
+                   <button type="button" onclick="sipOpenMathStudio_(1)" title="Klik dulu kolom pernyataan yang dituju, lalu sisipkan simbol/equation matematika" class="text-indigo-600 text-xs font-bold bg-indigo-50 px-2 py-1 rounded border border-indigo-200 hover:bg-indigo-100 transition">&#8721; Matematika</button>
                    <button type="button" onclick="addBsRowInput()" class="text-emerald-600 text-xs font-bold hover:underline bg-emerald-50 px-2 py-1 rounded border border-emerald-200 hover:bg-emerald-100 transition">+ Tambah Pernyataan</button>
+                </span>
                 </div>
                 
                 <div class="grid grid-cols-12 gap-2 mb-2 px-1 text-[10px] font-bold text-slate-400 uppercase">
@@ -8107,7 +8113,8 @@ function addBsRowInput(text = '', key = 'Benar', poin = 10) {
 
   div.innerHTML = `
         <div class="col-span-6">
-            <input type="text" class="bs-text w-full border border-slate-300 rounded p-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none" placeholder="Tulis pernyataan..." value="${text}" oninput="sipHitungTotalPoin_()">
+            <input type="text" class="bs-text w-full border border-slate-300 rounded p-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none" placeholder="Tulis pernyataan... (boleh $rumus$ / simbol)" oninput="sipHitungTotalPoin_(); sipMathPrevRow_(this)">
+            <div class="sip-math-prev hidden mt-1 text-sm bg-white border border-slate-200 rounded px-2 py-1"></div>
         </div>
         <div class="col-span-3">
             <select class="bs-key w-full border border-slate-300 rounded p-2 text-sm bg-white cursor-pointer">
@@ -8122,7 +8129,11 @@ function addBsRowInput(text = '', key = 'Benar', poin = 10) {
              <button type="button" onclick="this.parentElement.parentElement.remove(); sipHitungTotalPoin_()" class="text-red-400 hover:text-red-600"><i class="fas fa-trash"></i></button>
         </div>
     `;
+  // [V5.13] Nilai diisi lewat properti agar kutip/HTML/LaTeX tidak merusak atribut
+  const bsInp = div.querySelector('.bs-text');
+  bsInp.value = text || '';
   container.appendChild(div);
+  try { sipMathPrevRow_(bsInp); } catch (e) {}
   try { sipHitungTotalPoin_(); } catch (e) {}
 }
 
@@ -8237,21 +8248,24 @@ function addPairInput(qVal = '', optVal = '', keyVal = '', poin = 10) {
           <label class="text-[10px] text-slate-400 font-bold uppercase ml-1 mb-1 block">Soal / Pernyataan</label>
           <input type="text" class="pair-left w-full border border-slate-300 p-2 rounded text-sm focus:ring-1 focus:ring-blue-500 outline-none placeholder-slate-300 transition-shadow" 
                  placeholder="Contoh: Ibu Kota Jawa Barat" 
-                 value="${qVal}" oninput="sipHitungTotalPoin_()">
+                 oninput="sipHitungTotalPoin_(); sipMathPrevRow_(this)">
+          <div class="sip-math-prev hidden mt-1 text-sm bg-white border border-slate-200 rounded px-2 py-1"></div>
       </div>
 
       <div class="col-span-3">
           <label class="text-[10px] text-slate-400 font-bold uppercase ml-1 mb-1 block">Opsi (Tampil di Siswa)</label>
           <input type="text" class="pair-middle w-full border border-slate-300 p-2 rounded text-sm focus:ring-1 focus:ring-amber-500 outline-none bg-amber-50/30 placeholder-slate-300 transition-shadow" 
                  placeholder="Pengacoh / Jawaban" 
-                 value="${optVal}">
+                 oninput="sipMathPrevRow_(this)">
+          <div class="sip-math-prev hidden mt-1 text-sm bg-white border border-slate-200 rounded px-2 py-1"></div>
       </div>
 
       <div class="col-span-2">
           <label class="text-[10px] text-emerald-600 font-bold uppercase ml-1 mb-1 block">Kunci Jawaban</label>
           <input type="text" class="pair-right w-full border border-emerald-300 p-2 rounded text-sm focus:ring-1 focus:ring-emerald-500 outline-none bg-emerald-50 font-medium text-emerald-800 placeholder-emerald-300 transition-shadow" 
                  placeholder="Harus Persis Opsi" 
-                 value="${keyVal}" oninput="sipHitungTotalPoin_()">
+                 oninput="sipHitungTotalPoin_(); sipMathPrevRow_(this)">
+          <div class="sip-math-prev hidden mt-1 text-sm bg-white border border-slate-200 rounded px-2 py-1"></div>
       </div>
 
       <div class="col-span-2">
@@ -8267,7 +8281,11 @@ function addPairInput(qVal = '', optVal = '', keyVal = '', poin = 10) {
       </div>
   `;
   
+  // [V5.13] Nilai diisi lewat properti agar kutip/HTML/LaTeX tidak merusak atribut
+  const pL = div.querySelector('.pair-left'), pM = div.querySelector('.pair-middle'), pR = div.querySelector('.pair-right');
+  pL.value = qVal || ''; pM.value = optVal || ''; pR.value = keyVal || '';
   container.appendChild(div);
+  try { sipMathPrevRow_(pL); sipMathPrevRow_(pM); sipMathPrevRow_(pR); } catch (e) {}
   try { sipHitungTotalPoin_(); } catch (e) {}
 }
 
@@ -10262,11 +10280,13 @@ function viewStudentAnswers(responseId) {
               studentAnsObj = {};
             }
 
-            // Hitung berapa pasangan yang benar untuk status badge
+            // [V5.13] Hitung pasangan benar HANYA dari pasangan bersoal
+            // (baris pengecoh tanpa teks kiri dilewati — selaras skor server)
             let matchedCount = 0;
-            const totalPairs = pairs.length;
+            const realPairs = pairs.filter(p => p && String(p.q || '').trim() !== '');
+            const totalPairs = realPairs.length;
             if (totalPairs > 0) {
-              pairs.forEach(pair => {
+              realPairs.forEach(pair => {
                 const stuVal = String(studentAnsObj[pair.q] || '').trim().toLowerCase();
                 if (stuVal && stuVal === String(pair.a || '').trim().toLowerCase()) matchedCount++;
               });
@@ -10290,7 +10310,14 @@ function viewStudentAnswers(responseId) {
 
           } else {
             // PG, PG KOMPLEKS, BS
-            if (item.isCorrect) {
+            // [V5.13] BS & PG Kompleks: tampilkan BENAR SEBAGIAN bila poin parsial
+            const ptNum = parseFloat(item.point) || 0;
+            const mxNum = parseFloat(item.maxPoint) || 0;
+            if ((item.type === 'BS' || item.type === 'PG_KOMPLEKS') && mxNum > 0 && ptNum > 0.01 && ptNum < mxNum - 0.01) {
+              statusIcon = '<span class="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded border border-amber-200 font-bold"><i class="fas fa-star-half-stroke mr-1"></i>BENAR SEBAGIAN</span>';
+              borderClass = 'border-amber-200';
+              bgClass = 'bg-amber-50/20';
+            } else if (item.isCorrect) {
               statusIcon = '<span class="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded border border-emerald-200 font-bold"><i class="fas fa-check mr-1"></i>BENAR</span>';
               borderClass = 'border-emerald-200';
               bgClass = 'bg-emerald-50/30';
@@ -19261,7 +19288,44 @@ function sipMathRoot_(idx, r) {
   return pre + '√<span style="border-top:1.6px solid currentColor;padding:0 3px;">' + r + '</span>';
 }
 
+// [V5.13] Pratinjau matematika kecil di bawah field BS/JODOH (form bank soal)
+function sipMathPrevRow_(inp) {
+  try {
+    const prev = inp && inp.parentElement ? inp.parentElement.querySelector('.sip-math-prev') : null;
+    if (!prev) return;
+    const v = String(inp.value || '');
+    const punyaMath = v.indexOf('$') >= 0 || v.indexOf('\\(') >= 0 || /<\/?(sup|sub|span|i|b|em|strong)\b/i.test(v);
+    if (!punyaMath) { prev.classList.add('hidden'); prev.innerHTML = ''; return; }
+    prev.classList.remove('hidden');
+    prev.innerHTML = v;
+    clearTimeout(inp._sipPrevT);
+    inp._sipPrevT = setTimeout(function () { sipTypesetMath_(prev); }, 250);
+  } catch (e) {}
+}
+
+// [V5.13] Ingat field teks BS/JODOH yang terakhir difokuskan (target sisip simbol)
+document.addEventListener('focusin', function (ev) {
+  try {
+    const t = ev.target;
+    if (t && t.matches && t.matches('.bs-text, .pair-left, .pair-middle, .pair-right')) {
+      window._sipMathLastInp_ = t;
+    }
+  } catch (e) {}
+});
+
 function sipMathInsert_(html) {
+  // [V5.13] Mode field teks: sisip ke input BS/JODOH yang terakhir difokuskan
+  const inp = window._sipMathLastInp_;
+  if (window._sipMathForceInput_ && inp && document.body && document.body.contains(inp)) {
+    const s = (inp.selectionStart == null) ? String(inp.value).length : inp.selectionStart;
+    const e2 = (inp.selectionEnd == null) ? s : inp.selectionEnd;
+    inp.value = String(inp.value).slice(0, s) + html + String(inp.value).slice(e2);
+    const pos = s + String(html).length;
+    try { inp.setSelectionRange(pos, pos); } catch (e) {}
+    try { inp.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) {}
+    try { inp.focus(); } catch (e) {}
+    return;
+  }
   const ed = (window.tinymce && tinymce.activeEditor) ? tinymce.activeEditor : null;
   const warn = document.getElementById('sip-math-warn');
   if (!ed || typeof ed.insertContent !== 'function') {
@@ -19409,7 +19473,9 @@ function sipMathBindStudio_() {
   });
 }
 
-function sipOpenMathStudio_() {
+function sipOpenMathStudio_(forceInput) {
+  // [V5.13] forceInput=1: sisipan diarahkan ke field teks BS/JODOH terakhir fokus
+  window._sipMathForceInput_ = !!forceInput;
   Swal.fire({
     width: 720,
     title: '<span class="text-base font-black text-slate-800">∑ Matematika — Simbol &amp; Equation</span>',
@@ -20351,5 +20417,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4ecb5c4f966fdca',t:'MTc5MjcxNjIzMg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4ed08fedb479fd9',t:'MTc5MjcxOTY0MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
