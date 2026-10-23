@@ -8007,23 +8007,23 @@ Jawaban: A
                 
                 <div class="space-y-4">
                     <div class="flex flex-col gap-1">
-                        <span class="font-bold text-slate-500 text-xs">Pilihan A</span>
+                        <span class="flex items-center justify-between"><span class="font-bold text-slate-500 text-xs">Pilihan A</span><label class="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 px-2 py-0.5 rounded cursor-pointer transition" title="Unggah gambar sebagai jawaban A (tersimpan di folder Drive SIPINTAR-Jawaban Exam)"><i class="fas fa-image mr-0.5"></i> Gambar<input type="file" accept="image/jpeg,image/png" class="sr-only-foto" onchange="sipUnggahGambarOpsi_(0, this)"></label></span>
                         <textarea id="opt-0" class="editor-option w-full border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none p-2" placeholder="Tulis jawaban A..."></textarea>
                     </div>
                     <div class="flex flex-col gap-1">
-                        <span class="font-bold text-slate-500 text-xs">Pilihan B</span>
+                        <span class="flex items-center justify-between"><span class="font-bold text-slate-500 text-xs">Pilihan B</span><label class="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 px-2 py-0.5 rounded cursor-pointer transition" title="Unggah gambar sebagai jawaban B (tersimpan di folder Drive SIPINTAR-Jawaban Exam)"><i class="fas fa-image mr-0.5"></i> Gambar<input type="file" accept="image/jpeg,image/png" class="sr-only-foto" onchange="sipUnggahGambarOpsi_(1, this)"></label></span>
                         <textarea id="opt-1" class="editor-option w-full border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none p-2" placeholder="Tulis jawaban B..."></textarea>
                     </div>
                     <div class="flex flex-col gap-1">
-                        <span class="font-bold text-slate-500 text-xs">Pilihan C</span>
+                        <span class="flex items-center justify-between"><span class="font-bold text-slate-500 text-xs">Pilihan C</span><label class="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 px-2 py-0.5 rounded cursor-pointer transition" title="Unggah gambar sebagai jawaban C (tersimpan di folder Drive SIPINTAR-Jawaban Exam)"><i class="fas fa-image mr-0.5"></i> Gambar<input type="file" accept="image/jpeg,image/png" class="sr-only-foto" onchange="sipUnggahGambarOpsi_(2, this)"></label></span>
                         <textarea id="opt-2" class="editor-option w-full border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none p-2" placeholder="Tulis jawaban C..."></textarea>
                     </div>
                     <div class="flex flex-col gap-1">
-                        <span class="font-bold text-slate-500 text-xs">Pilihan D</span>
+                        <span class="flex items-center justify-between"><span class="font-bold text-slate-500 text-xs">Pilihan D</span><label class="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 px-2 py-0.5 rounded cursor-pointer transition" title="Unggah gambar sebagai jawaban D (tersimpan di folder Drive SIPINTAR-Jawaban Exam)"><i class="fas fa-image mr-0.5"></i> Gambar<input type="file" accept="image/jpeg,image/png" class="sr-only-foto" onchange="sipUnggahGambarOpsi_(3, this)"></label></span>
                         <textarea id="opt-3" class="editor-option w-full border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none p-2" placeholder="Tulis jawaban D..."></textarea>
                     </div>
                     <div class="flex flex-col gap-1">
-                        <span class="font-bold text-slate-500 text-xs">Pilihan E</span>
+                        <span class="flex items-center justify-between"><span class="font-bold text-slate-500 text-xs">Pilihan E</span><label class="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 px-2 py-0.5 rounded cursor-pointer transition" title="Unggah gambar sebagai jawaban E (tersimpan di folder Drive SIPINTAR-Jawaban Exam)"><i class="fas fa-image mr-0.5"></i> Gambar<input type="file" accept="image/jpeg,image/png" class="sr-only-foto" onchange="sipUnggahGambarOpsi_(4, this)"></label></span>
                         <textarea id="opt-4" class="editor-option w-full border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none p-2" placeholder="Tulis jawaban E..."></textarea>
                     </div>
                 </div>
@@ -8297,6 +8297,57 @@ function addPairInput(qVal = '', optVal = '', keyVal = '', poin = 10) {
 // Tersimpan ke subfolder "SIPINTAR - Unggahan Gambar Soal" (dibuat OTOMATIS oleh sistem
 // di dalam folder Drive induk) + terdaftar di lembar 'Gambar', lalu link
 // langsung terpasang pada field gambar soal ini.
+// [V5.13] Unggah gambar sebagai isi OPSI/PILIHAN JAWABAN (A-E).
+// Tersimpan di folder Drive "SIPINTAR-Jawaban Exam", lalu <img> disisipkan
+// ke editor opsi tersebut (boleh dicampur teks/rumus matematika).
+function sipUnggahGambarOpsi_(idx, inp) {
+  if (!inp || !inp.files || !inp.files[0]) return;
+  var f = inp.files[0];
+  if (!/^image\/(jpe?g|png)$/i.test(f.type || '')) {
+    inp.value = '';
+    Swal.fire('Gambar ditolak', 'Gunakan gambar JPG atau PNG.', 'error');
+    return;
+  }
+  if (f.size > 4 * 1024 * 1024) {
+    inp.value = '';
+    Swal.fire('Gambar ditolak', 'Ukuran gambar maksimal 4 MB.', 'error');
+    return;
+  }
+  Swal.fire({ title: 'Mengunggah gambar jawaban\u2026', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
+  var rd = new FileReader();
+  rd.onload = function () {
+    google.script.run
+      .withSuccessHandler(function (res) {
+        inp.value = '';
+        if (!res || !res.success) {
+          Swal.fire('Gagal', (res && res.message) || 'Gambar tidak dapat diunggah.', 'error');
+          return;
+        }
+        var imgHtml = '<img src="' + res.link + '" alt="Jawaban ' + ['A','B','C','D','E'][idx] + '" style="max-height:140px;border-radius:8px">';
+        var dipasang = false;
+        try {
+          if (typeof tinymce !== 'undefined' && tinymce.get('opt-' + idx)) {
+            tinymce.get('opt-' + idx).insertContent(imgHtml);
+            dipasang = true;
+          }
+        } catch (eT) {}
+        if (!dipasang) {
+          var ta = document.getElementById('opt-' + idx);
+          if (ta) { ta.value = (ta.value || '') + imgHtml; dipasang = true; }
+        }
+        try {
+          if (typeof allImagesData !== 'undefined' && allImagesData && allImagesData.push) {
+            allImagesData.push({ name: res.name || f.name, link: res.link, preview: res.link });
+          }
+        } catch (eA) {}
+        Swal.fire({ icon: 'success', title: 'Gambar jawaban terunggah', text: 'Tersimpan di folder "SIPINTAR-Jawaban Exam" pada Drive sistem dan sudah terpasang pada Pilihan ' + ['A','B','C','D','E'][idx] + '.', confirmButtonColor: '#1b3a6b' });
+      })
+      .withFailureHandler(function (err) { inp.value = ''; Swal.fire('Gagal', String(err), 'error'); })
+      .uploadGambarJawabanExam(rd.result, f.name, currentUser.userID, currentUser.token);
+  };
+  rd.readAsDataURL(f);
+}
+
 function sipUnggahGambarEditor_(inp) {
   if (!inp || !inp.files || !inp.files[0]) return;
   var f = inp.files[0];
@@ -20463,5 +20514,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4ee9cb4a9b3678e',t:'MTc5MjczNjE3Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4ef6432d8e7de08',t:'MTc5Mjc0NDM0OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
