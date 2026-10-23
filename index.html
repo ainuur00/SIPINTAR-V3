@@ -7881,33 +7881,33 @@ Jawaban: A
              <input type="hidden" name="examId" id="input-exam-id">
              <input type="hidden" name="questionId" id="input-question-id">
 
-             <fieldset class="border-2 border-blue-200 rounded-2xl p-4 bg-blue-50/20">
-                 <legend class="px-2 text-sm font-bold text-slate-700"><i class="fas fa-bullseye text-blue-600 mr-1"></i> Materi soal &amp; target kognitif</legend>
-                 <p class="text-[11px] text-slate-500 mb-3">Materi/bab wajib diisi untuk kisi-kisi dan pemilihan paket. Jenis soal tetap setelah simpan; ubah sendiri bila diperlukan.</p>
-                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+             <fieldset class="border border-slate-200 rounded-xl px-3.5 pt-1.5 pb-3 bg-gradient-to-b from-blue-50/40 to-white shadow-sm">
+                 <legend class="px-2 text-[11px] font-black text-blue-900 uppercase tracking-widest"><i class="fas fa-bullseye text-amber-500 mr-1"></i> Materi soal &amp; target kognitif</legend>
+                 <p class="text-[10px] text-slate-400 mb-2.5 leading-snug">Materi/bab wajib diisi untuk kisi-kisi dan pemilihan paket. Jenis soal tetap setelah simpan; ubah sendiri bila diperlukan.</p>
+                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2.5">
                      <div>
-                         <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Materi utama <span class="text-red-500">*</span></label>
-                         <select id="select-materi-utama" onchange="sipMateriUtamaChange_()" class="w-full border border-slate-200 p-3 rounded-xl bg-white outline-none focus:ring-2 focus:ring-blue-500 transition cursor-pointer">
+                         <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Materi utama <span class="text-red-500">*</span></label>
+                         <select id="select-materi-utama" onchange="sipMateriUtamaChange_()" class="w-full border border-slate-200 px-2.5 py-2 text-sm rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition cursor-pointer">
                              <option value="">&#8212; Pilih materi &#8212;</option>
                          </select>
                      </div>
                      <div>
-                         <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Bab / topik <span class="text-red-500">*</span></label>
-                         <select id="select-bab-topik" onchange="sipBabTopikChange_()" class="w-full border border-slate-200 p-3 rounded-xl bg-white outline-none focus:ring-2 focus:ring-blue-500 transition cursor-pointer">
+                         <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Bab / topik <span class="text-red-500">*</span></label>
+                         <select id="select-bab-topik" onchange="sipBabTopikChange_()" class="w-full border border-slate-200 px-2.5 py-2 text-sm rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition cursor-pointer">
                              <option value="">&#8212; Pilih bab &#8212;</option>
                          </select>
                      </div>
                  </div>
-                 <div class="mb-3">
-                     <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Materi / Bab tersimpan <span class="text-red-500">*</span></label>
-                     <input id="input-materi" list="materi-datalist" type="text" placeholder="Contoh: Bangun Ruang Sisi Datar" class="w-full border border-slate-200 p-3 rounded-xl bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-blue-500 transition">
+                 <div class="mb-2.5">
+                     <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Materi / Bab tersimpan <span class="text-red-500">*</span></label>
+                     <input id="input-materi" list="materi-datalist" type="text" placeholder="Contoh: Bangun Ruang Sisi Datar" class="w-full border border-slate-200 px-2.5 py-2 text-sm rounded-lg bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition">
                      <datalist id="materi-datalist"></datalist>
-                     <p class="text-[11px] text-slate-400 mt-1">Terisi otomatis dari pilihan di atas &#8212; boleh juga diketik manual. Dipakai untuk kisi-kisi dan Soal Acak per bab; tidak direset agar input satu bab lebih cepat. Kelola daftarnya pada menu <b>Materi &amp; Bab</b>.</p>
+                     <p class="text-[10px] text-slate-400 mt-1 leading-snug">Terisi otomatis dari pilihan di atas &#8212; boleh diketik manual. Dipakai untuk kisi-kisi dan Soal Acak per bab; tidak direset agar input satu bab lebih cepat. Kelola daftarnya di menu <b>Materi &amp; Bab</b>.</p>
                  </div>
-                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3 items-end">
                      <div>
-                         <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Target kognitif Admin</label>
-                         <select id="select-target-kognitif" class="w-full border border-slate-200 p-3 rounded-xl bg-white outline-none focus:ring-2 focus:ring-blue-500 transition cursor-pointer">
+                         <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Target kognitif Admin</label>
+                         <select id="select-target-kognitif" class="w-full border border-slate-200 px-2.5 py-2 text-sm rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition cursor-pointer">
                              <option value="">&#8212; Pilih jika menetapkan target / memakai AI &#8212;</option>
                              <option value="C1">C1 &#8212; Mengingat</option>
                              <option value="C2">C2 &#8212; Memahami</option>
@@ -7918,13 +7918,12 @@ Jawaban: A
                          </select>
                      </div>
                      <div>
-                         <button type="button" onclick="aiPerbaikiDrafSoal_()" class="w-full px-4 py-3 rounded-xl border-2 border-blue-500 text-blue-700 bg-white hover:bg-blue-50 text-sm font-bold transition">
-                             <i class="fas fa-wand-magic-sparkles mr-1"></i> Bantu perbaiki soal dengan AI
+                         <button type="button" onclick="aiPerbaikiDrafSoal_()" class="w-full px-3 py-2 rounded-lg border border-blue-400 text-blue-700 bg-white hover:bg-blue-50 hover:border-blue-500 text-xs font-bold transition shadow-sm">
+                             <i class="fas fa-wand-magic-sparkles mr-1 text-amber-500"></i> Bantu perbaiki soal dengan AI
                          </button>
                      </div>
                  </div>
-                 <div class="mt-3 bg-slate-100 rounded-xl p-3 text-[11px] text-slate-500">Target bukan hasil penilaian. AI memberi usulan, bukan jaminan level atau kebenaran kunci. Isi asli tetap sampai Anda menyetujui draf dan menekan Simpan.</div>
-                 <p class="text-[11px] text-slate-400 mt-2">Usulan diterapkan hanya ke draf. Periksa sekali lagi dan tekan Simpan Pertanyaan bila sudah benar. Analisis/persetujuan kisi-kisi tetap wajib setelah disimpan.</p>
+                 <p class="text-[10px] text-slate-400 mt-2.5 leading-snug border-t border-slate-100 pt-2"><i class="fas fa-circle-info text-blue-300 mr-1"></i>Target bukan hasil penilaian; AI memberi usulan, bukan jaminan level atau kebenaran kunci. Usulan diterapkan hanya ke draf &#8212; isi asli tetap sampai Anda menyetujuinya, lalu periksa dan tekan <b>Simpan Pertanyaan</b>. Analisis/persetujuan kisi-kisi tetap wajib setelah disimpan.</p>
              </fieldset>
 
              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -18363,7 +18362,10 @@ function renderAIPreview() {
 
     return `
       <div class="border border-slate-200 rounded-xl p-3 bg-slate-50 relative group">
-        <button onclick="removeAIQuestion(${i})" class="absolute top-2 right-2 text-slate-300 hover:text-red-500 text-xs" title="Hapus soal ini"><i class="fas fa-times"></i></button>
+        <div class="absolute top-2 right-2 flex items-center gap-1">
+          <button onclick="sipTerapkanAIKeForm_(${i})" class="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 px-2 py-0.5 rounded transition" title="Terapkan soal ini ke form Bank Soal untuk diperiksa/diedit sebelum disimpan"><i class="fas fa-file-import mr-0.5"></i> Terapkan</button>
+          <button onclick="removeAIQuestion(${i})" class="text-slate-300 hover:text-red-500 text-xs px-1" title="Hapus soal ini"><i class="fas fa-times"></i></button>
+        </div>
         <div class="flex items-start gap-2">
           <span class="bg-indigo-100 text-indigo-600 text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 mt-0.5">${i + 1}</span>
           ${imgHtml}
@@ -18379,11 +18381,55 @@ function renderAIPreview() {
   }).join('');
 
   saveArea.classList.remove('hidden');
+  try { sipTypesetMath_(box); } catch (eM) {} // [V5.13] render rumus matematika pada pratinjau AI
 }
 
 function removeAIQuestion(i) {
   _aiGeneratedQuestions.splice(i, 1);
   renderAIPreview();
+}
+
+// [V5.13] Terapkan SATU soal hasil AI Generator ke form Bank Soal.
+// Hanya mengisi draf form (termasuk notasi matematika $...$) — penyimpanan tetap
+// manual lewat tombol Simpan Pertanyaan, konsisten aturan V5.12.
+function sipTerapkanAIKeForm_(i) {
+  const q = _aiGeneratedQuestions[i];
+  if (!q) return;
+  let tipe = String(q.type || 'PG');
+  if (tipe.toUpperCase() === 'MATCHING') tipe = 'JODOH';
+  if (['PG', 'PG_KOMPLEKS', 'BS', 'JODOH', 'Esai'].indexOf(tipe) < 0) tipe = 'PG';
+  const topikAI = ((document.getElementById('ai-topic') || {}).value || '').trim();
+  const examAI = ((document.getElementById('ai-target-exam') || {}).value || '');
+  try { showAdminTab('dash-questions', document.getElementById('menu-questions')); } catch (e) {}
+  setTimeout(function () {
+    try {
+      // Pilih ujian target yang sama dengan pilihan di AI Generator (bila ada)
+      const selEx = document.getElementById('select-exam-q');
+      if (selEx && examAI) {
+        for (let x = 0; x < selEx.options.length; x++) {
+          if (String(selEx.options[x].value) === String(examAI)) {
+            if (selEx.value !== examAI) { selEx.value = examAI; try { loadQuestionsTable(examAI); } catch (eL) {} }
+            break;
+          }
+        }
+      }
+      // Set jenis soal + tampilkan area input yang sesuai
+      const sel = document.getElementById('q-type-select');
+      if (sel) { sel.value = tipe; try { toggleOptionsInput(tipe); } catch (eT) {} }
+      // Isi konten/opsi/kunci memakai mekanisme draf yang sudah teruji (V5.12)
+      sipTerapkanDrafKeForm_({ tipe: tipe, baru: { content: q.content || '', options: q.options || [], correct: (q.correct != null ? q.correct : '') } });
+      // Materi/Bab + gambar AI (bila ada)
+      const im = document.getElementById('input-materi');
+      if (im && (q.materi || topikAI)) im.value = q.materi || topikAI;
+      const ia = document.getElementById('input-image-ac');
+      if (ia && q.image) ia.value = q.image;
+      const fa = document.getElementById('form-add-q');
+      if (fa && fa.scrollIntoView) fa.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      Swal.fire({ icon: 'success', title: 'Diterapkan ke form Bank Soal', html: '<p class="text-sm">Soal hasil AI sudah mengisi form — termasuk rumus/simbol matematika. Periksa isi, lengkapi bila perlu, lalu tekan <b>Simpan Pertanyaan</b>.</p>', confirmButtonColor: '#1b3a6b' });
+    } catch (e) {
+      Swal.fire('Gagal', 'Tidak bisa menerapkan ke form: ' + ((e && e.message) || e), 'error');
+    }
+  }, 600);
 }
 
 function handleSaveAIQuestions() {
@@ -20417,5 +20463,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4ed08fedb479fd9',t:'MTc5MjcxOTY0MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4ee9cb4a9b3678e',t:'MTc5MjczNjE3Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
