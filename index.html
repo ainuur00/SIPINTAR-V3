@@ -2864,11 +2864,35 @@ function logout() {
    4. ADMIN PANEL FUNCTIONS
    ========================================================================== */
 
+// [V6.1] Avatar sidebar: Guru tanpa foto -> ikon bawaan; ada foto -> fotonya.
+// Admin TIDAK memakai ikon bawaan (tetap inisial).
+function sipSetSidebarAvatar_() {
+  var box = document.querySelector('#admin-sidebar .user-info-avatar') || document.querySelector('.user-info-avatar');
+  if (!box || !currentUser) return;
+  if (currentUser.role !== 'Guru') {
+    box.innerHTML = String(currentUser.username || 'A').charAt(0).toUpperCase();
+    return;
+  }
+  box.innerHTML = '<img src="icon-pocong.jpg" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:9999px">';
+  try {
+    google.script.run.withSuccessHandler(function (res) {
+      try {
+        var u = res && res.success && res.profil && res.profil.fotoUrl;
+        if (!u) return;
+        var img = box.querySelector('img');
+        var srcF = (typeof sipProfilFotoSrc_ === 'function') ? sipProfilFotoSrc_(u) : u;
+        if (img && srcF) { img.referrerPolicy = 'no-referrer'; img.src = srcF; }
+      } catch (eA) {}
+    }).getProfilGuru(currentUser.userID, currentUser.token);
+  } catch (eG) {}
+}
+
 function initAdminPanel() {
   switchPage('page-admin');
   // [V4.0] muat notifikasi lonceng (di latar, tidak menahan dashboard)
   try { setTimeout(function () { sipLoadNotif_(); }, 1500); } catch (eNt0) {}
   document.getElementById('admin-sidebar-name').innerText = currentUser.username;
+  try { sipSetSidebarAvatar_(); } catch (eAv0) {}
   try { setDateDisplay(); } catch (eSD0) {}
   try { showAdminTab('dash-home'); } catch (eHome0) {}
   try { fetchAndStartClock(); } catch (eClk0) {}
@@ -3664,11 +3688,12 @@ function renderProfilGuruPage(container) {
         '<div class="mx-auto" style="width:150px;height:200px;border-radius:14px;overflow:hidden;border:3px solid #e2e8f0;background:#f1f5f9;display:flex;align-items:center;justify-content:center">' +
         (fotoSrc
           ? '<img id="pfg-foto-prev" src="' + escapeHtmlProfil_(fotoSrc) + '" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:cover;object-position:center top">'
-          : '<img id="pfg-foto-prev" class="hidden" style="width:100%;height:100%;object-fit:cover;object-position:center top"><span id="pfg-foto-ph" class="text-slate-400 text-xs font-bold">Belum ada foto</span>') +
+          : '<img id="pfg-foto-prev" src="icon-pocong.jpg" style="width:100%;height:100%;object-fit:cover;object-position:center top"><span id="pfg-foto-ph" class="hidden text-slate-400 text-xs font-bold">Belum ada foto</span>') +
         '</div>' +
         '<input type="file" id="pfg-foto-file" accept="image/*" class="hidden" onchange="sipGuruPilihFoto_(this)">' +
         '<button type="button" onclick="document.getElementById(\'pfg-foto-file\').click()" class="mt-3 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold"><i class="fas fa-camera mr-1"></i>Pilih Foto</button>' +
-        '<p class="text-[10px] text-slate-400 mt-2">JPG/PNG, otomatis dikecilkan. Foto tampil menutup frame.</p>' +
+        '<button type="button" onclick="sipGuruFotoKamera_()" class="mt-2 px-4 py-2 rounded-xl bg-slate-700 text-white text-xs font-bold"><i class="fas fa-camera-retro mr-1"></i>Gunakan Kamera</button>' +
+        '<p class="text-[10px] text-slate-400 mt-2">JPG/PNG atau foto kamera, otomatis dikecilkan (maks 2 MB). Belum ada foto? Sistem menampilkan ikon bawaan.</p>' +
         '</div>' +
         '<div class="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">' +
         f('pfg-nama', 'Nama Lengkap (wajib)', p.namaLengkap, 'Nama beserta gelar') +
@@ -3694,28 +3719,34 @@ function renderProfilGuruPage(container) {
     .withFailureHandler(function (err) { container.innerHTML = '<div class="dash-card p-6 text-rose-600 text-sm font-bold">' + escapeHtmlProfil_(String(err)) + '</div>'; })
     .getProfilGuru(currentUser.userID, currentUser.token);
 }
+// [V6.1] Pemroses foto guru (dipakai galeri & kamera): kecilkan + jaga <= 2 MB
+function sipGuruTerimaFoto_(srcDataUrl) {
+  var img = new Image();
+  img.onload = function () {
+    var MAX = 900;
+    var sk = Math.min(1, MAX / Math.max(img.width, img.height));
+    var cv = document.createElement('canvas');
+    cv.width = Math.round(img.width * sk); cv.height = Math.round(img.height * sk);
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    var dataUrl = cv.toDataURL('image/jpeg', 0.88);
+    if (dataUrl.length * 0.75 > 2 * 1024 * 1024) dataUrl = cv.toDataURL('image/jpeg', 0.7);
+    window._guruFotoDataUrl = dataUrl;
+    var prev = document.getElementById('pfg-foto-prev');
+    var ph = document.getElementById('pfg-foto-ph');
+    if (prev) { prev.src = dataUrl; prev.classList.remove('hidden'); }
+    if (ph) ph.classList.add('hidden');
+  };
+  img.src = srcDataUrl;
+}
 function sipGuruPilihFoto_(input) {
   var file = input.files && input.files[0];
   if (!file) return;
   var reader = new FileReader();
-  reader.onload = function (ev) {
-    var img = new Image();
-    img.onload = function () {
-      var MAX = 600;
-      var sk = Math.min(1, MAX / Math.max(img.width, img.height));
-      var cv = document.createElement('canvas');
-      cv.width = Math.round(img.width * sk); cv.height = Math.round(img.height * sk);
-      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
-      var dataUrl = cv.toDataURL('image/jpeg', 0.85);
-      window._guruFotoDataUrl = dataUrl;
-      var prev = document.getElementById('pfg-foto-prev');
-      var ph = document.getElementById('pfg-foto-ph');
-      if (prev) { prev.src = dataUrl; prev.classList.remove('hidden'); }
-      if (ph) ph.classList.add('hidden');
-    };
-    img.src = ev.target.result;
-  };
+  reader.onload = function (ev) { sipGuruTerimaFoto_(ev.target.result); };
   reader.readAsDataURL(file);
+}
+function sipGuruFotoKamera_() {
+  sipBukaKamera_(function (dataUrl) { sipGuruTerimaFoto_(dataUrl); });
 }
 function sipSimpanProfilGuru_() {
   var v = function (id) { var el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; };
@@ -4129,6 +4160,7 @@ function profilFormHtml_(p, opts) {
           <div class="min-w-0 flex-1">
             <input type="hidden" id="pf-fotoUrl" value="${escapeHtmlProfil_(p.fotoUrl || '')}">
             ${ro ? '' : '<label class="inline-flex items-center px-3 py-2 rounded-lg bg-[#1b3a6b] text-white text-xs font-bold cursor-pointer"><i class="fas fa-images mr-1"></i> Pilih dari galeri<input id="pf-foto-file" type="file" accept="' + ((typeof sipIsAkunDemoIHT_ === 'function' && sipIsAkunDemoIHT_(p)) ? '.jpg,.jpeg,.png,image/jpeg,image/png' : '.jpg,.jpeg,image/jpeg') + '" class="sr-only-foto" onchange="sipProfilPickFoto_(this)"></label>'}
+            ${ro ? '' : '<button type="button" onclick="sipProfilFotoKamera_()" class="inline-flex items-center px-3 py-2 rounded-lg bg-slate-700 text-white text-xs font-bold ml-2"><i class="fas fa-camera mr-1"></i> Gunakan kamera</button>'}
             <p id="pf-foto-msg" class="text-[11px] text-slate-500 mt-1">${p.fotoUrl ? 'Foto tampil di frame. Pilih dari galeri untuk mengganti.' : ((typeof sipIsAkunDemoIHT_ === 'function' && sipIsAkunDemoIHT_(p)) ? 'Akun presentasi (kelas IHT): foto profil OPSIONAL — boleh dikosongkan, atau unggah JPG/PNG apa pun tanpa aturan latar merah.' : 'Foto WAJIB: JPG berlatar merah. Sistem otomatis memaskan ke bingkai 3×4.')}</p>
           </div>
         </div>
@@ -4546,6 +4578,9 @@ function sipBindFotoImg_(img, url) {
   img.src = srcs[0];
 }
 
+// [V6.1] Ikon bawaan bagi user yang BELUM unggah/ganti foto profil (kecuali Admin)
+var SIP_FOTO_DEFAULT_ = 'icon-pocong.jpg';
+
 function sipSetSiswaFotoUI_(url) {
   window._siswaFotoUrl = url || '';
   var prev = document.getElementById('pf-foto-preview');
@@ -4558,10 +4593,11 @@ function sipSetSiswaFotoUI_(url) {
     sipBindFotoImg_(prev, url);
     sipBindFotoImg_(head, url);
   } else {
-    if (prev) { prev.classList.add('hidden'); prev.removeAttribute('src'); }
-    if (head) { head.classList.add('hidden'); head.removeAttribute('src'); }
-    if (ph) ph.classList.remove('hidden');
-    if (headPh) headPh.classList.remove('hidden');
+    // [V6.1] Belum ada foto -> tampilkan ikon bawaan (aturan: kecuali Admin)
+    if (ph) ph.classList.add('hidden');
+    if (headPh) headPh.classList.add('hidden');
+    sipBindFotoImg_(prev, SIP_FOTO_DEFAULT_);
+    sipBindFotoImg_(head, SIP_FOTO_DEFAULT_);
   }
 }
 
@@ -4790,6 +4826,68 @@ function sipApplyRedBackground_(canvas) {
   } catch (eBg) {}
 }
 
+/* [V6.1] GUNAKAN KAMERA — ambil foto langsung untuk foto profil (guru & siswa) */
+function sipBukaKamera_(onFoto) {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    Swal.fire('Kamera tidak didukung', 'Browser ini tidak mendukung kamera. Gunakan tombol pilih foto/galeri.', 'info');
+    return;
+  }
+  var streamCam = null;
+  Swal.fire({
+    title: 'Ambil Foto',
+    html: '<video id="sip-cam-video" autoplay playsinline muted style="width:100%;max-height:58vh;border-radius:12px;background:#000"></video>' +
+          '<p style="font-size:11px;color:#64748b;margin-top:8px">Posisikan wajah di tengah, lalu tekan <b>Jepret</b>.</p>',
+    width: '34rem',
+    showCancelButton: true,
+    cancelButtonText: 'Batal',
+    confirmButtonText: 'Jepret',
+    confirmButtonColor: '#2563eb',
+    allowOutsideClick: false,
+    didOpen: function () {
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 960 } }, audio: false })
+        .then(function (s) {
+          streamCam = s;
+          var v = document.getElementById('sip-cam-video');
+          if (v) v.srcObject = s;
+        })
+        .catch(function (err) {
+          Swal.fire('Kamera tidak bisa dibuka', 'Izinkan akses kamera di browser, atau gunakan pilih foto/galeri. (' + String(err && err.name || err) + ')', 'error');
+        });
+    },
+    preConfirm: function () {
+      var v = document.getElementById('sip-cam-video');
+      if (!v || !v.videoWidth) return '';
+      var cv = document.createElement('canvas');
+      cv.width = v.videoWidth;
+      cv.height = v.videoHeight;
+      cv.getContext('2d').drawImage(v, 0, 0);
+      return cv.toDataURL('image/jpeg', 0.92);
+    },
+    willClose: function () {
+      try { if (streamCam) streamCam.getTracks().forEach(function (t) { t.stop(); }); } catch (eC) {}
+    }
+  }).then(function (r) {
+    if (!r.isConfirmed) return;
+    if (!r.value) { Swal.fire('Kamera belum siap', 'Tunggu gambar kamera tampil, lalu tekan Jepret lagi.', 'info'); return; }
+    onFoto(r.value);
+  });
+}
+function sipDataUrlKeFile_(dataUrl, nama) {
+  var m = String(dataUrl).match(/^data:([^;]+);base64,(.+)$/);
+  var mime = (m && m[1]) || 'image/jpeg';
+  var bin = atob(m ? m[2] : '');
+  var arr = new Uint8Array(bin.length);
+  for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  try { return new File([arr], nama || 'kamera.jpg', { type: mime }); }
+  catch (eF) { var b = new Blob([arr], { type: mime }); b.name = nama || 'kamera.jpg'; return b; }
+}
+function sipProfilFotoKamera_() {
+  sipBukaKamera_(function (dataUrl) {
+    var f = sipDataUrlKeFile_(dataUrl, 'kamera-profil.jpg');
+    sipProfilPickFoto_({ files: [f], value: '' });
+  });
+}
+
 function sipProfilPickFoto_(inp) {
   _sipProfilFotoPending = null;
   var msg = document.getElementById('pf-foto-msg');
@@ -4855,14 +4953,14 @@ function sipProfilPickFoto_(inp) {
     function encode() {
       if (!canvas.toBlob) {
         var du = canvas.toDataURL('image/jpeg', 0.82);
-        if (du.length * 0.75 > 1 * 1024 * 1024) { fail('Foto masih di atas 1 MB.'); return; }
+        if (du.length * 0.75 > 2 * 1024 * 1024) { fail('Foto masih di atas 2 MB.'); return; }
         finish(du, Math.round(du.length * 0.75 / 1024));
         return;
       }
       canvas.toBlob(function (b) {
         if (!b) { fail('Gagal mengompres foto.'); return; }
-        if (b.size > 1 * 1024 * 1024 && q > 0.5) { q -= 0.08; encode(); return; }
-        if (b.size > 1 * 1024 * 1024) { fail('Foto masih di atas 1 MB setelah kompresi.'); return; }
+        if (b.size > 2 * 1024 * 1024 && q > 0.5) { q -= 0.08; encode(); return; }
+        if (b.size > 2 * 1024 * 1024) { fail('Foto masih di atas 2 MB setelah kompresi.'); return; }
         var rd = new FileReader();
         rd.onload = function () { finish(rd.result, Math.round(b.size / 1024)); };
         rd.readAsDataURL(b);
@@ -5153,7 +5251,9 @@ function exportBankSoalA4_(format) {
         const ws = XLSX.utils.json_to_sheet(rows);
         ws['!cols'] = [{ wch: 5 }, { wch: 14 }, { wch: 60 }, { wch: 40 }, { wch: 24 }, { wch: 8 }];
         XLSX.utils.book_append_sheet(wb, ws, 'Bank Soal');
-        XLSX.writeFile(wb, 'Bank-Soal-' + mapel.replace(/[\\/:*?"<>|]/g, '-') + '.xlsx');
+        var _nmEx1 = 'Bank-Soal-' + mapel.replace(/[\\/:*?"<>|]/g, '-') + '.xlsx';
+        XLSX.writeFile(wb, _nmEx1);
+        sipKirimExportKeDrive_(wb, _nmEx1); // [V6.1] salinan ke SIPINTAR-Export
       }
     } catch (eX) {}
     Swal.fire({ title: 'Menyimpan salinan ke Drive…', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
@@ -5332,7 +5432,8 @@ function paintProfilTable_() {
         : '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-400 border border-slate-200">Belum</span>');
     const valActs = canVal ? `
       <button type="button" onclick="sipSetProfilValidasi_('${escapeHtmlProfil_(it.userID)}', 'VALID')" class="w-8 h-8 inline-flex items-center justify-center rounded-lg text-emerald-700 bg-emerald-50" title="Tandai profil VALID"><i class="fas fa-check-double"></i></button>
-      <button type="button" onclick="sipSetProfilValidasi_('${escapeHtmlProfil_(it.userID)}', 'REVISI')" class="w-8 h-8 inline-flex items-center justify-center rounded-lg text-amber-600 bg-amber-50" title="Minta REVISI profil"><i class="fas fa-rotate-left"></i></button>` : '';
+      <button type="button" onclick="sipSetProfilValidasi_('${escapeHtmlProfil_(it.userID)}', 'REVISI')" class="w-8 h-8 inline-flex items-center justify-center rounded-lg text-amber-600 bg-amber-50" title="Minta REVISI profil"><i class="fas fa-rotate-left"></i></button>
+      <button type="button" onclick="sipAdminUnggahFotoSiswa_('${escapeHtmlProfil_(it.userID)}')" class="w-8 h-8 inline-flex items-center justify-center rounded-lg text-blue-600 bg-blue-50" title="Unggah/ganti foto profil siswa (foto ditolak / belum ada foto resmi)"><i class="fas fa-camera"></i></button>` : '';
     const acts = `
       <button type="button" onclick="openProfilModal('${escapeHtmlProfil_(it.userID)}', 'view')" class="w-8 h-8 inline-flex items-center justify-center rounded-lg text-teal-600 bg-teal-50" title="Lihat"><i class="fas fa-eye"></i></button>
       ${canEdit ? `<button type="button" onclick="openProfilModal('${escapeHtmlProfil_(it.userID)}', 'edit')" class="w-8 h-8 inline-flex items-center justify-center rounded-lg text-indigo-600 bg-indigo-50" title="Edit"><i class="fas fa-pen"></i></button>
@@ -5377,6 +5478,156 @@ function sipSetProfilValidasi_(uid, status) {
     })
     .withFailureHandler(function (err) { Swal.fire({ icon: 'error', title: 'Gagal', text: String(err) }); })
     .setProfilValidasi(uid, stKirim, currentUser.userID, currentUser.token);
+}
+
+/* [V6.1] UNGGAH/GANTI FOTO PROFIL SISWA oleh Admin & Guru Panitia.
+   Untuk siswa yang fotonya tidak sesuai (ditolak) atau belum punya foto
+   resmi berseragam sekolah. Tampilan mengikuti kartu field profil (bingkai
+   3x4, pilih file / gunakan kamera, cek latar merah, maks 2 MB). */
+function sipAdminUnggahFotoSiswa_(uid, pendingDataUrl) {
+  var it = (window._profilListCache || []).filter(function (x) { return x.userID === uid; })[0];
+  var pr = (it && it.profil) || {};
+  var nama = pr.namaLengkap || (it && it.name) || uid;
+  var kelas = pr.kelas || (it && it.className) || '-';
+  var absenTersimpan = String(pr.nomorAbsen || '').replace(/[^0-9]/g, '');
+  var absen = absenTersimpan || String(window._stafFotoAbsenSementara || '').replace(/[^0-9]/g, '');
+  var fotoAwal = pendingDataUrl || (pr.fotoUrl ? (typeof sipProfilFotoSrc_ === 'function' ? sipProfilFotoSrc_(pr.fotoUrl) : pr.fotoUrl) : 'icon-pocong.jpg');
+  window._stafFotoPending = pendingDataUrl || '';
+  var lbl = 'font-size:10px;font-weight:bold;color:#64748b;text-transform:uppercase;letter-spacing:.04em';
+  var fin = 'width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:10px;font-size:13px;margin:2px 0 8px;box-sizing:border-box';
+  Swal.fire({
+    title: 'Foto Profil Siswa',
+    width: '30rem',
+    html: '<div style="text-align:left">' +
+      '<div style="display:flex;gap:14px;align-items:flex-start">' +
+      '<div style="width:120px;height:160px;border-radius:12px;overflow:hidden;border:3px solid #e2e8f0;background:#f1f5f9;flex:0 0 auto">' +
+      '<img id="staf-foto-prev" src="' + fotoAwal + '" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:cover;object-position:center top" onerror="this.src=\'icon-pocong.jpg\'">' +
+      '</div>' +
+      '<div style="flex:1;min-width:0">' +
+      '<label style="' + lbl + '">Nama Siswa</label>' +
+      '<input value="' + escapeHtmlProfil_(nama) + '" disabled style="' + fin + ';background:#f8fafc">' +
+      '<label style="' + lbl + '">Kelas</label>' +
+      '<input value="' + escapeHtmlProfil_(kelas) + '" disabled style="' + fin + ';background:#f8fafc">' +
+      '<label style="' + lbl + '">No. Absen' + (absenTersimpan ? '' : ' (wajib)') + '</label>' +
+      '<input id="staf-foto-absen" value="' + escapeHtmlProfil_(absen) + '"' + (absenTersimpan ? ' disabled' : '') + ' inputmode="numeric" placeholder="cth: 12" style="' + fin + (absenTersimpan ? ';background:#f8fafc' : '') + '">' +
+      '</div></div>' +
+      '<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">' +
+      '<label style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:10px;background:#1b3a6b;color:#fff;font-size:12px;font-weight:bold;cursor:pointer"><i class="fas fa-images"></i> Pilih dari file<input id="staf-foto-file" type="file" accept=".jpg,.jpeg,image/jpeg" style="display:none"></label>' +
+      '<button type="button" id="staf-foto-cam" style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:10px;background:#334155;color:#fff;font-size:12px;font-weight:bold;border:none;cursor:pointer"><i class="fas fa-camera"></i> Gunakan kamera</button>' +
+      '</div>' +
+      '<p id="staf-foto-msg" style="font-size:11px;color:#64748b;margin-top:8px">' +
+      (pendingDataUrl ? 'Foto siap \u2014 tekan <b>Simpan Foto</b>.' : 'Foto resmi: JPG berlatar <b>MERAH</b>, berseragam sekolah. Otomatis dipaskan bingkai 3&times;4, maks <b>2 MB</b>.') +
+      '</p></div>',
+    showCancelButton: true,
+    cancelButtonText: 'Batal',
+    confirmButtonText: 'Simpan Foto',
+    confirmButtonColor: '#0d9488',
+    allowOutsideClick: false,
+    didOpen: function () {
+      var inpF = document.getElementById('staf-foto-file');
+      if (inpF) inpF.addEventListener('change', function () {
+        if (!inpF.files || !inpF.files[0]) return;
+        var mg0 = document.getElementById('staf-foto-msg');
+        if (mg0) { mg0.style.color = '#64748b'; mg0.textContent = 'Memeriksa & memproses foto\u2026'; }
+        sipProsesFotoSiswaStaf_(inpF.files[0], pr, function (du) {
+          window._stafFotoPending = du;
+          var pv = document.getElementById('staf-foto-prev');
+          if (pv) pv.src = du;
+          var mg = document.getElementById('staf-foto-msg');
+          if (mg) { mg.style.color = '#0d9488'; mg.textContent = 'Foto siap \u2014 tekan Simpan Foto.'; }
+        }, function (t) {
+          var mg = document.getElementById('staf-foto-msg');
+          if (mg) { mg.style.color = '#dc2626'; mg.textContent = String(t); }
+        });
+      });
+      var btnC = document.getElementById('staf-foto-cam');
+      if (btnC) btnC.addEventListener('click', function () {
+        var ab = document.getElementById('staf-foto-absen');
+        window._stafFotoAbsenSementara = ab ? ab.value : '';
+        Swal.close();
+        sipBukaKamera_(function (duK) {
+          sipProsesFotoSiswaStaf_(sipDataUrlKeFile_(duK, 'kamera-siswa.jpg'), pr, function (du) {
+            sipAdminUnggahFotoSiswa_(uid, du);
+          }, function (t) {
+            Swal.fire({ icon: 'error', title: 'Foto ditolak', text: String(t) })
+              .then(function () { sipAdminUnggahFotoSiswa_(uid); });
+          });
+        });
+      });
+    },
+    preConfirm: function () {
+      if (!window._stafFotoPending) { Swal.showValidationMessage('Pilih dari file atau gunakan kamera terlebih dahulu.'); return false; }
+      var ab = document.getElementById('staf-foto-absen');
+      var absenKirim = String((ab && ab.value) || absen || '').replace(/[^0-9]/g, '');
+      if (!absenKirim) { Swal.showValidationMessage('Isi nomor absen siswa terlebih dahulu.'); return false; }
+      return { absen: absenKirim };
+    }
+  }).then(function (r) {
+    if (!r.isConfirmed || !r.value) return;
+    var du = window._stafFotoPending;
+    Swal.fire({ title: 'Menyimpan foto\u2026', html: 'Foto masuk ke folder siswa di Drive', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
+    google.script.run
+      .withSuccessHandler(function (res) {
+        if (res && res.success) {
+          try {
+            if (it && it.profil) {
+              it.profil.fotoUrl = res.fotoUrl || it.profil.fotoUrl || du;
+              it.profil.nomorAbsen = r.value.absen;
+            }
+          } catch (eC) {}
+          window._stafFotoPending = '';
+          window._stafFotoAbsenSementara = '';
+          Swal.fire({ icon: 'success', title: 'Foto tersimpan', text: 'Foto profil ' + nama + ' berhasil diperbarui.', timer: 2200, showConfirmButton: false });
+          try { paintProfilTable_(); } catch (eP) {}
+        } else {
+          Swal.fire({ icon: 'error', title: 'Gagal', text: (res && res.message) || 'Tidak dapat menyimpan foto.' });
+        }
+      })
+      .withFailureHandler(function (err) { Swal.fire({ icon: 'error', title: 'Gagal', text: String(err) }); })
+      .uploadProfilFoto(du, 'foto-profil.jpg', r.value.absen, currentUser.userID, currentUser.token, uid);
+  });
+}
+
+// Pemroses foto siswa utk staf: cover-crop 3x4 (600x800), WAJIB latar merah
+// (kecuali akun demo IHT), kompres sampai <= 2 MB.
+function sipProsesFotoSiswaStaf_(file, profilTarget, onOk, onErr) {
+  var demoIHT = (typeof sipIsAkunDemoIHT_ === 'function') && sipIsAkunDemoIHT_(profilTarget || {});
+  var okTipe = /^image\/jpe?g$/i.test(file.type || '') || /\.(jpe?g)$/i.test(file.name || '');
+  if (!okTipe && !demoIHT) { onErr('Foto wajib berformat JPG/JPEG (foto resmi berlatar merah).'); return; }
+  if (file.size > 12 * 1024 * 1024) { onErr('File asli terlalu besar (maks. 12 MB sebelum diproses).'); return; }
+  sipLoadImageFile_(file, function (src, iw, ih, isBmp) {
+    if (iw < 120 || ih < 160) {
+      if (isBmp && src.close) try { src.close(); } catch (eC) {}
+      onErr('Resolusi foto terlalu kecil.');
+      return;
+    }
+    var outW = 600, outH = 800;
+    var canvas = document.createElement('canvas');
+    canvas.width = outW; canvas.height = outH;
+    var ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#b91c1c';
+    ctx.fillRect(0, 0, outW, outH);
+    var scale = Math.max(outW / iw, outH / ih);
+    var sw2 = Math.min(iw, Math.round(outW / scale));
+    var sh2 = Math.min(ih, Math.round(outH / scale));
+    var sx = Math.max(0, Math.round((iw - sw2) / 2));
+    var sy = Math.max(0, Math.round((ih - sh2) * 0.25));
+    ctx.drawImage(src, sx, sy, sw2, sh2, 0, 0, outW, outH);
+    if (isBmp && src.close) try { src.close(); } catch (eC2) {}
+    if (!demoIHT && !sipCekLatarMerah_(canvas)) {
+      onErr('Foto ditolak: latar belakang WAJIB MERAH (foto resmi berseragam sekolah).');
+      return;
+    }
+    if (!demoIHT) sipApplyRedBackground_(canvas);
+    var q = 0.88;
+    function encode() {
+      var du = canvas.toDataURL('image/jpeg', q);
+      if (du.length * 0.75 > 2 * 1024 * 1024 && q > 0.5) { q -= 0.08; encode(); return; }
+      if (du.length * 0.75 > 2 * 1024 * 1024) { onErr('Foto masih di atas 2 MB setelah kompresi.'); return; }
+      onOk(du);
+    }
+    encode();
+  }, onErr);
 }
 
 function exportProfilExcelFromList_() {
@@ -10265,7 +10516,9 @@ function executeExcelRecapDownload(tpl) {
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Rekap Hasil');
-    XLSX.writeFile(wb, `Rekap_Hasil_${cleanFileName}.xlsx`);
+    var _nmEx2 = `Rekap_Hasil_${cleanFileName}.xlsx`;
+    XLSX.writeFile(wb, _nmEx2);
+    sipKirimExportKeDrive_(wb, _nmEx2); // [V6.1] salinan ke SIPINTAR-Export
 }
 
 function downloadResultPDF() {
@@ -13744,6 +13997,22 @@ document.addEventListener('DOMContentLoaded', function() {
 /* -----------------------------------------------------------
    LOGIKA IMPORT EXCEL
    ----------------------------------------------------------- */
+
+/* [V6.1] Salin ekspor Excel buatan browser ke folder Drive 'SIPINTAR-Export'
+   (hanya Admin & Guru; berjalan di latar, tidak menahan unduhan). */
+function sipKirimExportKeDrive_(wb, namaFile) {
+  try {
+    if (!currentUser || (currentUser.role !== 'Admin' && currentUser.role !== 'Guru')) return;
+    if (typeof XLSX === 'undefined' || !wb) return;
+    var b64 = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+    google.script.run
+      .withSuccessHandler(function () {})
+      .withFailureHandler(function () {})
+      .simpanFileExport(b64, namaFile,
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        currentUser.userID, currentUser.token);
+  } catch (eEx) {}
+}
 
 function downloadTemplateExcel() {
     const headers = ["Tipe", "Pertanyaan", "Opsi_A", "Opsi_B", "Opsi_C", "Opsi_D", "Opsi_E", "Kunci_Jawaban", "Wajib"];
@@ -17535,7 +17804,9 @@ function downloadSingleStudentAnswers(responseId, studentName) {
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, ws, "Laporan Hasil");
         const cleanName = studentName.replace(/[^a-z0-9]/gi, '_');
-        XLSX.writeFile(workbook, `Laporan_Ujian_${cleanName}.xlsx`);
+        var _nmEx3 = `Laporan_Ujian_${cleanName}.xlsx`;
+        XLSX.writeFile(workbook, _nmEx3);
+        sipKirimExportKeDrive_(workbook, _nmEx3); // [V6.1] salinan ke SIPINTAR-Export
         Swal.close();
 
       } catch (err) {
@@ -20633,5 +20904,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5200ba2ceb1f918',t:'MTc5MzI1NDUyMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a52032873f99fe17',t:'MTc5MzI1NjExNg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
