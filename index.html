@@ -2636,6 +2636,15 @@ function handleLogin(e) {
           }));
         } catch (eLs) {}
 
+        // [V6.0] POIN 1 — simpan username+password di perangkat ini
+        try {
+          sipSimpanKredensial_(
+            (document.getElementById('username') || {}).value || res.userID,
+            (document.getElementById('password') || {}).value || '',
+            !!((document.getElementById('isAdmin') || {}).checked)
+          );
+        } catch (eKr) {}
+
         currentUser = res;
         window.currentUser = res;
 
@@ -2662,6 +2671,8 @@ function handleLogin(e) {
           const note = document.getElementById('login-exam-reauth-note');
           if (note) note.classList.add('hidden');
           window._siswaExamGateOk = !!reauth;
+          // [V6.0] POIN 4 — setelah login ulang khusus ujian, HANYA menu Ujian yang terbuka
+          window._siswaExamOnly = !!reauth;
           showStudentHub(reauth ? 'ujian' : 'dash');
         }
       } else {
@@ -2749,7 +2760,7 @@ function forceLogoutSession() {
   if (pinInput) { pinInput.value = ''; pinInput.removeAttribute('required'); }
   const pshF = document.getElementById('page-siswa-hub'); if (pshF) pshF.classList.add('hidden');
   const reauthNoteF = document.getElementById('login-exam-reauth-note'); if (reauthNoteF) reauthNoteF.classList.add('hidden');
-  try { sessionStorage.removeItem('sipintar_exam_relogin'); window._siswaExamGateOk = false; } catch (ePinF) {}
+  try { sessionStorage.removeItem('sipintar_exam_relogin'); window._siswaExamGateOk = false; window._siswaExamOnly = false; } catch (ePinF) {}
 
   window.scrollTo(0, 0);
 
@@ -2840,7 +2851,7 @@ function logout() {
       }
       const pshL = document.getElementById('page-siswa-hub'); if (pshL) pshL.classList.add('hidden');
       const reauthNoteL = document.getElementById('login-exam-reauth-note'); if (reauthNoteL) reauthNoteL.classList.add('hidden');
-      try { sessionStorage.removeItem('sipintar_exam_relogin'); window._siswaExamGateOk = false; } catch (ePinL) {}
+      try { sessionStorage.removeItem('sipintar_exam_relogin'); window._siswaExamGateOk = false; window._siswaExamOnly = false; } catch (ePinL) {}
 
       // 8. Scroll ke atas
       window.scrollTo(0, 0);
@@ -3519,7 +3530,7 @@ function sipHadirTampil_() {
           '<td class="py-2 px-2">' + escapeHtmlProfil_(r.nama) + '</td>' +
           '<td class="py-2 px-2 text-center">' + escapeHtmlProfil_(r.kelas) + '</td>' +
           '<td class="py-2 px-2 text-center">' + escapeHtmlProfil_(ex.subject || '') + '</td>' +
-          '<td class="py-2 px-2 text-center text-xs">' + escapeHtmlProfil_(sesiWaktu) + '</td>' +
+          '<td class="py-2 px-2 text-center text-xs">' + escapeHtmlProfil_(r.sesi ? ('Sesi ' + r.sesi + (r.jam ? ' \u00b7 ' + r.jam : '')) : sesiWaktu) + '</td>' +
           '<td class="py-2 px-2 text-xs text-slate-400' + (i % 2 ? ' text-right' : '') + '">' + (i + 1) + '. ..........</td></tr>';
       }).join('') : '<tr><td colspan="6" class="py-4 text-center text-slate-400">Belum ada siswa pada kelas ini.</td></tr>';
       b.innerHTML = '<div class="dash-card p-6 overflow-x-auto">' +
@@ -3550,6 +3561,83 @@ function sipHadirUnduhPdf_() {
     })
     .withFailureHandler(function (err) { Swal.fire('Gagal', String(err), 'error'); })
     .generateDaftarHadirPDF(examId, kelasPilih, currentUser.userID, currentUser.token);
+}
+
+/* [V6.0] POIN 5 \u2014 PEMBAGIAN SESI & JAM UJIAN PER KELAS (Admin & Panitia) */
+function sipSesiBuka_(examId, kelasPilih) {
+  Swal.fire({ title: 'Memuat\u2026', html: 'Mengambil data siswa & sesi', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
+  google.script.run
+    .withSuccessHandler(function (res) {
+      if (!res || !res.success) { Swal.fire('Gagal', (res && res.message) || 'Tidak dapat memuat data sesi.', 'error'); return; }
+      var ex = res.exam || {};
+      var cfg = res.cfg || [];
+      var rows = res.rows || [];
+      var kelasList = ex.kelasList || [];
+      var kelasAktif = String(ex.kelasTarget || '');
+      var locked = String(res.kelasTerkunci || '');
+      var optKelas = kelasList.map(function (k) {
+        return '<option value="' + escapeHtmlProfil_(k) + '"' + (String(k).toLowerCase() === kelasAktif.toLowerCase() ? ' selected' : '') + '>' + escapeHtmlProfil_(k) + '</option>';
+      }).join('');
+      var cfgInfo = cfg.length
+        ? cfg.map(function (c) { return '<span style="display:inline-block;background:#eef6ff;border:1px solid #bfdbfe;color:#1d4ed8;border-radius:9999px;padding:2px 10px;font-size:11px;font-weight:bold;margin:2px">Sesi ' + c.sesi + ' \u2022 ' + escapeHtmlProfil_(c.jam || '-') + '</span>'; }).join('')
+        : '<span style="color:#b45309;font-size:12px;font-weight:bold"><i class="fas fa-circle-exclamation"></i> Belum ada jam sesi. Isi dulu "Pembagian Sesi & Jam Ujian" lewat tombol Edit pada jadwal ini.</span>';
+      var optSesi = function (terpilih) {
+        var o = '<option value="">\u2014</option>';
+        cfg.forEach(function (c) { o += '<option value="' + c.sesi + '"' + (String(terpilih) === String(c.sesi) ? ' selected' : '') + '>Sesi ' + c.sesi + (c.jam ? ' (' + escapeHtmlProfil_(c.jam) + ')' : '') + '</option>'; });
+        return o;
+      };
+      var baris = rows.length ? rows.map(function (r) {
+        return '<tr style="border-bottom:1px solid #e2e8f0">' +
+          '<td style="padding:6px;text-align:center">' + escapeHtmlProfil_(r.absen || '-') + '</td>' +
+          '<td style="padding:6px;text-align:left">' + escapeHtmlProfil_(r.nama) + '</td>' +
+          '<td style="padding:6px"><select class="sip-sesi-pilih" data-uid="' + escapeHtmlProfil_(r.userID || '') + '" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:8px">' + optSesi(r.sesi) + '</select></td></tr>';
+      }).join('') : '<tr><td colspan="3" style="padding:12px;text-align:center;color:#94a3b8">Belum ada siswa pada kelas ini.</td></tr>';
+      var html = '<div style="text-align:left">' +
+        '<div style="margin-bottom:6px;font-size:12px;color:#475569">Mapel: <b>' + escapeHtmlProfil_(ex.subject || '-') + '</b></div>' +
+        '<div style="margin-bottom:10px">' + cfgInfo + '</div>' +
+        '<label style="font-size:11px;font-weight:bold;color:#64748b">KELAS</label>' +
+        '<select id="sip-sesi-kelas"' + (locked ? ' disabled' : '') + ' style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px;margin:4px 0 10px">' + optKelas + '</select>' +
+        (locked ? '<p style="font-size:11px;color:#64748b;margin:-4px 0 8px">Panitia hanya mengatur kelas pasangannya: <b>' + escapeHtmlProfil_(locked) + '</b>.</p>' : '') +
+        '<div style="max-height:46vh;overflow:auto;border:1px solid #e2e8f0;border-radius:10px">' +
+        '<table style="width:100%;border-collapse:collapse;font-size:13px">' +
+        '<thead><tr style="background:#f1f5f9;font-size:11px;color:#64748b"><th style="padding:6px">ABSEN</th><th style="padding:6px;text-align:left">NAMA</th><th style="padding:6px;width:40%">SESI</th></tr></thead>' +
+        '<tbody>' + baris + '</tbody></table></div>' +
+        '<p style="font-size:11px;color:#94a3b8;margin-top:8px">Hasil pembagian ini otomatis tampil pada kolom sesi di <b>Daftar Hadir</b> (pratinjau & PDF).</p></div>';
+      Swal.fire({
+        title: 'Atur Sesi Ujian',
+        html: html,
+        width: '44rem',
+        showCancelButton: true,
+        cancelButtonText: 'Tutup',
+        confirmButtonText: 'Simpan Pembagian',
+        confirmButtonColor: '#0d9488',
+        didOpen: function () {
+          var sel = document.getElementById('sip-sesi-kelas');
+          if (sel && !locked) sel.addEventListener('change', function () { sipSesiBuka_(examId, sel.value); });
+        },
+        preConfirm: function () {
+          var daftar = [];
+          document.querySelectorAll('.sip-sesi-pilih').forEach(function (s) {
+            daftar.push({ userID: s.getAttribute('data-uid') || '', sesi: s.value ? parseInt(s.value, 10) : 0 });
+          });
+          var selK = document.getElementById('sip-sesi-kelas');
+          return { kelas: (selK && selK.value) || kelasAktif, daftar: daftar };
+        }
+      }).then(function (r) {
+        if (!r.isConfirmed || !r.value) return;
+        if (!cfg.length) { Swal.fire('Belum ada jam sesi', 'Isi dulu "Pembagian Sesi & Jam Ujian" lewat tombol Edit pada jadwal ini.', 'info'); return; }
+        Swal.fire({ title: 'Menyimpan\u2026', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
+        google.script.run
+          .withSuccessHandler(function (sv) {
+            if (sv && sv.success) Swal.fire({ icon: 'success', title: 'Tersimpan', text: sv.message || 'Pembagian sesi disimpan.', timer: 1800, showConfirmButton: false });
+            else Swal.fire('Gagal', (sv && sv.message) || 'Tidak dapat menyimpan.', 'error');
+          })
+          .withFailureHandler(function (err) { Swal.fire('Gagal', String(err), 'error'); })
+          .simpanSesiUjian(examId, r.value.kelas, r.value.daftar, currentUser.userID, currentUser.token);
+      });
+    })
+    .withFailureHandler(function (err) { Swal.fire('Gagal', String(err), 'error'); })
+    .getSesiUjianData(examId, kelasPilih || '', currentUser.userID, currentUser.token);
 }
 
 // [V5.3] PROFIL GURU \u2014 data diri + foto, otomatis tersimpan ke folder Drive per guru
@@ -4159,6 +4247,13 @@ function startSiswaExamRelogin_() {
   const pin = document.getElementById('pin');
   if (u) u.value = uid;
   if (p) p.value = '';
+  // [V6.0] POIN 1 — password tersimpan di perangkat ikut terisi otomatis
+  try {
+    const credR = sipBacaKredensial_();
+    if (p && credR && String(credR.u || '').trim().toLowerCase() === String(uid).trim().toLowerCase()) {
+      p.value = credR.p || '';
+    }
+  } catch (eKr) {}
   if (pin) pin.value = '';
   const isAd = document.getElementById('isAdmin');
   if (isAd) isAd.checked = false;
@@ -4187,12 +4282,18 @@ function showSiswaTab(tab) {
     Swal.fire({ icon: 'warning', title: 'Profil belum lengkap', text: 'Lengkapi dan simpan profil Anda (termasuk foto) terlebih dahulu untuk membuka menu ini.', confirmButtonColor: '#1b3a6b' });
     tab = 'profil';
   }
+  // [V6.0] POIN 4 — Mode khusus ujian: setelah login ulang untuk ujian,
+  // HANYA menu Ujian yang dapat dibuka sampai ujian selesai.
+  if (currentUser && currentUser.role === 'Siswa' && window._siswaExamOnly && tab !== 'ujian') {
+    Swal.fire({ icon: 'info', title: 'Mode Ujian', text: 'Anda login khusus untuk mengikuti ujian. Masukkan PIN sesi lalu masuk ruang ujian — menu lain terbuka kembali setelah ujian selesai.', confirmButtonColor: '#1b3a6b' });
+    tab = 'ujian';
+  }
   // [UJIAN SAJA] Menu belajar (materi/tugas/jurnal/game) telah dihapus.
   if (tab === 'ujian' && !window._siswaExamGateOk) {
     startSiswaExamRelogin_();
     return;
   }
-  if (tab !== 'ujian') window._siswaExamGateOk = false;
+  if (tab !== 'ujian') { window._siswaExamGateOk = false; window._siswaExamOnly = false; }
   ['dash', 'profil', 'kisi', 'nilai', 'ujian'].forEach(function (t) {
     const pane = document.getElementById('siswa-tab-' + t);
     const btn = document.getElementById('siswa-nav-' + t);
@@ -6657,6 +6758,9 @@ function renderExamForm(container) {
             </td>
             <td class="p-4 pr-6 text-right">
                 <div class="flex justify-end gap-2 opacity-80 group-hover:opacity-100 transition">
+                    <button onclick="sipSesiBuka_('${exam.id}')" class="w-8 h-8 rounded-lg bg-teal-50 text-teal-600 hover:bg-teal-600 hover:text-white transition flex items-center justify-center shadow-sm border border-teal-100" title="Atur Sesi & Jam Ujian Siswa">
+                         <i class="fas fa-user-clock text-xs"></i>
+                    </button>
                     <button onclick="sipLihatPeringkatUjian_('${exam.id}', '${String(exam.subject || '').replace(/["']/g, '')}')" class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white transition flex items-center justify-center shadow-sm border border-amber-100" title="Peringkat 3 Besar ujian ini">
                          <i class="fas fa-trophy text-xs"></i>
                     </button>
@@ -6751,6 +6855,12 @@ function initExamModalComponent() {
                                  <input type="text" name="pin" id="input-pin" class="pl-10 w-full bg-yellow-50 border border-yellow-200 p-2.5 rounded-lg font-mono tracking-widest font-bold focus:ring-2 focus:ring-yellow-400 outline-none transition text-slate-800" placeholder="12345" required>
                              </div>
                          </div>
+                     </div>
+
+                     <div>
+                         <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Pembagian Sesi &amp; Jam Ujian (opsional)</label>
+                         <textarea name="sesiJam" id="input-sesi-jam" rows="3" class="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition text-sm" placeholder="Sesi 1 = 07.30 - 09.00&#10;Sesi 2 = 09.30 - 11.00"></textarea>
+                         <p class="text-[10px] text-slate-400 mt-1">Tulis satu sesi per baris dengan format <b>Sesi 1 = 07.30 - 09.00</b>. Setelah jadwal tersimpan, Admin/Panitia membagi siswa per kelas ke sesi lewat tombol <b>Atur Sesi</b> (ikon jam) pada daftar jadwal, dan hasilnya ikut tercetak pada daftar hadir (PDF).</p>
                      </div>
 
                      <div class="border border-blue-100 rounded-xl overflow-hidden bg-blue-50/40">
@@ -10670,6 +10780,10 @@ function returnToLoginSilent() {
   if (gl) gl.classList.add('hidden');
   const loginForm = document.getElementById('loginForm');
   if (loginForm) loginForm.reset();
+  window._siswaExamOnly = false;
+  window._siswaExamGateOk = false;
+  try { sessionStorage.removeItem('sipintar_exam_relogin'); } catch (eRl) {}
+  try { sipIsiKredensial_(); } catch (eKr) {}
   window.scrollTo(0, 0);
 }
 
@@ -13490,6 +13604,35 @@ function submitEssayGrade() {
   } catch (eMig) {}
 })();
 
+/* [V6.0] POIN 1 — Kredensial tersimpan di perangkat masing-masing:
+   setelah login pertama berhasil, username+password terisi otomatis. */
+function sipSimpanKredensial_(u, p, adm) {
+  try {
+    localStorage.setItem('sipintar_cred',
+      btoa(unescape(encodeURIComponent(JSON.stringify({ u: String(u || ''), p: String(p || ''), a: !!adm })))));
+  } catch (eK) {}
+}
+function sipBacaKredensial_() {
+  try {
+    const raw = localStorage.getItem('sipintar_cred');
+    if (!raw) return null;
+    return JSON.parse(decodeURIComponent(escape(atob(raw))));
+  } catch (eK) { return null; }
+}
+function sipIsiKredensial_() {
+  const c = sipBacaKredensial_();
+  if (!c) return;
+  const u = document.getElementById('username');
+  const p = document.getElementById('password');
+  const b = document.getElementById('isAdmin');
+  if (u && !u.value) u.value = c.u || '';
+  if (p && !p.value) p.value = c.p || '';
+  if (b && c.a && !b.checked) {
+    b.checked = true;
+    if (typeof togglePinInput === 'function') { try { togglePinInput(); } catch (eT) {} }
+  }
+}
+
 function checkSavedSession() {
     // 1. Cek apakah ada data sesi di LocalStorage browser
     const savedSession = localStorage.getItem('sipintar_session');
@@ -13545,18 +13688,12 @@ function checkSavedSession() {
                         // untuk mencegah kecurangan/reset timer yang tidak diinginkan.
                         // Namun jika ingin tetap login, kita arahkan kembali.
                         
-                        Swal.fire({
-                            title: 'Sesi Dipulihkan',
-                            text: 'Silakan masukkan kembali PIN Ujian jika diminta.',
-                            icon: 'info',
-                            timer: 2000,
-                            showConfirmButton: false
-                        });
-                        
-                        // Demi keamanan ujian, kita hapus sesi siswa agar login manual ulang
-                        // (Anda bisa mengubah ini jika ingin siswa langsung masuk)
-                        localStorage.removeItem('sipintar_session');
-                        document.getElementById('page-login').classList.remove('hidden');
+                        // [V6.0] POIN 2 — sesi SISWA juga dipulihkan: refresh/kembali
+                        // tidak lagi melempar siswa ke halaman login, langsung dashboard.
+                        window._siswaExamGateOk = false;
+                        window._siswaExamOnly = false;
+                        window._pendingExamData = null;
+                        showStudentHub('dash');
                     }
 
                 } else {
@@ -13597,10 +13734,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 2. Cek Sesi (yang sudah ada sebelumnya)
     fetchAndStartClock();
+    try { sipIsiKredensial_(); } catch (eKr) {}
     setTimeout(function() {
       if (window._sipLoginBusy) return;
       checkSavedSession();
-    }, 4000); 
+    }, 800); 
 });
 
 /* -----------------------------------------------------------
@@ -16577,6 +16715,8 @@ function openExamModal(data = null) {
         document.getElementById('input-endDate').value = toLocalISO(data.endDate);
         document.getElementById('input-duration').value = data.duration;
         document.getElementById('input-pin').value = data.pin;
+        const sjEdit = document.getElementById('input-sesi-jam');
+        if (sjEdit) sjEdit.value = (Array.isArray(data.sesiJam) ? data.sesiJam.map(function (s) { return 'Sesi ' + s.sesi + ' = ' + s.jam; }).join('\n') : '');
 
         // Isi toggle ShuffleConfig saat edit
         const sc = data.shuffleConfig || {};
@@ -20493,5 +20633,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4ef9672fc28ce16',t:'MTc5Mjc0NjQwNg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5200ba2ceb1f918',t:'MTc5MzI1NDUyMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
