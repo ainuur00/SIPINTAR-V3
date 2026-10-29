@@ -249,7 +249,8 @@
     .sip-pf-frame{width:168px;height:224px;border-radius:10px;overflow:hidden;border:2px solid #1b3a6b;background:#7f1d1d;flex-shrink:0;position:relative}
     .sip-pf-frame img{width:100%;height:100%;object-fit:cover;object-position:center top;display:block;background:#7f1d1d}
     /* [V5.0] Pastikan foto MENUTUP SELURUH frame: menu profil & header aplikasi */
-    #pf-foto-preview,#siswa-eb-head-foto{width:100%!important;height:100%!important;object-fit:cover!important;object-position:center top!important;display:block}
+    /* [V6.1b] Foto yang diunggah WAJIB menutupi bingkai profil & header (cover penuh) */
+    .sip-pf-frame img,#pf-foto-preview,#siswa-eb-head-foto{width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;object-fit:cover!important;object-position:center top!important;display:block}
     /* [V5.0] Podium peringkat 3 besar */
     .sip-podium-card{background:linear-gradient(135deg,#0f2a54,#1b3a6b 55%,#27497f);border-radius:18px;padding:20px 16px 0;color:#fff;overflow:hidden;position:relative;border:1px solid rgba(246,196,83,.35)}
     .sip-podium-wrap{display:flex;align-items:flex-end;justify-content:center;gap:10px;margin-top:14px}
@@ -4563,11 +4564,13 @@ function sipProfilFotoCandidates_(url) {
 function sipBindFotoImg_(img, url) {
   if (!img) return;
   var srcs = sipProfilFotoCandidates_(url);
-  if (!srcs.length) {
-    img.classList.add('hidden');
-    img.removeAttribute('src');
-    return;
-  }
+  // [V6.1b] Jaring pengaman agar bingkai SELALU tertutup foto:
+  // 1) dataURL lokal hasil unggahan terakhir (URL Drive baru kadang butuh
+  //    beberapa saat sebelum bisa dimuat), 2) ikon bawaan (pocong).
+  try {
+    if (window._sipFotoLokal_ && srcs.indexOf(window._sipFotoLokal_) === -1) srcs.push(window._sipFotoLokal_);
+  } catch (eL) {}
+  if (srcs.indexOf(SIP_FOTO_DEFAULT_) === -1) srcs.push(SIP_FOTO_DEFAULT_);
   var i = 0;
   img.onload = function () { img.classList.remove('hidden'); };
   img.onerror = function () {
@@ -4946,6 +4949,7 @@ function sipProfilPickFoto_(inp) {
     var q = 0.88;
     function finish(dataUrl, kb) {
       _sipProfilFotoPending = { dataUrl: dataUrl, name: 'foto-profil.jpg', type: 'image/jpeg' };
+      window._sipFotoLokal_ = dataUrl; // [V6.1b] cadangan tampilan selama URL Drive belum siap
       sipSetSiswaFotoUI_(dataUrl);
       if (msg) msg.textContent = 'Foto dipaskan ke bingkai 3×4 (' + kb + ' KB). Menyimpan ke folder foto…';
       sipAutoSimpanFotoProfil_(msg);
@@ -20904,5 +20908,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a52032873f99fe17',t:'MTc5MzI1NjExNg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a520531aaf2726da',t:'MTc5MzI1NzQ1MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
