@@ -3595,7 +3595,30 @@ function sipHadirUnduhPdf_() {
 }
 
 /* [V6.0] POIN 5 \u2014 PEMBAGIAN SESI & JAM UJIAN PER KELAS (Admin & Panitia) */
+/* [V6.3a] Fitur jadwal ujian & pembagian sesi KHUSUS Admin + Guru Panitia.
+   Penjaga sisi klien (pertahanan berlapis) — server tetap menolak lewat
+   requireAdminAtauPanitia_ pada createExam/updateExam/deleteExam,
+   getSesiUjianData, simpanSesiUjian, getKartuExportData, getDaftarHadirData. */
+function sipBolehPanitiaKlien_() {
+  if (!currentUser) return false;
+  if (currentUser.role === 'Admin') return true;
+  return currentUser.role === 'Guru' && ((currentUser.pengawas || {}).izinPanitia === true);
+}
+function sipTolakPanitiaKlien_(container) {
+  var pesan = 'Menu ini khusus Admin dan Guru yang ditunjuk sebagai Panitia.';
+  if (container) {
+    container.innerHTML = '<div class="fade-in w-full"><div class="dash-card p-8 text-center">' +
+      '<i class="fas fa-lock text-3xl text-rose-500"></i>' +
+      '<p class="mt-3 font-bold text-slate-700">Akses Ditolak</p>' +
+      '<p class="text-sm text-slate-500 mt-1">' + pesan + '</p></div></div>';
+  } else {
+    try { Swal.fire('Akses Ditolak', pesan, 'warning'); } catch (eTP) {}
+  }
+}
+
 function sipSesiBuka_(examId, kelasPilih) {
+  // [V6.3a] Atur Sesi (pilih kelas + bagi siswa) hanya Admin & Panitia.
+  if (!sipBolehPanitiaKlien_()) { sipTolakPanitiaKlien_(null); return; }
   Swal.fire({ title: 'Memuat\u2026', html: 'Mengambil data siswa & sesi', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
   google.script.run
     .withSuccessHandler(function (res) {
@@ -3611,7 +3634,15 @@ function sipSesiBuka_(examId, kelasPilih) {
       }).join('');
       var cfgInfo = cfg.length
         ? cfg.map(function (c) { return '<span style="display:inline-block;background:#eef6ff;border:1px solid #bfdbfe;color:#1d4ed8;border-radius:9999px;padding:2px 10px;font-size:11px;font-weight:bold;margin:2px">Sesi ' + c.sesi + ' \u2022 ' + escapeHtmlProfil_(c.jam || '-') + '</span>'; }).join('')
-        : '<span style="color:#b45309;font-size:12px;font-weight:bold"><i class="fas fa-circle-exclamation"></i> Belum ada jam sesi. Isi dulu "Pembagian Sesi & Jam Ujian" lewat tombol Edit pada jadwal ini.</span>';
+        : '<span style="color:#b45309;font-size:12px;font-weight:bold"><i class="fas fa-circle-exclamation"></i> Belum ada jam sesi. Edit jadwal ini dan lengkapi "Pembagian Sesi & Jam Ujian" (wajib).</span>';
+      // [V6.3] Notifikasi siswa yang BELUM memiliki sesi pada kelas terpilih.
+      var tanpaSesi63 = rows.filter(function (r) { return !r.sesi; }).length;
+      var notifSesi63 = '';
+      if (rows.length && cfg.length) {
+        notifSesi63 = tanpaSesi63 > 0
+          ? '<div style="margin:6px 0;background:#fffbeb;border:1px solid #fcd34d;color:#92400e;border-radius:10px;padding:8px 10px;font-size:12px;font-weight:bold"><i class="fas fa-triangle-exclamation"></i> ' + tanpaSesi63 + ' siswa di kelas ini BELUM memiliki sesi. Pilih sesinya lalu klik Simpan Pembagian.</div>'
+          : '<div style="margin:6px 0;background:#ecfdf5;border:1px solid #6ee7b7;color:#065f46;border-radius:10px;padding:8px 10px;font-size:12px;font-weight:bold"><i class="fas fa-circle-check"></i> Semua siswa kelas ini sudah memiliki sesi.</div>';
+      }
       var optSesi = function (terpilih) {
         var o = '<option value="">\u2014</option>';
         cfg.forEach(function (c) { o += '<option value="' + c.sesi + '"' + (String(terpilih) === String(c.sesi) ? ' selected' : '') + '>Sesi ' + c.sesi + (c.jam ? ' (' + escapeHtmlProfil_(c.jam) + ')' : '') + '</option>'; });
@@ -3625,15 +3656,15 @@ function sipSesiBuka_(examId, kelasPilih) {
       }).join('') : '<tr><td colspan="3" style="padding:12px;text-align:center;color:#94a3b8">Belum ada siswa pada kelas ini.</td></tr>';
       var html = '<div style="text-align:left">' +
         '<div style="margin-bottom:6px;font-size:12px;color:#475569">Mapel: <b>' + escapeHtmlProfil_(ex.subject || '-') + '</b></div>' +
-        '<div style="margin-bottom:10px">' + cfgInfo + '</div>' +
-        '<label style="font-size:11px;font-weight:bold;color:#64748b">KELAS</label>' +
+        '<div style="margin-bottom:10px">' + cfgInfo + '</div>' + notifSesi63 +
+        '<label style="font-size:11px;font-weight:bold;color:#64748b">KELAS (sesuai data siswa)</label>' +
         '<select id="sip-sesi-kelas"' + (locked ? ' disabled' : '') + ' style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px;margin:4px 0 10px">' + optKelas + '</select>' +
         (locked ? '<p style="font-size:11px;color:#64748b;margin:-4px 0 8px">Panitia hanya mengatur kelas pasangannya: <b>' + escapeHtmlProfil_(locked) + '</b>.</p>' : '') +
         '<div style="max-height:46vh;overflow:auto;border:1px solid #e2e8f0;border-radius:10px">' +
         '<table style="width:100%;border-collapse:collapse;font-size:13px">' +
         '<thead><tr style="background:#f1f5f9;font-size:11px;color:#64748b"><th style="padding:6px">ABSEN</th><th style="padding:6px;text-align:left">NAMA</th><th style="padding:6px;width:40%">SESI</th></tr></thead>' +
         '<tbody>' + baris + '</tbody></table></div>' +
-        '<p style="font-size:11px;color:#94a3b8;margin-top:8px">Hasil pembagian ini otomatis tampil pada kolom sesi di <b>Daftar Hadir</b> (pratinjau & PDF).</p></div>';
+        '<p style="font-size:11px;color:#94a3b8;margin-top:8px">Hasil pembagian ini otomatis tampil pada <b>Kartu Ujian</b> tiap siswa dan kolom sesi di <b>Daftar Hadir</b> (pratinjau & PDF). Kelas peserta ujian juga diperbarui otomatis dari pembagian ini.</p></div>';
       Swal.fire({
         title: 'Atur Sesi Ujian',
         html: html,
@@ -5981,8 +6012,12 @@ function fetchKartuData_(cb) {
         Swal.fire({ icon: 'error', title: 'Gagal', text: (res && res.message) || '' });
         return;
       }
-      if (res.dilewatiValidasi > 0) {
-        try { Swal.fire({ icon: 'info', title: 'Sebagian kartu tidak terbit', text: res.dilewatiValidasi + ' siswa BELUM divalidasi Panitia/Admin sehingga kartunya dilewati.', timer: 4000, showConfirmButton: false }); } catch (eVK) {}
+      // [V6.3] Gabungkan peringatan validasi & siswa tanpa sesi dalam satu notifikasi.
+      var warnK63 = [];
+      if (res.dilewatiValidasi > 0) warnK63.push(res.dilewatiValidasi + ' siswa BELUM divalidasi Panitia/Admin sehingga kartunya dilewati.');
+      if (res.tanpaSesi > 0) warnK63.push(res.tanpaSesi + ' siswa BELUM memiliki sesi \u2014 kolom Sesi/Waktu pada kartunya memakai jadwal umum. Atur lewat menu Pembagian Sesi (tombol Atur Sesi).');
+      if (warnK63.length) {
+        try { Swal.fire({ icon: 'info', title: 'Perhatian', html: warnK63.join('<br><br>'), timer: 7000, showConfirmButton: true }); } catch (eVK) {}
       }
       cb(res);
     })
@@ -6921,6 +6956,8 @@ function paintDashUpdateDataBox_() {
    dimulai, pengawas memantau lewat Monitor Ujian (Manajemen User). */
 function renderSesiBagiPage(container) {
   if (!container) return;
+  // [V6.3a] Pembagian Sesi hanya Admin & Guru Panitia.
+  if (!sipBolehPanitiaKlien_()) { sipTolakPanitiaKlien_(container); return; }
   function paintSesiBagi() {
     var list = (cachedExams || []);
     var rows = list.map(function (e) {
@@ -6939,9 +6976,9 @@ function renderSesiBagiPage(container) {
       '<h2 class="text-xl font-bold text-slate-800 flex items-center gap-2"><i class="fas fa-clock text-teal-600"></i> Pembagian Sesi Ujian</h2>' +
       '<p class="text-sm text-slate-500 mt-1">Menu ini hanya untuk <b>Admin</b> dan <b>Guru Panitia</b>.</p>' +
       '<ol class="list-decimal list-inside text-sm text-slate-600 mt-3 space-y-1">' +
-      '<li><b>Tentukan sesi</b> dan jam pelaksanaan (dimulai &amp; diakhiri) pada kolom <b>Pembagian Sesi &amp; Jam Ujian</b> di Jadwal Ujian, contoh: <code class="bg-slate-100 px-1 rounded">Sesi 1 = 07.30 - 09.00</code>.</li>' +
-      '<li><b>Bagi siswa</b> (berdasarkan UserID &amp; kelas) ke sesi lewat tombol <b>Atur Sesi</b> di bawah.</li>' +
-      '<li><b>Lengkapi &amp; simpan</b> jadwal ujian. Setelah tersimpan, Tim Pembuat Soal menulis soal; saat jadwal dimulai, Pengawas memantau lewat <b>Monitor Ujian</b> (Manajemen User).</li>' +
+      '<li><b>Buat jadwal</b> di menu Jadwal Ujian \u2014 jumlah sesi (dropdown Sesi 1-4) beserta <b>tanggal &amp; jam</b> mulai/selesai tiap sesi <b>wajib</b> diisi; kelas tidak lagi dipilih di sana.</li>' +
+      '<li><b>Pilih kelas &amp; bagi siswa</b>: klik <b>Atur Sesi</b>, pilih kelas sesuai data siswa, lalu tentukan sesi untuk tiap nama. Kelas peserta ujian terisi otomatis dari pembagian ini.</li>' +
+      '<li><b>Pantau</b>: sistem memberi notifikasi bila masih ada siswa tanpa sesi; info sesi tampil di <b>Kartu Ujian</b> &amp; <b>Daftar Hadir</b>. Saat jadwal dimulai, Pengawas memantau lewat <b>Monitor Ujian</b>.</li>' +
       '</ol></div>' +
       '<div class="dash-card overflow-hidden"><div class="overflow-x-auto"><table class="w-full text-left">' +
       '<thead><tr class="bg-slate-50 text-[11px] uppercase text-slate-400 border-b border-slate-200">' +
@@ -6959,6 +6996,8 @@ function renderSesiBagiPage(container) {
 }
 
 function renderExamForm(container) {
+  // [V6.3a] Jadwal Ujian (builder sesi, durasi, PIN) hanya Admin & Panitia.
+  if (!sipBolehPanitiaKlien_()) { sipTolakPanitiaKlien_(container); return; }
   // --- 1. SETUP FILTER ---
   window.filterExams = (val) => {
     const rows = document.querySelectorAll('.exam-row');
@@ -7144,31 +7183,54 @@ function initExamModalComponent() {
                              </select>
                          </div>
                          <div>
-                             <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Pilih Kelas (Bisa lebih dari satu)</label>
-                             <div id="input-class-container" class="max-h-36 overflow-y-auto p-3 bg-slate-50 border border-slate-300 rounded-lg space-y-2">
-                                 <p class="text-xs text-slate-400">Memuat daftar kelas...</p>
+                             <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Kelas Peserta (otomatis)</label>
+                             <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg text-[11px] text-slate-500 leading-relaxed">
+                                 <i class="fas fa-users text-teal-600 mr-1"></i> Kelas tidak lagi dipilih di sini. Setelah jadwal tersimpan, buka menu <b>Pembagian Sesi</b> (tombol <b>Atur Sesi</b>), pilih kelas sesuai data siswa, lalu bagi nama-nama siswa ke sesi. Kelas peserta ujian terisi otomatis dari pembagian itu.
                              </div>
+                         </div>
+                     </div>
+
+                     <div class="border border-teal-200 rounded-xl overflow-hidden bg-teal-50/40">
+                         <div class="bg-teal-50 px-4 py-3 border-b border-teal-100 flex items-center gap-2">
+                             <i class="fas fa-clock text-teal-600"></i>
+                             <span class="text-xs font-bold text-slate-700 uppercase tracking-wide">Pembagian Sesi &amp; Jam Ujian (wajib)</span>
+                         </div>
+                         <div class="p-4 space-y-3">
+                             <div>
+                                 <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Jumlah Sesi</label>
+                                 <select id="input-sesi-count" onchange="sipSesiRowsRender_(this.value)" class="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none transition text-sm bg-white text-slate-700" required>
+                                     <option value="">-- Pilih Jumlah Sesi (1-4) --</option>
+                                     <option value="1">1 Sesi</option>
+                                     <option value="2">2 Sesi</option>
+                                     <option value="3">3 Sesi</option>
+                                     <option value="4">4 Sesi</option>
+                                 </select>
+                             </div>
+                             <div id="sesi-rows" class="space-y-3"></div>
+                             <textarea name="sesiJam" id="input-sesi-jam" rows="2" class="hidden" tabindex="-1" aria-hidden="true"></textarea>
+                             <p class="text-[10px] text-slate-500">Tiap sesi diatur lengkap: <b>tanggal, bulan, tahun, dan jam</b> mulai/selesai. Waktu Mulai &amp; Waktu Selesai jadwal terisi otomatis dari sesi paling awal &amp; paling akhir. Setelah tersimpan, bagi siswa per kelas ke sesi lewat tombol <b>Atur Sesi</b> &mdash; hasilnya tampil di kartu ujian &amp; daftar hadir.</p>
                          </div>
                      </div>
 
                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                          <div>
-                             <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Waktu Mulai</label>
-                             <input type="datetime-local" name="date" id="input-date" class="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition text-sm text-slate-600" required>
+                             <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Waktu Mulai (otomatis dari sesi)</label>
+                             <input type="datetime-local" name="date" id="input-date" readonly class="w-full border border-slate-300 p-2.5 rounded-lg bg-slate-100 outline-none transition text-sm text-slate-600" required>
                          </div>
                          <div>
-                             <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Waktu Selesai</label>
-                             <input type="datetime-local" name="endDate" id="input-endDate" class="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition text-sm text-slate-600" required>
+                             <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Waktu Selesai (otomatis dari sesi)</label>
+                             <input type="datetime-local" name="endDate" id="input-endDate" readonly class="w-full border border-slate-300 p-2.5 rounded-lg bg-slate-100 outline-none transition text-sm text-slate-600" required>
                          </div>
                      </div>
                      
                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                          <div>
-                             <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Durasi (Menit) — jika timer aktif</label>
+                             <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Durasi (Menit) — bisa diisi manual</label>
                              <div class="relative">
                                  <span class="absolute left-3 top-2.5 text-slate-400"><i class="far fa-clock"></i></span>
-                                 <input type="number" name="duration" id="input-duration" class="pl-9 w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition text-sm" placeholder="60">
+                                 <input type="number" name="duration" id="input-duration" min="1" class="pl-9 w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition text-sm" placeholder="60">
                              </div>
+                             <p id="sesi-durasi-hint" class="text-[10px] text-teal-700 font-bold mt-1"></p>
                          </div>
                          <div>
                              <label class="block text-xs font-bold text-slate-500 uppercase mb-1">PIN Sesi</label>
@@ -7177,12 +7239,6 @@ function initExamModalComponent() {
                                  <input type="text" name="pin" id="input-pin" class="pl-10 w-full bg-yellow-50 border border-yellow-200 p-2.5 rounded-lg font-mono tracking-widest font-bold focus:ring-2 focus:ring-yellow-400 outline-none transition text-slate-800" placeholder="12345" required>
                              </div>
                          </div>
-                     </div>
-
-                     <div>
-                         <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Pembagian Sesi &amp; Jam Ujian (opsional)</label>
-                         <textarea name="sesiJam" id="input-sesi-jam" rows="3" class="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition text-sm" placeholder="Sesi 1 = 07.30 - 09.00&#10;Sesi 2 = 09.30 - 11.00"></textarea>
-                         <p class="text-[10px] text-slate-400 mt-1">Tulis satu sesi per baris dengan format <b>Sesi 1 = 07.30 - 09.00</b>. Setelah jadwal tersimpan, Admin/Panitia membagi siswa per kelas ke sesi lewat tombol <b>Atur Sesi</b> (ikon jam) pada daftar jadwal, dan hasilnya ikut tercetak pada daftar hadir (PDF).</p>
                      </div>
 
                      <div class="border border-blue-100 rounded-xl overflow-hidden bg-blue-50/40">
@@ -7513,6 +7569,128 @@ function selectExamInfoImage(link) {
    3. HANDLERS (SUBMIT, DELETE, STATUS, REFRESH)
    ========================================================================== */
 
+/* ================= [V6.3] BUILDER PEMBAGIAN SESI & JAM UJIAN =================
+   Wajib diisi. Dropdown jumlah sesi (1-4); tiap sesi punya waktu mulai &
+   selesai lengkap (tanggal-bulan-tahun-jam). Waktu Mulai/Selesai jadwal dan
+   batas durasi (menit) dihitung otomatis; durasi tetap bisa diketik manual. */
+function sipSesiPad2_(n) { n = parseInt(n, 10) || 0; return (n < 10 ? '0' : '') + n; }
+function sipSesiFmtTampil_(v) {
+  var m = String(v || '').match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (!m) return '';
+  return m[3] + '/' + m[2] + '/' + m[1] + ' ' + m[4] + '.' + m[5];
+}
+function sipSesiRowsRender_(count, preset) {
+  var box = document.getElementById('sesi-rows');
+  if (!box) return;
+  var n = Math.max(0, Math.min(4, parseInt(count, 10) || 0));
+  var html = '';
+  for (var i = 1; i <= n; i++) {
+    var p = (preset && preset[i - 1]) || {};
+    html += '<div class="border border-teal-100 bg-white rounded-lg p-3">'
+      + '<div class="text-[11px] font-bold text-teal-700 uppercase mb-2"><i class="far fa-clock mr-1"></i>Sesi ' + i + '</div>'
+      + '<div class="grid grid-cols-1 md:grid-cols-2 gap-3">'
+      + '<div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Mulai (tanggal &amp; jam)</label>'
+      + '<input type="datetime-local" id="sesi-mulai-' + i + '" value="' + (p.mulai || '') + '" onchange="sipSesiSync_()" class="w-full border border-slate-300 p-2 rounded-lg text-sm text-slate-600" required></div>'
+      + '<div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Selesai (tanggal &amp; jam)</label>'
+      + '<input type="datetime-local" id="sesi-selesai-' + i + '" value="' + (p.selesai || '') + '" onchange="sipSesiSync_()" class="w-full border border-slate-300 p-2 rounded-lg text-sm text-slate-600" required></div>'
+      + '</div></div>';
+  }
+  box.innerHTML = html;
+  sipSesiSync_();
+}
+function sipSesiData_() {
+  var selC = document.getElementById('input-sesi-count');
+  var n = Math.max(0, Math.min(4, parseInt(selC && selC.value, 10) || 0));
+  var rows = [];
+  for (var i = 1; i <= n; i++) {
+    var a = document.getElementById('sesi-mulai-' + i);
+    var b = document.getElementById('sesi-selesai-' + i);
+    var va = (a && a.value) || '', vb = (b && b.value) || '';
+    var menit = 0;
+    if (va && vb) menit = Math.round((new Date(vb).getTime() - new Date(va).getTime()) / 60000);
+    rows.push({ mulai: va, selesai: vb, menit: menit });
+  }
+  return { n: n, rows: rows };
+}
+function sipSesiSync_() {
+  var d = sipSesiData_();
+  var lines = [], starts = [], ends = [], cap = 0;
+  d.rows.forEach(function (r, idx) {
+    if (!r.mulai || !r.selesai) return;
+    lines.push('Sesi ' + (idx + 1) + ' = ' + sipSesiFmtTampil_(r.mulai) + ' - ' + sipSesiFmtTampil_(r.selesai));
+    starts.push(r.mulai);
+    ends.push(r.selesai);
+    if (r.menit > 0 && (cap === 0 || r.menit < cap)) cap = r.menit;
+  });
+  var ta = document.getElementById('input-sesi-jam');
+  if (ta) ta.value = lines.join('\n');
+  var di = document.getElementById('input-date');
+  var de = document.getElementById('input-endDate');
+  if (starts.length && di) di.value = starts.slice().sort()[0];
+  if (ends.length && de) de.value = ends.slice().sort().pop();
+  var dur = document.getElementById('input-duration');
+  if (dur) {
+    if (cap > 0) {
+      dur.max = cap;
+      dur.placeholder = cap;
+      var v = parseInt(dur.value, 10);
+      if (!v || v > cap) dur.value = cap;
+    } else {
+      dur.removeAttribute('max');
+    }
+  }
+  var hint = document.getElementById('sesi-durasi-hint');
+  if (hint) hint.textContent = cap > 0 ? ('Maksimal ' + cap + ' menit \u2014 sesuai selisih waktu mulai-selesai sesi (terpendek). Boleh diketik manual asal tidak melebihi.') : '';
+  return { cap: cap };
+}
+function sipSesiValidasi_() {
+  var d = sipSesiData_();
+  if (!d.n) return { ok: false, message: 'Pembagian Sesi & Jam Ujian wajib diisi. Pilih jumlah sesi (1-4) terlebih dahulu.' };
+  for (var i = 0; i < d.rows.length; i++) {
+    var r = d.rows[i];
+    if (!r.mulai || !r.selesai) return { ok: false, message: 'Lengkapi tanggal & jam mulai/selesai untuk Sesi ' + (i + 1) + '.' };
+    if (r.menit <= 0) return { ok: false, message: 'Waktu selesai Sesi ' + (i + 1) + ' harus lebih akhir dari waktu mulainya.' };
+  }
+  // Baca durasi ketikan manual SEBELUM sinkron, supaya kelebihan durasi
+  // ditolak dengan pesan jelas (bukan dipangkas diam-diam).
+  var cap = 0;
+  d.rows.forEach(function (r2) {
+    if (r2.menit > 0 && (cap === 0 || r2.menit < cap)) cap = r2.menit;
+  });
+  var dur = document.getElementById('input-duration');
+  var v = parseInt((dur && dur.value) || '', 10);
+  if (cap > 0 && v > cap) return { ok: false, message: 'Durasi maksimal ' + cap + ' menit (selisih waktu mulai-selesai sesi). Kurangi durasi pengerjaan.' };
+  sipSesiSync_();
+  return { ok: true, cap: cap };
+}
+function sipSesiIsiDariData_(arr) {
+  var sel = document.getElementById('input-sesi-count');
+  var list = Array.isArray(arr) ? arr.slice(0, 4) : [];
+  if (!list.length) {
+    if (sel) sel.value = '';
+    sipSesiRowsRender_(0);
+    return;
+  }
+  if (sel) sel.value = String(list.length);
+  var tglDasar = String((document.getElementById('input-date') || {}).value || '').slice(0, 10);
+  var preset = list.map(function (s) {
+    var jam = String((s && s.jam) || '');
+    var m = jam.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2})[.:](\d{2})\s*[-\u2013]\s*(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2})[.:](\d{2})/);
+    if (m) {
+      return {
+        mulai: m[3] + '-' + sipSesiPad2_(m[2]) + '-' + sipSesiPad2_(m[1]) + 'T' + sipSesiPad2_(m[4]) + ':' + m[5],
+        selesai: m[8] + '-' + sipSesiPad2_(m[7]) + '-' + sipSesiPad2_(m[6]) + 'T' + sipSesiPad2_(m[9]) + ':' + m[10]
+      };
+    }
+    var m2 = jam.match(/(\d{1,2})[.:](\d{2})\s*[-\u2013]\s*(\d{1,2})[.:](\d{2})/);
+    if (m2 && tglDasar) {
+      return { mulai: tglDasar + 'T' + sipSesiPad2_(m2[1]) + ':' + m2[2], selesai: tglDasar + 'T' + sipSesiPad2_(m2[3]) + ':' + m2[4] };
+    }
+    return {};
+  });
+  sipSesiRowsRender_(list.length, preset);
+}
+
 function handleExamSubmit(e) {
   e.preventDefault();
   e.stopPropagation();
@@ -7525,18 +7703,21 @@ function handleExamSubmit(e) {
     // Konversi datetime-local ke ISO string dengan offset timezone browser
   // agar server menerima waktu yang benar sesuai lokasi admin
 
-  // [NEW] Read multiple classes from checkboxes
-  const selectedClasses = [];
-  const classCheckboxes = document.querySelectorAll('#input-class-container input[type="checkbox"]:checked');
-  classCheckboxes.forEach(cb => {
-    selectedClasses.push(cb.value);
-  });
+  // [V6.3] Kelas TIDAK lagi dipilih di form ini — kelas peserta ujian
+  // otomatis mengikuti hasil Pembagian Sesi (tombol Atur Sesi).
+  delete data.class;
 
-  if (selectedClasses.length === 0) {
-    Swal.fire('Validasi Gagal', 'Anda harus memilih setidaknya satu kelas.', 'warning');
-    return; // Stop submission
+  // [V6.3] Pembagian Sesi & Jam Ujian WAJIB — validasi builder sesi.
+  const vSesi63 = sipSesiValidasi_();
+  if (!vSesi63.ok) {
+    Swal.fire('Validasi Gagal', vSesi63.message, 'warning');
+    return;
   }
-  data.class = selectedClasses.join(','); // Join into a comma-separated string
+  // Kirim nilai hasil sinkron terakhir (teks sesi, waktu mulai/selesai, durasi).
+  data.sesiJam = (document.getElementById('input-sesi-jam') || {}).value || '';
+  data.date = (document.getElementById('input-date') || {}).value || data.date;
+  data.endDate = (document.getElementById('input-endDate') || {}).value || data.endDate;
+  data.duration = (document.getElementById('input-duration') || {}).value || data.duration;
 // Baca ShuffleConfig dari toggle switches
   data.shuffleConfig = {
     PG:          document.getElementById('shuffle-PG')?.checked || false,
@@ -17023,6 +17204,8 @@ function populateSelect(selectEl, options, keepOld = false) {
 }
 
 function openExamModal(data = null) {
+    // [V6.3a] Form jadwal (buat/edit) hanya Admin & Guru Panitia.
+    if (!sipBolehPanitiaKlien_()) { sipTolakPanitiaKlien_(null); return; }
     const modal = document.getElementById('examModal');
 
     // Safety check: Init jika modal belum ada
@@ -17057,6 +17240,8 @@ function openExamModal(data = null) {
         document.getElementById('input-pin').value = data.pin;
         const sjEdit = document.getElementById('input-sesi-jam');
         if (sjEdit) sjEdit.value = (Array.isArray(data.sesiJam) ? data.sesiJam.map(function (s) { return 'Sesi ' + s.sesi + ' = ' + s.jam; }).join('\n') : '');
+        // [V6.3] Isi builder sesi (dropdown + tanggal-jam) dari data tersimpan.
+        try { if (typeof sipSesiIsiDariData_ === 'function') sipSesiIsiDariData_(data.sesiJam); } catch (eSB63) {}
 
         // Isi toggle ShuffleConfig saat edit
         const sc = data.shuffleConfig || {};
@@ -17115,6 +17300,19 @@ function openExamModal(data = null) {
         document.getElementById('input-endDate').value = toLocalISO(next);
         document.getElementById('input-duration').value = '60';
         document.getElementById('input-pin').value = Math.floor(10000 + Math.random() * 90000);
+        // [V6.3] Reset builder sesi — jadwal baru wajib memilih sesi lagi.
+        try {
+          var selSesi63 = document.getElementById('input-sesi-count');
+          if (selSesi63) selSesi63.value = '';
+          var rows63 = document.getElementById('sesi-rows');
+          if (rows63) rows63.innerHTML = '';
+          var ta63 = document.getElementById('input-sesi-jam');
+          if (ta63) ta63.value = '';
+          var dur63 = document.getElementById('input-duration');
+          if (dur63) dur63.removeAttribute('max');
+          var hint63 = document.getElementById('sesi-durasi-hint');
+          if (hint63) hint63.textContent = '';
+        } catch (eRS63) {}
         fillExamInfoFields({});
     }
 
@@ -20975,5 +21173,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a53fd6d889b5fe90',t:'MTc5MzU4NzkwNQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a53fd6d889b5fe90',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a54072cfb8043f31',t:'MTc5MzU5NDI5Mw=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a54072cfb8043f31',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
