@@ -3005,45 +3005,107 @@ function sipPgwBukaBank_() {
      menimpa peran lain milik guru yang sama (server melakukan merge per peran).
    - Semua kotak centang dilengkapi "Centang Semua".
    ========================================================================== */
+/* [V6.3] Kartu panduan peran = sumber informasi untuk guru yang ditunjuk.
+   Isi WAJIB sama dengan matriks menu & gerbang server yang berlaku:
+   - Pengawas  (izinUjian)   : HANYA memantau (Monitor Ujian) — tanpa PIN/koreksi.
+   - Tim Soal  (izinBankSoal): Bank Soal + Materi & Bab + Folder Gambar — TANPA jadwal.
+   - Panitia   (izinPanitia) : setara Admin utk modul ujian (jadwal+sesi wajib,
+     pembagian sesi, PIN, profil, kartu, hadir, koreksi esai, hasil, bank soal). */
 var SIP_PGW_ROLE_META = {
   pengawas: {
     judul: 'Pengawas Ujian',
     ikon: 'fa-clipboard-check',
+    grad: 'linear-gradient(135deg,#0ea5e9,#2563eb)',
     tombol: 'Tunjuk Pengawas',
-    deskripsi: 'Bertugas saat <b>pelaksanaan ujian</b>: mengatur PIN sesi & kelas yang diawasi, lalu mengoreksi jawaban esai siswa.',
+    deskripsi: 'Bertugas saat <b>pelaksanaan ujian</b>: <b>memantau</b> siswa yang sedang mengerjakan ujian pada kelas yang diawasinya. Pengawas tidak mengubah jadwal, PIN, soal, maupun nilai.',
     tugas: [
-      'Mengatur PIN sesi ujian per kelas (menu Ujian — Pengawas)',
-      'Memindahkan ujian ke kelas yang diawasinya',
-      'Mereset / membuka kunci peserta yang bermasalah',
-      'Mengoreksi jawaban esai siswa (menu Koreksi Jawaban)'
+      'Memantau jalannya ujian secara langsung lewat <b>Monitor Ujian</b> (menu Manajemen User)',
+      'Pemantauan terbatas pada <b>kelas pasangannya</b> yang ditetapkan Admin saat penunjukan',
+      'Melaporkan peserta bermasalah (terkunci / terindikasi curang) ke Admin atau Panitia untuk ditindaklanjuti'
     ],
-    menuGuru: 'Dashboard · Ujian — Pengawas · Koreksi Jawaban',
+    alur: [
+      'Login — menu pemantauan langsung tersedia',
+      'Saat jadwal dimulai, buka <b>Manajemen User → Monitor Ujian</b>',
+      'Pantau status & progres siswa kelas yang diawasi',
+      'Ada kendala? Laporkan ke Admin / Panitia'
+    ],
+    catatan: 'PIN sesi, jadwal, dan pembagian sesi hanya diatur <b>Admin & Panitia</b>; koreksi jawaban esai adalah tugas <b>Panitia</b>.',
+    menu: [
+      ['fa-house', 'Dashboard'],
+      ['fa-desktop', 'Manajemen User — Monitor Ujian'],
+      ['fa-id-badge', 'Profil Saya']
+    ],
+    menuGuru: 'Dashboard · Manajemen User (Monitor Ujian) · Profil Saya',
     kolom: 'Kelas & Mapel yang Diawasi'
   },
   timsoal: {
     judul: 'Tim Pembuat Soal',
     ikon: 'fa-file-pen',
+    grad: 'linear-gradient(135deg,#6366f1,#2563eb)',
     tombol: 'Tunjuk Tim Soal',
-    deskripsi: 'Bertugas pada <b>persiapan ujian</b>: membuat soal & menyusun jadwal untuk mapel yang ditetapkan Admin. <b>Kolom PIN ditutup</b> — PIN hanya diatur Pengawas/Admin.',
+    deskripsi: 'Bertugas pada <b>persiapan ujian</b>: menulis soal untuk mapel yang ditetapkan Admin, <b>setelah</b> jadwal ujian dibuat oleh Admin/Panitia. Tim soal tidak menyusun jadwal dan tidak memegang PIN sesi.',
     tugas: [
-      'Membuat & mengelola soal di Bank Soal (sesuai mapel yang ditetapkan)',
-      'Menyusun jadwal ujian (tanpa akses PIN sesi)',
-      'Mengisi tata cara & cara menjawab per jenis soal pada jadwal'
+      'Membuat & mengelola soal di <b>Bank Soal</b> — soal menempel pada jadwal yang sudah dibuat Admin/Panitia (sesuai mapel yang ditetapkan)',
+      'Mengelola <b>Materi & Bab</b> — wajib diisi per soal dan dipakai untuk soal acak per bab',
+      'Mengunggah gambar soal secara mandiri lewat <b>Folder Gambar</b> (tanpa akses Drive Admin)',
+      'Memakai bantuan AI untuk memperbaiki soal sesuai level kognitif — jenis soal & bab tidak berubah'
     ],
-    menuGuru: 'Dashboard · Bank Soal · Jadwal Ujian',
+    alur: [
+      'Admin / Panitia membuat <b>Jadwal Ujian</b> (sesi & jam wajib)',
+      'Tim soal menulis soal di <b>Bank Soal</b> untuk jadwal tersebut',
+      'Lengkapi <b>Materi/Bab</b> tiap soal + unggah gambar bila perlu',
+      'Soal siap — pelaksanaan dipantau Pengawas, administrasi oleh Panitia'
+    ],
+    catatan: 'Jadwal ujian, PIN sesi, dan pembagian sesi hanya diatur <b>Admin & Panitia</b> — menu Jadwal Ujian tidak terbuka untuk tim soal.',
+    menu: [
+      ['fa-house', 'Dashboard'],
+      ['fa-database', 'Bank Soal'],
+      ['fa-book', 'Materi & Bab'],
+      ['fa-images', 'Folder Gambar'],
+      ['fa-id-badge', 'Profil Saya']
+    ],
+    menuGuru: 'Dashboard · Bank Soal · Materi & Bab · Folder Gambar · Profil Saya',
     kolom: 'Mapel yang Diampu'
   },
   panitia: {
     judul: 'Panitia Ujian',
     ikon: 'fa-user-tie',
+    grad: 'linear-gradient(135deg,#f59e0b,#b45309)',
     tombol: 'Tunjuk Panitia',
-    deskripsi: 'Bertugas pada <b>administrasi ujian</b>: memvalidasi profil siswa, mencetak kartu ujian, dan memvalidasi hasil belajar.',
+    deskripsi: 'Pusat <b>administrasi & penyelenggaraan ujian</b> — haknya setara Admin untuk modul ujian: jadwal & sesi, PIN, validasi profil, kartu, daftar hadir, koreksi esai, hingga hasil & nilai.',
     tugas: [
+      'Membuat / mengubah <b>Jadwal Ujian</b> — Pembagian Sesi & Jam Ujian <b>wajib</b> (dropdown Sesi 1-4, tanggal & jam lengkap); durasi dibatasi otomatis selisih waktu sesi',
+      '<b>Pembagian Sesi</b>: pilih kelas sesuai data siswa, bagi tiap nama ke sesi — kelas peserta terisi otomatis & sistem menandai siswa yang belum punya sesi',
+      'Mengatur <b>Sesi & PIN Ujian</b> per kelas',
       'Validasi profil siswa — VALID / REVISI (menu Profil Siswa)',
-      'Mencetak & membagikan kartu ujian (menu Kartu Ujian)',
-      'Validasi hasil belajar siswa (menu Hasil & Nilai)'
+      'Mencetak <b>Kartu Ujian</b> — hanya siswa tervalidasi; kartu memuat sesi & jam milik tiap siswa',
+      'Mencetak <b>Daftar Hadir</b> per kelas (kolom sesi terisi otomatis)',
+      'Mengoreksi jawaban <b>esai</b> (menu Koreksi Jawaban) dan memvalidasi <b>Hasil & Nilai</b>',
+      'Ikut mengelola <b>Bank Soal</b> serta <b>Materi & Bab</b>'
     ],
-    menuGuru: 'Dashboard · Profil Siswa · Kartu Ujian · Hasil & Nilai',
+    alur: [
+      'Buat <b>Jadwal Ujian</b> + sesi & jam (wajib)',
+      'Bagi siswa per kelas ke sesi lewat <b>Atur Sesi</b>',
+      'Validasi profil → terbitkan <b>Kartu Ujian</b> & <b>Daftar Hadir</b>',
+      'Atur <b>PIN sesi</b>; pelaksanaan dipantau Pengawas',
+      'Koreksi <b>esai</b> → validasi <b>Hasil & Nilai</b>'
+    ],
+    catatan: 'Saat membagi sesi, Panitia terkunci ke <b>kelas pasangannya</b>; Admin bebas semua kelas. Kartu ujian hanya terbit untuk siswa <b>TERVALIDASI</b>.',
+    menu: [
+      ['fa-house', 'Dashboard'],
+      ['fa-calendar-alt', 'Jadwal Ujian'],
+      ['fa-clock', 'Pembagian Sesi'],
+      ['fa-key', 'Sesi & PIN Ujian'],
+      ['fa-id-card', 'Profil Siswa'],
+      ['fa-address-card', 'Kartu Ujian'],
+      ['fa-clipboard-list', 'Daftar Hadir'],
+      ['fa-pen', 'Koreksi Jawaban'],
+      ['fa-chart-line', 'Hasil & Nilai'],
+      ['fa-database', 'Bank Soal'],
+      ['fa-book', 'Materi & Bab'],
+      ['fa-id-badge', 'Profil Saya']
+    ],
+    menuGuru: 'Dashboard · Jadwal Ujian · Pembagian Sesi · Sesi & PIN Ujian · Profil Siswa · Kartu Ujian · Daftar Hadir · Koreksi Jawaban · Hasil & Nilai · Bank Soal · Materi & Bab · Profil Saya',
     kolom: 'Tugas Panitia'
   }
 };
@@ -3061,18 +3123,50 @@ function sipPgwToggleSemua_(src, cls) {
 function renderPengawasPage(container, fokus) {
   window._pgwFokus = (fokus === 'timsoal' || fokus === 'panitia') ? fokus : 'pengawas';
   var R = SIP_PGW_ROLE_META[sipPgwRoleKey_()];
+  // [V6.3] Kartu panduan peran: tugas + alur kerja + menu yang terbuka,
+  // sebagai panduan informasi bagi guru yang ditunjuk pada peran ini.
   var tugasLi = R.tugas.map(function (t) {
-    return '<li class="flex items-start gap-2"><i class="fas fa-check-circle text-emerald-500 mt-0.5"></i><span>' + t + '</span></li>';
+    return '<li class="flex items-start gap-2.5"><i class="fas fa-circle-check text-emerald-500 mt-0.5 shrink-0"></i><span class="leading-relaxed">' + t + '</span></li>';
   }).join('');
+  var alurLi = (R.alur || []).map(function (t, i) {
+    return '<li class="flex items-start gap-2.5">' +
+      '<span class="shrink-0 w-5 h-5 rounded-full text-white text-[10px] font-bold flex items-center justify-center shadow-sm" style="background:' + R.grad + '">' + (i + 1) + '</span>' +
+      '<span class="leading-relaxed">' + t + '</span></li>';
+  }).join('');
+  var menuChips = (R.menu || []).map(function (m) {
+    return '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-slate-200 text-[11px] font-bold text-slate-600 shadow-sm whitespace-nowrap"><i class="fas ' + m[0] + ' text-blue-600"></i>' + m[1] + '</span>';
+  }).join(' ');
   container.innerHTML = '<div class="fade-in w-full space-y-6">' +
-    '<div class="dash-card p-6 flex flex-col md:flex-row md:items-start justify-between gap-4">' +
-    '<div class="flex-1"><div class="flex items-center gap-3 mb-1">' +
-    '<div class="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center text-white shadow-md"><i class="fas ' + R.ikon + '"></i></div>' +
-    '<h2 class="text-xl font-bold text-slate-800 tracking-tight">' + R.judul + '</h2></div>' +
-    '<p class="text-slate-500 text-sm ml-14">' + R.deskripsi + '</p>' +
-    '<ul class="text-xs text-slate-600 ml-14 mt-3 space-y-1.5">' + tugasLi + '</ul>' +
-    '<p class="text-[11px] text-slate-400 ml-14 mt-3"><i class="fas fa-bars mr-1"></i>Menu yang terbuka untuk guru dengan peran ini: <b>' + R.menuGuru + '</b></p></div>' +
+    '<div class="dash-card overflow-hidden">' +
+    '<div class="p-6 pb-5">' +
+    '<div class="flex flex-col md:flex-row md:items-start justify-between gap-4">' +
+    '<div class="flex items-start gap-4 flex-1">' +
+    '<div class="w-12 h-12 rounded-xl flex items-center justify-center text-white text-lg shadow-lg shrink-0" style="background:' + R.grad + '"><i class="fas ' + R.ikon + '"></i></div>' +
+    '<div class="flex-1 min-w-0">' +
+    '<div class="flex items-center gap-2 flex-wrap">' +
+    '<h2 class="text-xl font-bold text-slate-800 tracking-tight">' + R.judul + '</h2>' +
+    '<span class="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200"><i class="fas fa-circle-info mr-1"></i>Panduan Peran</span>' +
+    '</div>' +
+    '<p class="text-slate-500 text-sm mt-1.5 leading-relaxed">' + R.deskripsi + '</p>' +
+    '</div></div>' +
     '<button type="button" onclick="sipPgwForm_(null)" class="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-700 shadow-lg shadow-blue-500/30 whitespace-nowrap self-start"><i class="fas fa-user-plus mr-2"></i>' + R.tombol + '</button>' +
+    '</div>' +
+    '<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-5">' +
+    '<div class="rounded-xl border border-slate-200 bg-slate-50/60 p-4">' +
+    '<p class="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-3"><i class="fas fa-list-check mr-1.5 text-emerald-500"></i>Tugas & Wewenang</p>' +
+    '<ul class="text-xs text-slate-600 space-y-2">' + tugasLi + '</ul>' +
+    '</div>' +
+    '<div class="rounded-xl border border-slate-200 bg-slate-50/60 p-4">' +
+    '<p class="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-3"><i class="fas fa-route mr-1.5 text-blue-500"></i>Alur Kerja Singkat</p>' +
+    '<ol class="text-xs text-slate-600 space-y-2">' + alurLi + '</ol>' +
+    (R.catatan ? '<div class="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 leading-relaxed"><i class="fas fa-triangle-exclamation mr-1.5"></i>' + R.catatan + '</div>' : '') +
+    '</div>' +
+    '</div>' +
+    '</div>' +
+    '<div class="px-6 py-4 bg-slate-50 border-t border-slate-100">' +
+    '<p class="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-2"><i class="fas fa-bars mr-1.5"></i>Menu yang terbuka untuk guru dengan peran ini</p>' +
+    '<div class="flex flex-wrap gap-1.5">' + menuChips + '</div>' +
+    '</div>' +
     '</div>' +
     '<div class="dash-card p-6 overflow-x-auto"><table class="w-full text-sm">' +
     '<thead><tr class="text-left text-slate-500 border-b border-slate-200">' +
@@ -21173,5 +21267,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a54072cfb8043f31',t:'MTc5MzU5NDI5Mw=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a54072cfb8043f31',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5414a846914a027',t:'MTc5MzYwMzEyOQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5414a846914a027',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
