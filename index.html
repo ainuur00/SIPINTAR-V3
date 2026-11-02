@@ -246,7 +246,7 @@
     .sip-nilai-materi-btn{transition:transform .15s ease,background .15s ease}
     .sip-nilai-materi-btn:hover{transform:translateY(-2px);background:#163057}
     .sip-nilai-focus{box-shadow:0 0 0 3px #38bdf8,0 12px 28px rgba(27,58,107,.16)}
-    .sip-pf-frame{width:168px;height:224px;border-radius:10px;overflow:hidden;border:2px solid #1b3a6b;background:#7f1d1d;flex-shrink:0;position:relative}
+    .sip-pf-frame{width:168px;height:224px;aspect-ratio:3/4;border-radius:10px;overflow:hidden;border:2px solid #1b3a6b;background:#7f1d1d;flex-shrink:0;position:relative}
     .sip-pf-frame img{width:100%;height:100%;object-fit:cover;object-position:center top;display:block;background:#7f1d1d}
     /* [V5.0] Pastikan foto MENUTUP SELURUH frame: menu profil & header aplikasi */
     /* [V6.1b] Foto yang diunggah WAJIB menutupi bingkai profil & header (cover penuh) */
@@ -267,7 +267,7 @@
     .sip-podium-crown{font-size:20px;line-height:1;margin-bottom:2px}
     @keyframes sipPodiumUp{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:translateY(0)}}
     .sip-pf-frame .sip-pf-ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fecaca;font-size:11px;text-align:center;padding:8px;pointer-events:none}
-    .sip-pf-frame-head{width:42px;height:56px;border-radius:6px;border-width:1px;border-color:rgba(255,255,255,.45);background:#7f1d1d}
+    .sip-pf-frame-head{width:42px;height:56px;aspect-ratio:3/4;border-radius:6px;border-width:1px;border-color:rgba(255,255,255,.45);background:#7f1d1d}
     .sip-pf-frame-head .sip-pf-ph{font-size:8px;color:#fecaca}
     .siswa-nav-keluar{color:#fecaca}
     .sr-only-foto{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
@@ -1825,6 +1825,9 @@
               <div id="menu-exams" class="sidebar-item" onclick="showAdminTab('dash-exams', this)">
                 <i class="fas fa-calendar-days"></i> <span class="sidebar-text font-medium">Jadwal Ujian</span>
               </div>
+              <div id="menu-sesi-bagi" class="sidebar-item" onclick="showAdminTab('dash-sesi-bagi', this)">
+                <i class="fas fa-clock"></i> <span class="sidebar-text font-medium">Pembagian Sesi</span>
+              </div>
               <div id="menu-questions" class="sidebar-item" onclick="showAdminTab('dash-questions', this)">
                 <i class="fas fa-book"></i> <span class="sidebar-text font-medium">Bank Soal</span>
               </div>
@@ -2907,11 +2910,11 @@ function initAdminPanel() {
  
   // ── LOGIKA VISIBILITAS MENU BERDASARKAN ROLE ──────────────────────
   // [PENGAWAS] Guru (pengawas) hanya melihat: Dashboard, Jadwal Ujian, Bank Soal, Hasil & Nilai
-  const guruAllowedMenus = ['menu-home', 'menu-profil-guru', 'menu-pgw-ujian', 'menu-pgw-koreksi', 'menu-questions', 'menu-materibab', 'menu-exams', 'menu-results', 'menu-profil', 'menu-kartu', 'menu-hadir', 'menu-users', 'menu-images'];
+  const guruAllowedMenus = ['menu-home', 'menu-profil-guru', 'menu-pgw-ujian', 'menu-pgw-koreksi', 'menu-questions', 'menu-materibab', 'menu-exams', 'menu-sesi-bagi', 'menu-results', 'menu-profil', 'menu-kartu', 'menu-hadir', 'menu-users', 'menu-images'];
   const adminOnlyMenus = ['menu-questions', 'menu-kisi', 'menu-ai-generator', 'menu-hermes',
     'menu-report-template', 'menu-users', 'menu-profil', 'menu-kartu', 'menu-hadir',
     'menu-images', 'menu-music', 'menu-config',
-    'menu-master-data', 'menu-pengawas', 'menu-timsoal', 'menu-panitia', 'menu-exams', 'menu-results',
+    'menu-master-data', 'menu-pengawas', 'menu-timsoal', 'menu-panitia', 'menu-exams', 'menu-sesi-bagi', 'menu-results',
     'menu-pgw-ujian', 'menu-pgw-koreksi'];
   const guruOnlyMenus = ['menu-pgw-ujian', 'menu-pgw-koreksi'];
 
@@ -2931,12 +2934,15 @@ function initAdminPanel() {
       if (el) el.classList.add('hidden');
     });
     guruAllowedMenus.forEach(id => {
-      if (id === 'menu-pgw-koreksi' && !izinUjianGuru) return;
-      // [V5.2] Sesi & PIN Ujian: pengawas (hanya lihat) ATAU panitia (atur PIN)
-      if (id === 'menu-pgw-ujian' && !izinUjianGuru && !izinPanitiaGuru) return;
-      if ((id === 'menu-questions' || id === 'menu-materibab') && !izinBankGuru) return;
-      // [V5.10] Jadwal Ujian: tim soal ATAU panitia (panitia = fitur penuh spt Admin)
-      if (id === 'menu-exams' && !izinBankGuru && !izinPanitiaGuru) return;
+      // [V6.2] Koreksi jawaban esai = tugas PANITIA (bukan pengawas)
+      if (id === 'menu-pgw-koreksi' && !izinPanitiaGuru) return;
+      // [V6.2] Sesi & PIN Ujian: PIN dibuat PANITIA. Pengawas tidak lagi
+      // mengubah/melihat menu ini; pengawas memantau lewat Manajemen User.
+      if (id === 'menu-pgw-ujian' && !izinPanitiaGuru) return;
+      // [V6.2] Bank Soal tampil utk Admin, PANITIA, dan TIM PEMBUAT SOAL
+      if ((id === 'menu-questions' || id === 'menu-materibab') && !izinBankGuru && !izinPanitiaGuru) return;
+      // [V6.2] Jadwal Ujian & Pembagian Sesi: HANYA Admin dan PANITIA
+      if ((id === 'menu-exams' || id === 'menu-sesi-bagi') && !izinPanitiaGuru) return;
       if ((id === 'menu-profil' || id === 'menu-kartu' || id === 'menu-hadir' || id === 'menu-results') && !izinPanitiaGuru) return;
       // [V3.9] Manajemen User (mode monitor) utk PENGAWAS; Folder Gambar utk TIM SOAL
       if (id === 'menu-users' && !izinUjianGuru) return;
@@ -3729,8 +3735,11 @@ function sipGuruTerimaFoto_(srcDataUrl) {
     var cv = document.createElement('canvas');
     cv.width = Math.round(img.width * sk); cv.height = Math.round(img.height * sk);
     cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
-    var dataUrl = cv.toDataURL('image/jpeg', 0.88);
-    if (dataUrl.length * 0.75 > 2 * 1024 * 1024) dataUrl = cv.toDataURL('image/jpeg', 0.7);
+    // [V6.2] Sumber >2MB dipadatkan bertahap sampai DI BAWAH 1MB.
+    var batasG = (String(srcDataUrl || '').length * 0.75 > 2 * 1024 * 1024) ? (1024 * 1024) : (2 * 1024 * 1024);
+    var qG = 0.88;
+    var dataUrl = cv.toDataURL('image/jpeg', qG);
+    while (dataUrl.length * 0.75 > batasG && qG > 0.4) { qG -= 0.08; dataUrl = cv.toDataURL('image/jpeg', qG); }
     window._guruFotoDataUrl = dataUrl;
     var prev = document.getElementById('pfg-foto-prev');
     var ph = document.getElementById('pfg-foto-ph');
@@ -3923,9 +3932,11 @@ function showAdminTab(tabId, el) {
     const _pgwIzinTab = (currentUser && currentUser.pengawas) || {};
     const allowedGuruTabs = ['dash-home', 'dash-profil-guru'];
     // [V3] Izin harus EKSPLISIT true dari penunjukan Admin
-    if (_pgwIzinTab.izinUjian === true) allowedGuruTabs.push('dash-pgw-ujian', 'dash-pgw-koreksi', 'dash-users');
-    if (_pgwIzinTab.izinBankSoal === true) allowedGuruTabs.push('dash-questions', 'dash-materibab', 'dash-exams', 'dash-images');
-    if (_pgwIzinTab.izinPanitia === true) allowedGuruTabs.push('dash-profil', 'dash-kartu', 'dash-hadir', 'dash-results', 'dash-pgw-ujian', 'dash-exams');
+    // [V6.2] PENGAWAS: hanya pantau lewat Monitor Ujian (Manajemen User)
+    if (_pgwIzinTab.izinUjian === true) allowedGuruTabs.push('dash-users');
+    // [V6.2] TIM SOAL: kelola bank soal SETELAH jadwal dibuat Admin/Panitia
+    if (_pgwIzinTab.izinBankSoal === true) allowedGuruTabs.push('dash-questions', 'dash-materibab', 'dash-images');
+    if (_pgwIzinTab.izinPanitia === true) allowedGuruTabs.push('dash-profil', 'dash-kartu', 'dash-hadir', 'dash-results', 'dash-pgw-ujian', 'dash-exams', 'dash-sesi-bagi', 'dash-pgw-koreksi', 'dash-questions', 'dash-materibab');
     if (!allowedGuruTabs.includes(tabId)) {
       Swal.fire({
         title: 'Akses Ditolak',
@@ -3963,6 +3974,10 @@ function showAdminTab(tabId, el) {
   } else if (tabId === 'dash-exams') {
     title.innerText = 'Manajemen Jadwal Ujian';
     renderExamForm(content);
+
+  } else if (tabId === 'dash-sesi-bagi') {
+    title.innerText = 'Pembagian Sesi Ujian';
+    renderSesiBagiPage(content);
  
   } else if (tabId === 'dash-questions') {
     title.innerText = 'Bank Soal';
@@ -4946,6 +4961,8 @@ function sipProfilPickFoto_(inp) {
       return;
     }
     if (!demoIHT) sipApplyRedBackground_(canvas);
+    // [V6.2] Sumber lebih dari 2 MB WAJIB dipadatkan sampai di bawah 1 MB.
+    var batasFoto = (file.size > 2 * 1024 * 1024) ? (1024 * 1024) : (2 * 1024 * 1024);
     var q = 0.88;
     function finish(dataUrl, kb) {
       _sipProfilFotoPending = { dataUrl: dataUrl, name: 'foto-profil.jpg', type: 'image/jpeg' };
@@ -4957,14 +4974,15 @@ function sipProfilPickFoto_(inp) {
     function encode() {
       if (!canvas.toBlob) {
         var du = canvas.toDataURL('image/jpeg', 0.82);
-        if (du.length * 0.75 > 2 * 1024 * 1024) { fail('Foto masih di atas 2 MB.'); return; }
+        while (du.length * 0.75 > batasFoto && du.length > 50000) { du = canvas.toDataURL('image/jpeg', 0.6); break; }
+        if (du.length * 0.75 > batasFoto) { fail('Foto masih melebihi batas ukuran.'); return; }
         finish(du, Math.round(du.length * 0.75 / 1024));
         return;
       }
       canvas.toBlob(function (b) {
         if (!b) { fail('Gagal mengompres foto.'); return; }
-        if (b.size > 2 * 1024 * 1024 && q > 0.5) { q -= 0.08; encode(); return; }
-        if (b.size > 2 * 1024 * 1024) { fail('Foto masih di atas 2 MB setelah kompresi.'); return; }
+        if (b.size > batasFoto && q > 0.4) { q -= 0.08; encode(); return; }
+        if (b.size > batasFoto) { fail('Foto masih melebihi batas ukuran setelah kompresi.'); return; }
         var rd = new FileReader();
         rd.onload = function () { finish(rd.result, Math.round(b.size / 1024)); };
         rd.readAsDataURL(b);
@@ -5623,11 +5641,13 @@ function sipProsesFotoSiswaStaf_(file, profilTarget, onOk, onErr) {
       return;
     }
     if (!demoIHT) sipApplyRedBackground_(canvas);
+    // [V6.2] Sumber >2MB dipadatkan sampai DI BAWAH 1MB.
+    var batasS = (file && file.size > 2 * 1024 * 1024) ? (1024 * 1024) : (2 * 1024 * 1024);
     var q = 0.88;
     function encode() {
       var du = canvas.toDataURL('image/jpeg', q);
-      if (du.length * 0.75 > 2 * 1024 * 1024 && q > 0.5) { q -= 0.08; encode(); return; }
-      if (du.length * 0.75 > 2 * 1024 * 1024) { onErr('Foto masih di atas 2 MB setelah kompresi.'); return; }
+      if (du.length * 0.75 > batasS && q > 0.4) { q -= 0.08; encode(); return; }
+      if (du.length * 0.75 > batasS) { onErr('Foto masih melebihi batas ukuran setelah kompresi.'); return; }
       onOk(du);
     }
     encode();
@@ -5960,6 +5980,9 @@ function fetchKartuData_(cb) {
       if (!res || !res.success) {
         Swal.fire({ icon: 'error', title: 'Gagal', text: (res && res.message) || '' });
         return;
+      }
+      if (res.dilewatiValidasi > 0) {
+        try { Swal.fire({ icon: 'info', title: 'Sebagian kartu tidak terbit', text: res.dilewatiValidasi + ' siswa BELUM divalidasi Panitia/Admin sehingga kartunya dilewati.', timer: 4000, showConfirmButton: false }); } catch (eVK) {}
       }
       cb(res);
     })
@@ -6890,6 +6913,50 @@ function paintDashUpdateDataBox_() {
 /* ==========================================================================
    2. MANAJEMEN JADWAL UJIAN (TABLE & MODAL)
    ========================================================================== */
+
+/* [V6.2] PEMBAGIAN SESI UJIAN — khusus Admin & Guru Panitia.
+   Alur: (1) tulis daftar sesi + jam mulai/selesai pada jadwal ujian;
+   (2) bagi siswa per UserID & kelas ke sesi lewat tombol Atur Sesi;
+   (3) lengkapi & simpan jadwal -> tim soal menulis soal -> saat ujian
+   dimulai, pengawas memantau lewat Monitor Ujian (Manajemen User). */
+function renderSesiBagiPage(container) {
+  if (!container) return;
+  function paintSesiBagi() {
+    var list = (cachedExams || []);
+    var rows = list.map(function (e) {
+      var aktif = String(e.status || '').toLowerCase() === 'aktif';
+      return '<tr class="hover:bg-slate-50 border-b border-slate-100">' +
+        '<td class="p-3"><div class="font-bold text-slate-800 text-sm">' + String(e.subject || '-') + '</div>' +
+        '<div class="text-[11px] text-slate-500">' + String(e.id || '') + '</div></td>' +
+        '<td class="p-3 text-sm text-slate-600">' + String(e.class || '-') + '</td>' +
+        '<td class="p-3 text-sm text-slate-600">' + String(e.dateStr || '-') + '</td>' +
+        '<td class="p-3"><span class="text-[10px] font-bold px-2 py-1 rounded-full ' + (aktif ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500') + '">' + String(e.status || '-') + '</span></td>' +
+        '<td class="p-3 text-center"><button onclick="sipSesiBuka_(\'' + String(e.id || '') + '\')" class="px-3 py-2 rounded-lg bg-teal-600 text-white text-xs font-bold hover:bg-teal-700"><i class="fas fa-clock mr-1"></i>Atur Sesi</button></td></tr>';
+    }).join('');
+    container.innerHTML =
+      '<div class="fade-in w-full space-y-4">' +
+      '<div class="dash-card p-6">' +
+      '<h2 class="text-xl font-bold text-slate-800 flex items-center gap-2"><i class="fas fa-clock text-teal-600"></i> Pembagian Sesi Ujian</h2>' +
+      '<p class="text-sm text-slate-500 mt-1">Menu ini hanya untuk <b>Admin</b> dan <b>Guru Panitia</b>.</p>' +
+      '<ol class="list-decimal list-inside text-sm text-slate-600 mt-3 space-y-1">' +
+      '<li><b>Tentukan sesi</b> dan jam pelaksanaan (dimulai &amp; diakhiri) pada kolom <b>Pembagian Sesi &amp; Jam Ujian</b> di Jadwal Ujian, contoh: <code class="bg-slate-100 px-1 rounded">Sesi 1 = 07.30 - 09.00</code>.</li>' +
+      '<li><b>Bagi siswa</b> (berdasarkan UserID &amp; kelas) ke sesi lewat tombol <b>Atur Sesi</b> di bawah.</li>' +
+      '<li><b>Lengkapi &amp; simpan</b> jadwal ujian. Setelah tersimpan, Tim Pembuat Soal menulis soal; saat jadwal dimulai, Pengawas memantau lewat <b>Monitor Ujian</b> (Manajemen User).</li>' +
+      '</ol></div>' +
+      '<div class="dash-card overflow-hidden"><div class="overflow-x-auto"><table class="w-full text-left">' +
+      '<thead><tr class="bg-slate-50 text-[11px] uppercase text-slate-400 border-b border-slate-200">' +
+      '<th class="p-3">Mata Ujian</th><th class="p-3">Kelas</th><th class="p-3">Tanggal</th><th class="p-3">Status</th><th class="p-3 text-center">Aksi</th></tr></thead>' +
+      '<tbody>' + (rows || '<tr><td colspan="5" class="p-6 text-center text-slate-400 text-sm">Belum ada jadwal ujian. Buat dahulu di menu Jadwal Ujian.</td></tr>') + '</tbody>' +
+      '</table></div></div></div>';
+  }
+  paintSesiBagi();
+  try {
+    google.script.run
+      .withSuccessHandler(function (exams) { cachedExams = exams || cachedExams || []; paintSesiBagi(); })
+      .withFailureHandler(function () {})
+      .getExamList(currentUser.userID, currentUser.token);
+  } catch (eSB) {}
+}
 
 function renderExamForm(container) {
   // --- 1. SETUP FILTER ---
@@ -13847,7 +13914,7 @@ function submitEssayGrade() {
         } else {
             Swal.fire('Gagal', res.message, 'error');
         }
-    }).saveEssayGrade(currentGradingId, score);
+    }).saveEssayGrade(currentGradingId, score, currentUser.userID, currentUser.token);
 }
 // [V4.9] Migrasi sesi lama: kunci 'sipadu_session' -> 'sipintar_session'
 // agar pengguna yang masih login TIDAK terlempar keluar setelah pembaruan.
@@ -20908,5 +20975,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a520531aaf2726da',t:'MTc5MzI1NzQ1MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a53fd6d889b5fe90',t:'MTc5MzU4NzkwNQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a53fd6d889b5fe90',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
