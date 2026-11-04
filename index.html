@@ -1911,7 +1911,7 @@
         </nav>
 
         <div class="p-4 border-t border-slate-700/50">
-          <button onclick="logout()" class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm font-medium text-red-200 bg-red-900/20 hover:bg-red-600 hover:text-white transition-all border border-red-900/30 sidebar-item">
+          <button id="menu-keluar" onclick="logout()" class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm font-medium text-red-200 bg-red-900/20 hover:bg-red-600 hover:text-white transition-all border border-red-900/30 sidebar-item">
             <i class="fas fa-sign-out-alt"></i> <span class="sidebar-text">Keluar</span>
           </button>
         </div>
@@ -2923,6 +2923,10 @@ function initAdminPanel() {
     // penunjukan Admin hanya mendapat 2 menu: Dashboard & Profil Guru.
     // Menu lain dibuka kembali HANYA lewat izin eksplisit di bawah.
     document.querySelectorAll('#admin-sidebar .sidebar-item').forEach(function (itSb) { itSb.classList.add('hidden'); });
+    // [V6.3c] Tombol KELUAR wajib SELALU tampil untuk semua guru — ia ikut
+    // class .sidebar-item sehingga tersapu baris di atas; pulihkan eksplisit.
+    const elKeluar63 = document.getElementById('menu-keluar');
+    if (elKeluar63) elKeluar63.classList.remove('hidden');
     const _pgwIzin = (currentUser && currentUser.pengawas) || {};
     // [V3] Izin harus EKSPLISIT dari penunjukan Admin. Guru tanpa penunjukan
     // (bukan Pengawas & bukan Tim Pembuat Soal) hanya melihat Dashboard.
@@ -21312,5 +21316,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5506eae6e42603f',t:'MTc5Mzc2MTg5Ng=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5506eae6e42603f',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5508b90be3e6bdc',t:'MTc5Mzc2MzA3OQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5508b90be3e6bdc',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
