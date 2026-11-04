@@ -2877,7 +2877,7 @@ function sipSetSidebarAvatar_() {
     box.innerHTML = String(currentUser.username || 'A').charAt(0).toUpperCase();
     return;
   }
-  box.innerHTML = '<img src="icon-pocong.jpg" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:9999px">';
+  box.innerHTML = '<img src="icon-pocong.jpg" alt="" onerror="sipFotoImgErr_(this)" style="width:100%;height:100%;object-fit:cover;border-radius:9999px">';
   try {
     google.script.run.withSuccessHandler(function (res) {
       try {
@@ -3819,13 +3819,13 @@ function renderProfilGuruPage(container) {
         '<div class="text-center">' +
         '<div class="mx-auto" style="width:150px;height:200px;border-radius:14px;overflow:hidden;border:3px solid #e2e8f0;background:#f1f5f9;display:flex;align-items:center;justify-content:center">' +
         (fotoSrc
-          ? '<img id="pfg-foto-prev" src="' + escapeHtmlProfil_(fotoSrc) + '" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:cover;object-position:center top">'
-          : '<img id="pfg-foto-prev" src="icon-pocong.jpg" style="width:100%;height:100%;object-fit:cover;object-position:center top"><span id="pfg-foto-ph" class="hidden text-slate-400 text-xs font-bold">Belum ada foto</span>') +
+          ? '<img id="pfg-foto-prev" src="' + escapeHtmlProfil_(fotoSrc) + '" referrerpolicy="no-referrer" onerror="sipFotoImgErr_(this)" style="width:100%;height:100%;object-fit:cover;object-position:center top">'
+          : '<img id="pfg-foto-prev" src="icon-pocong.jpg" onerror="sipFotoImgErr_(this)" style="width:100%;height:100%;object-fit:cover;object-position:center top"><span id="pfg-foto-ph" class="hidden text-slate-400 text-xs font-bold">Belum ada foto</span>') +
         '</div>' +
         '<input type="file" id="pfg-foto-file" accept="image/*" class="hidden" onchange="sipGuruPilihFoto_(this)">' +
         '<button type="button" onclick="document.getElementById(\'pfg-foto-file\').click()" class="mt-3 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold"><i class="fas fa-camera mr-1"></i>Pilih Foto</button>' +
         '<button type="button" onclick="sipGuruFotoKamera_()" class="mt-2 px-4 py-2 rounded-xl bg-slate-700 text-white text-xs font-bold"><i class="fas fa-camera-retro mr-1"></i>Gunakan Kamera</button>' +
-        '<p class="text-[10px] text-slate-400 mt-2">JPG/PNG atau foto kamera, otomatis dikecilkan (maks 2 MB). Belum ada foto? Sistem menampilkan ikon bawaan.</p>' +
+        '<p class="text-[10px] text-slate-400 mt-2">JPG/PNG atau foto kamera \u2014 otomatis dipotong ke bingkai pas-foto <b>3\u00d74</b> dan dipadatkan (maks 2 MB). Belum ada foto? Sistem menampilkan ikon bawaan.</p>' +
         '</div>' +
         '<div class="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">' +
         f('pfg-nama', 'Nama Lengkap (wajib)', p.namaLengkap, 'Nama beserta gelar') +
@@ -3851,15 +3851,22 @@ function renderProfilGuruPage(container) {
     .withFailureHandler(function (err) { container.innerHTML = '<div class="dash-card p-6 text-rose-600 text-sm font-bold">' + escapeHtmlProfil_(String(err)) + '</div>'; })
     .getProfilGuru(currentUser.userID, currentUser.token);
 }
-// [V6.1] Pemroses foto guru (dipakai galeri & kamera): kecilkan + jaga <= 2 MB
+// [V6.3b] Pemroses foto guru (galeri & kamera): dipotong otomatis ke ukuran
+// pas-foto 3x4 (600x800, cover-crop tengah dengan bias ke atas agar kepala
+// aman) lalu dipadatkan — sama seperti jalur foto siswa.
 function sipGuruTerimaFoto_(srcDataUrl) {
   var img = new Image();
   img.onload = function () {
-    var MAX = 900;
-    var sk = Math.min(1, MAX / Math.max(img.width, img.height));
+    var outW = 600, outH = 800;
+    var iw = img.width, ih = img.height;
     var cv = document.createElement('canvas');
-    cv.width = Math.round(img.width * sk); cv.height = Math.round(img.height * sk);
-    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    cv.width = outW; cv.height = outH;
+    var scale34 = Math.max(outW / iw, outH / ih);
+    var sw34 = Math.min(iw, Math.round(outW / scale34));
+    var sh34 = Math.min(ih, Math.round(outH / scale34));
+    var sx34 = Math.max(0, Math.round((iw - sw34) / 2));
+    var sy34 = Math.max(0, Math.round((ih - sh34) * 0.25));
+    cv.getContext('2d').drawImage(img, sx34, sy34, sw34, sh34, 0, 0, outW, outH);
     // [V6.2] Sumber >2MB dipadatkan bertahap sampai DI BAWAH 1MB.
     var batasG = (String(srcDataUrl || '').length * 0.75 > 2 * 1024 * 1024) ? (1024 * 1024) : (2 * 1024 * 1024);
     var qG = 0.88;
@@ -4701,24 +4708,62 @@ function sipProfilFotoCandidates_(url) {
   ];
 }
 
+// [V6.3b] Cadangan ONLINE ikon bawaan (repo GitHub) — dipakai bila file
+// lokal icon-pocong.jpg gagal dimuat, agar bingkai BENAR-BENAR menampilkan
+// foto bawaan tersebut dalam kondisi apa pun.
+var SIP_FOTO_DEFAULT_URL_ = 'https://raw.githubusercontent.com/ainuur00/SIPINTAR-V3/d1696c3f852090ed26be48cf9572e4f90bb9a1da/icon%20pocong.jpg';
+
+// [V6.3b] Foto unggahan terakhir milik user ini disimpan juga di perangkat
+// (localStorage per UserID) supaya foto yang diunggah LANGSUNG menggantikan
+// isi bingkai (termasuk ikon bawaan) dan tetap tampil setelah login ulang,
+// walau URL Drive belum siap dimuat.
+function sipFotoLokalKey_() { return 'sipFotoLokal:' + String((window.currentUser && currentUser.userID) || ''); }
+function sipFotoLokalSet_(dataUrl) {
+  window._sipFotoLokal_ = dataUrl || '';
+  try { if (dataUrl) localStorage.setItem(sipFotoLokalKey_(), dataUrl); } catch (eQ) {}
+}
+function sipFotoLokalGet_() {
+  if (window._sipFotoLokal_) return window._sipFotoLokal_;
+  try { return localStorage.getItem(sipFotoLokalKey_()) || ''; } catch (eQ) { return ''; }
+}
+
 function sipBindFotoImg_(img, url) {
   if (!img) return;
   var srcs = sipProfilFotoCandidates_(url);
-  // [V6.1b] Jaring pengaman agar bingkai SELALU tertutup foto:
-  // 1) dataURL lokal hasil unggahan terakhir (URL Drive baru kadang butuh
-  //    beberapa saat sebelum bisa dimuat), 2) ikon bawaan (pocong).
+  // [V6.3b] Urutan sumber foto:
+  // 1) dataURL yang baru diunggah (dipakai langsung bila url sudah dataURL),
+  // 2) foto unggahan terakhir user ini (memori/localStorage) — DIUTAMAKAN
+  //    di depan URL Drive agar bingkai langsung terganti foto unggahan,
+  // 3) kandidat URL Drive, 4) ikon bawaan lokal, 5) ikon bawaan online.
   try {
-    if (window._sipFotoLokal_ && srcs.indexOf(window._sipFotoLokal_) === -1) srcs.push(window._sipFotoLokal_);
+    var lokal = sipFotoLokalGet_();
+    if (lokal && String(url || '').indexOf('data:') !== 0 && srcs.indexOf(lokal) === -1) srcs.unshift(lokal);
   } catch (eL) {}
   if (srcs.indexOf(SIP_FOTO_DEFAULT_) === -1) srcs.push(SIP_FOTO_DEFAULT_);
+  if (srcs.indexOf(SIP_FOTO_DEFAULT_URL_) === -1) srcs.push(SIP_FOTO_DEFAULT_URL_);
   var i = 0;
   img.onload = function () { img.classList.remove('hidden'); };
   img.onerror = function () {
     i += 1;
-    if (i < srcs.length) img.src = srcs[i];
-    else img.classList.add('hidden');
+    if (i < srcs.length) { img.src = srcs[i]; return; }
+    // Semua sumber gagal: jangan biarkan bingkai kosong tanpa penanda.
+    img.classList.add('hidden');
+    try {
+      var ph63 = img.parentElement && img.parentElement.querySelector('.sip-pf-ph');
+      if (ph63) ph63.classList.remove('hidden');
+    } catch (eP) {}
   };
   img.src = srcs[0];
+}
+
+// [V6.3b] Fallback berantai untuk <img> langsung: ikon lokal -> ikon online.
+function sipFotoImgErr_(img) {
+  try {
+    var s = String((img && img.src) || '');
+    if (s.indexOf('icon-pocong.jpg') === -1) { img.src = SIP_FOTO_DEFAULT_; return; }
+    img.onerror = null;
+    img.src = SIP_FOTO_DEFAULT_URL_;
+  } catch (eF) {}
 }
 
 // [V6.1] Ikon bawaan bagi user yang BELUM unggah/ganti foto profil (kecuali Admin)
@@ -5091,7 +5136,7 @@ function sipProfilPickFoto_(inp) {
     var q = 0.88;
     function finish(dataUrl, kb) {
       _sipProfilFotoPending = { dataUrl: dataUrl, name: 'foto-profil.jpg', type: 'image/jpeg' };
-      window._sipFotoLokal_ = dataUrl; // [V6.1b] cadangan tampilan selama URL Drive belum siap
+      sipFotoLokalSet_(dataUrl); // [V6.3b] simpan juga di perangkat (localStorage per UserID)
       sipSetSiswaFotoUI_(dataUrl);
       if (msg) msg.textContent = 'Foto dipaskan ke bingkai 3×4 (' + kb + ' KB). Menyimpan ke folder foto…';
       sipAutoSimpanFotoProfil_(msg);
@@ -5648,7 +5693,7 @@ function sipAdminUnggahFotoSiswa_(uid, pendingDataUrl) {
     html: '<div style="text-align:left">' +
       '<div style="display:flex;gap:14px;align-items:flex-start">' +
       '<div style="width:120px;height:160px;border-radius:12px;overflow:hidden;border:3px solid #e2e8f0;background:#f1f5f9;flex:0 0 auto">' +
-      '<img id="staf-foto-prev" src="' + fotoAwal + '" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:cover;object-position:center top" onerror="this.src=\'icon-pocong.jpg\'">' +
+      '<img id="staf-foto-prev" src="' + fotoAwal + '" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:cover;object-position:center top" onerror="sipFotoImgErr_(this)">' +
       '</div>' +
       '<div style="flex:1;min-width:0">' +
       '<label style="' + lbl + '">Nama Siswa</label>' +
@@ -21267,5 +21312,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5414a846914a027',t:'MTc5MzYwMzEyOQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5414a846914a027',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5506eae6e42603f',t:'MTc5Mzc2MTg5Ng=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5506eae6e42603f',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
