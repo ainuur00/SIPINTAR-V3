@@ -11569,6 +11569,7 @@ function aiDrafTampilkanUsulan_(res) {
       '<div class="border rounded-xl p-3 text-xs bg-slate-50 text-slate-600">' + esc(res.lama && res.lama.content) + '</div>' +
       '<p class="text-[11px] font-bold text-blue-600 uppercase">Usulan AI</p>' +
       '<p class="text-[10px] text-slate-400 -mt-1">' + (res.dariCache ? '<i class="fas fa-bolt mr-1"></i>Dari simpanan: instan' : '<i class="fas fa-stopwatch mr-1"></i>AI selesai dalam ' + (res.detik !== undefined ? res.detik : '?') + ' detik · batas ' + (res.batasDetik || 90) + ' detik') + '</p>' +
+      sipKotakAkurasiHitung_(res) +
       '<div class="border-2 border-blue-200 rounded-xl p-3 text-xs bg-blue-50 text-slate-700">' + esc(res.baru && res.baru.content) + '</div>' +
       optHtml +
       (res.baru && res.baru.correct ? '<p class="text-[11px] text-emerald-700 mt-1"><b>Kunci baru:</b> ' + String(JSON.stringify(res.baru.correct)).replace(/</g, '&lt;') + '</p>' : '') +
@@ -11700,6 +11701,13 @@ function renderQuestionBank(container) {
                      class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg transition flex items-center gap-2 transform active:scale-95"
                      title="Cek kenapa soal tidak muncul di siswa">
                         <i class="fas fa-stethoscope"></i> <span class="hidden sm:inline">Diagnosa</span>
+                    </button>
+
+                    <!-- [V7.2] AI Level Kognitif — tombol sama untuk Admin & Tim Pembuat Soal -->
+                    <button onclick="openAiLevelBank_()" id="btn-ai-level-bank"
+                     class="bg-violet-600 hover:bg-violet-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg transition flex items-center gap-2 transform active:scale-95"
+                     title="AI: perbaiki level kognitif soal pada mapel terpilih (maks 90 detik)">
+                        <i class="fas fa-wand-magic-sparkles"></i> <span class="hidden sm:inline">AI Level</span>
                     </button>
 
                     <!-- [BARU] Menu Fungsi SOAL ACAK per jenis soal -->
@@ -12678,6 +12686,9 @@ function loadQuestionsTable(examId) {
 }
 
 function applyGuruBankSoalMode_() {
+  // [V7.2] Tombol AI Level hanya untuk Admin & Tim Pembuat Soal.
+  const btnAi = document.getElementById('btn-ai-level-bank');
+  if (btnAi) btnAi.classList.toggle('hidden', !sipBolehAiLevel_());
   if (!(currentUser && currentUser.role === 'Guru')) return;
   const _pgw = (currentUser && currentUser.pengawas) || {};
   if (_pgw.izinBankSoal !== false) {
@@ -12831,11 +12842,11 @@ function renderQuestionsInternal() {
                 </div>
             </td>
             <td class="p-5 align-top w-24 text-right">
-                <div class="flex flex-col gap-2 items-end opacity-0 group-hover:opacity-100 transition-opacity">
+                <div class="flex flex-col gap-2 items-end opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                     <button onclick="editQuestionAt(${qIdx})" class="qb-edit-btn w-8 h-8 rounded flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-blue-50 border border-transparent hover:border-blue-100 transition-all" title="Edit Soal">
                         <i class="fas fa-pencil-alt text-sm"></i>
                     </button>
-                    ${(currentUser && (currentUser.role === 'Admin' || ((currentUser.pengawas || {}).izinBankSoal === true))) ? `<button onclick="aiLevelSoalAt(${qIdx})" class="w-8 h-8 rounded flex items-center justify-center text-slate-500 hover:text-violet-600 hover:bg-violet-50 border border-transparent hover:border-violet-100 transition-all" title="AI: Perbaiki Level Kognitif Soal">
+                    ${sipBolehAiLevel_() ? `<button onclick="aiLevelSoalAt(${qIdx})" class="w-8 h-8 rounded flex items-center justify-center text-slate-500 hover:text-violet-600 hover:bg-violet-50 border border-transparent hover:border-violet-100 transition-all" title="AI: Perbaiki Level Kognitif Soal">
                         <i class="fas fa-wand-magic-sparkles text-sm"></i>
                     </button>` : ''}
                     <button onclick="showQuestionPreviewAt(${qIdx})" class="w-8 h-8 rounded flex items-center justify-center text-slate-500 hover:text-teal-600 hover:bg-teal-50 border border-transparent hover:border-teal-100 transition-all" title="Preview Soal">
@@ -16860,14 +16871,78 @@ function sipAiLoading_(judul, sub) {
   }, (batas + 2) * 1000);
 }
 
-/* ===== [V5.9] AI PERBAIKAN LEVEL KOGNITIF SOAL (khusus Admin) ===== */
-function aiLevelSoalAt(idx, segar) {
-  const q = (filteredQuestions || [])[idx];
-  if (!q) { Swal.fire('Gagal', 'Data soal tidak ditemukan.', 'error'); return; }
-  if (!(currentUser && (currentUser.role === 'Admin' || ((currentUser.pengawas || {}).izinBankSoal === true)))) {
+/* ===== [V5.9] AI PERBAIKAN LEVEL KOGNITIF SOAL =====
+   [V7.2] Berlaku SAMA untuk Admin dan Guru yang ditunjuk sebagai Tim Pembuat
+   Soal. Satu sumber kebenaran: sipBolehAiLevel_(). */
+function sipBolehAiLevel_() {
+  return !!(currentUser && (currentUser.role === 'Admin' || ((currentUser.pengawas || {}).izinBankSoal === true)));
+}
+function sipAiLevelJudulPeran_() {
+  return (currentUser && currentUser.role === 'Admin') ? 'Admin' : 'Tim Pembuat Soal';
+}
+
+// Panel AI level dari tombol toolbar (sama untuk Admin & Tim Pembuat Soal).
+function openAiLevelBank_() {
+  if (!sipBolehAiLevel_()) {
     Swal.fire('Akses dibatasi', 'Perbaikan soal dengan AI hanya untuk Admin atau Guru Tim Pembuat Soal.', 'info');
     return;
   }
+  if (!(filteredQuestions || []).length) {
+    Swal.fire('Pilih mata pelajaran', 'Pilih mata pelajaran pada daftar di atas agar soal dapat diperbaiki dengan AI.', 'warning');
+    return;
+  }
+  const potong = function (v, n) {
+    const t = String(v == null ? '' : v).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    return t.length > n ? t.slice(0, n) + '…' : t;
+  };
+  const opsiSoal = (filteredQuestions || []).map(function (q, i) {
+    return '<option value="' + i + '">' + (i + 1) + '. [' + String(q.type || 'PG') + '] ' + potong(q.content, 60).replace(/</g, '&lt;') + '</option>';
+  }).join('');
+  Swal.fire({
+    title: 'Perbaiki Level Kognitif (AI)',
+    html:
+      '<div class="text-left space-y-3">' +
+      '<p class="text-xs text-slate-500">AI menulis ulang <b>deskripsi soal</b> agar mencapai level kognitif target. Tipe soal, Materi/Bab, bobot, dan jumlah soal <b>tidak berubah</b>. Hasil berupa usulan — Anda meninjau dulu sebelum diterapkan.</p>' +
+      '<p class="text-[11px] text-emerald-600"><i class="fas fa-bolt mr-1"></i>Batas maksimal <b>90 detik</b>; biasanya 5–20 detik. Soal &amp; level yang sama tidak diulang ke AI.</p>' +
+      '<p class="text-[11px] text-indigo-600"><i class="fas fa-square-root-variable mr-1"></i>Rumus, pangkat, akar, pecahan, dan satuan matematika/IPA dijaga tepat &amp; ditulis LaTeX.</p>' +
+      '<label class="block text-xs font-bold text-slate-600">Soal yang diperbaiki' +
+      '<select id="swal-ai-soal" class="mt-1 w-full border rounded-xl px-3 py-2 text-sm font-normal">' + opsiSoal + '</select></label>' +
+      '<label class="block text-xs font-bold text-slate-600">Level Kognitif Target' +
+      '<select id="swal-ai-level" class="mt-1 w-full border rounded-xl px-3 py-2 text-sm font-normal">' +
+      '<option value="C1">C1 — Mengingat</option>' +
+      '<option value="C2">C2 — Memahami</option>' +
+      '<option value="C3">C3 — Menerapkan</option>' +
+      '<option value="C4" selected>C4 — Menganalisis</option>' +
+      '<option value="C5">C5 — Mengevaluasi</option>' +
+      '<option value="C6">C6 — Mencipta</option>' +
+      '</select></label>' +
+      '<p class="text-[10px] text-slate-400">Peran Anda: <b>' + sipAiLevelJudulPeran_() + '</b>. Fitur ini sama persis dengan yang dipakai Admin.</p>' +
+      '</div>',
+    showCancelButton: true,
+    confirmButtonText: '<i class="fas fa-wand-magic-sparkles"></i> Buat Perbaikan',
+    cancelButtonText: 'Batal',
+    confirmButtonColor: '#7c3aed',
+    preConfirm: function () {
+      return {
+        idx: parseInt((document.getElementById('swal-ai-soal') || {}).value, 10) || 0,
+        level: (document.getElementById('swal-ai-level') || {}).value || 'C4'
+      };
+    }
+  }).then(function (r) {
+    if (!r.isConfirmed) return;
+    aiLevelSoalAt(r.value.idx, false, r.value.level);
+  });
+}
+
+function aiLevelSoalAt(idx, segar, levelPaksa) {
+  const q = (filteredQuestions || [])[idx];
+  if (!q) { Swal.fire('Gagal', 'Data soal tidak ditemukan.', 'error'); return; }
+  if (!sipBolehAiLevel_()) {
+    Swal.fire('Akses dibatasi', 'Perbaikan soal dengan AI hanya untuk Admin atau Guru Tim Pembuat Soal.', 'info');
+    return;
+  }
+  // [V7.2] Bila level sudah ditentukan (dari panel toolbar), langsung proses.
+  if (levelPaksa) { sipAiLevelJalan_(q, segar, levelPaksa); return; }
   Swal.fire({
     title: 'Perbaiki Level Kognitif (AI)',
     html:
@@ -16902,24 +16977,43 @@ function aiLevelSoalAt(idx, segar) {
     }
   }).then(function (r) {
     if (!r.isConfirmed) return;
-    sipAiLoading_('AI sedang memperbaiki soal...', 'Menyesuaikan rumusan ke level ' + r.value.level + ' tanpa mengubah tipe &amp; bab.');
-    google.script.run
-      .withSuccessHandler(function (res) {
-        sipAiLoadingStop_();
-        if (sipAiSudahKedaluwarsa_()) return;
-        if (!res || !res.success) {
-          Swal.fire(res && res.aiTimeout ? 'Melebihi batas waktu' : 'Gagal', (res && res.message) || 'AI tidak merespon.', res && res.aiTimeout ? 'warning' : 'error');
-          return;
-        }
-        aiLevelTampilkanUsulan_(res);
-      })
-      .withFailureHandler(function (err) {
-        sipAiLoadingStop_();
-        if (sipAiSudahKedaluwarsa_()) return;
-        Swal.fire('Error', (err && err.message) || String(err), 'error');
-      })
-      .perbaikiSoalLevelAI(q.id, r.value.level, r.value.prov, currentUser.userID, currentUser.token, { segar: !!segar });
+    sipAiLevelJalan_(q, segar, r.value.level, r.value.prov);
   });
+}
+
+// Satu jalur proses untuk Admin & Tim Pembuat Soal (hasil diusulkan dulu).
+function sipAiLevelJalan_(q, segar, level, prov) {
+  prov = prov || 'gemini';
+  sipAiLoading_('AI sedang memperbaiki soal...', 'Menyesuaikan rumusan ke level ' + level + ' tanpa mengubah tipe &amp; bab.');
+  google.script.run
+    .withSuccessHandler(function (res) {
+      sipAiLoadingStop_();
+      if (sipAiSudahKedaluwarsa_()) return;
+      if (!res || !res.success) {
+        Swal.fire(res && res.aiTimeout ? 'Melebihi batas waktu' : 'Gagal', (res && res.message) || 'AI tidak merespon.', res && res.aiTimeout ? 'warning' : 'error');
+        return;
+      }
+      aiLevelTampilkanUsulan_(res);
+    })
+    .withFailureHandler(function (err) {
+      sipAiLoadingStop_();
+      if (sipAiSudahKedaluwarsa_()) return;
+      Swal.fire('Error', (err && err.message) || String(err), 'error');
+    })
+    .perbaikiSoalLevelAI(q.id, level, prov, currentUser.userID, currentUser.token, { segar: !!segar });
+}
+
+// [V7.2] Kotak peringatan akurasi matematika/IPA pada usulan AI.
+function sipKotakAkurasiHitung_(res) {
+  const a = res && res.akurasi;
+  if (!a) return '';
+  if (a.ok) {
+    return '<p class="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2 py-1 mt-1">' +
+      '<i class="fas fa-square-root-variable mr-1"></i>Notasi matematika/IPA terperiksa: pangkat, akar, pecahan, dan simbol tertulis rapi (LaTeX).</p>';
+  }
+  const daftar = (a.masalah || []).map(function (m) { return '<li>' + String(m).replace(/</g, '&lt;') + '</li>'; }).join('');
+  return '<div class="text-[10px] text-amber-800 bg-amber-50 border border-amber-300 rounded-lg px-2 py-1 mt-1">' +
+    '<b><i class="fas fa-triangle-exclamation mr-1"></i>Periksa notasi hitung sebelum diterapkan:</b><ul class="list-disc list-inside">' + daftar + '</ul></div>';
 }
 
 function aiLevelTampilkanUsulan_(res) {
@@ -16943,6 +17037,7 @@ function aiLevelTampilkanUsulan_(res) {
       '<div class="border rounded-xl p-3 text-xs bg-slate-50 text-slate-600">' + esc(res.lama && res.lama.content) + '</div>' +
       '<p class="text-[11px] font-bold text-violet-600 uppercase">Soal baru (usulan AI)</p>' +
       '<p class="text-[10px] text-slate-400 -mt-1">' + (res.dariCache ? '<i class="fas fa-bolt mr-1"></i>Dari simpanan: instan (tidak memanggil AI lagi)' : '<i class="fas fa-stopwatch mr-1"></i>AI selesai dalam ' + (res.detik !== undefined ? res.detik : '?') + ' detik · batas ' + (res.batasDetik || 90) + ' detik') + '</p>' +
+      sipKotakAkurasiHitung_(res) +
       '<div class="border-2 border-violet-200 rounded-xl p-3 text-xs bg-violet-50 text-slate-700">' + esc(res.baru && res.baru.content) + '</div>' +
       optHtml +
       (res.baru && res.baru.correct ? '<p class="text-[11px] text-emerald-700 mt-1"><b>Kunci baru:</b> ' + String(JSON.stringify(res.baru.correct)).replace(/</g, '&lt;') + '</p>' : '') +
@@ -16967,7 +17062,17 @@ function aiLevelTampilkanUsulan_(res) {
     google.script.run
       .withSuccessHandler(function (ok) {
         if (ok && ok.success) {
-          Swal.fire({ icon: 'success', title: 'Diterapkan', text: ok.message, timer: 2200, showConfirmButton: false });
+          if (ok.akurasi && ok.akurasi.ok === false) {
+            Swal.fire({
+              icon: 'warning', title: 'Diterapkan — periksa notasi',
+              html: '<div class="text-left text-xs"><p>Soal sudah disimpan, tetapi ada catatan notasi hitung:</p><ul class="list-disc list-inside text-amber-700 mt-1">' +
+                (ok.akurasi.masalah || []).map(function (m) { return '<li>' + String(m).replace(/</g, '&lt;') + '</li>'; }).join('') +
+                '</ul><p class="mt-1 text-slate-500">Perbaiki lewat tombol Edit bila perlu.</p></div>',
+              confirmButtonText: 'Mengerti', confirmButtonColor: '#1b3a6b'
+            });
+          } else {
+            Swal.fire({ icon: 'success', title: 'Diterapkan', text: ok.message, timer: 2200, showConfirmButton: false });
+          }
           const eid = (document.getElementById('select-exam-q') || {}).value || (document.getElementById('input-exam-id') || {}).value;
           if (eid && typeof loadQuestionsTable === 'function') loadQuestionsTable(eid);
         } else {
@@ -22457,14 +22562,22 @@ function handleGenerateAI() {
 
   const btn = document.getElementById('btn-generate-ai');
   btn.disabled = true;
-  btn.innerHTML = opts.withImages
-    ? '<i class="fas fa-circle-notch fa-spin"></i> AI membuat soal + gambar... (bisa 2-5 menit)'
-    : '<i class="fas fa-circle-notch fa-spin"></i> AI sedang membuat soal...';
+  // [V7.2] AI Generator juga dibatasi 90 detik. Hitung waktu ditampilkan
+  // langsung pada tombol agar pengguna tahu proses berjalan.
+  const _t0Ai = Date.now();
+  const _tulisTombolAi = function (awalan) {
+    const d = Math.floor((Date.now() - _t0Ai) / 1000);
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> ' + awalan + ' ' + d + ' dtk · maks 90 dtk';
+  };
+  _tulisTombolAi('AI sedang membuat soal...');
+  if (window._aiGenTimer) clearInterval(window._aiGenTimer);
+  window._aiGenTimer = setInterval(function () { _tulisTombolAi('AI sedang membuat soal...'); }, 1000);
 
   const wantImages = opts.withImages;
   opts.withImages = false; // tahap 1: soal teks dulu (anti timeout)
 
   const finishPreview = function(res, imageCount) {
+    if (window._aiGenTimer) { clearInterval(window._aiGenTimer); window._aiGenTimer = null; }
     btn.disabled = false;
     btn.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Generate Soal';
     _aiGeneratedQuestions = res.questions || [];
@@ -22483,12 +22596,24 @@ function handleGenerateAI() {
   google.script.run
     .withSuccessHandler(res => {
       if (!res || !res.success) {
+        if (window._aiGenTimer) { clearInterval(window._aiGenTimer); window._aiGenTimer = null; }
         btn.disabled = false;
         btn.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Generate Soal';
-        Swal.fire('Gagal', (res && res.message) ? res.message : 'Tidak ada respon dari server.', 'error');
+        Swal.fire(res && res.aiTimeout ? 'Melebihi batas waktu' : 'Gagal', (res && res.message) ? res.message : 'Tidak ada respon dari server.', res && res.aiTimeout ? 'warning' : 'error');
         return;
       }
       const questions = res.questions || [];
+      // [V7.2] Bila batas 90 detik tercapai, sampaikan apa adanya (hasil sebagian).
+      if (res.dibatasi) {
+        try {
+          Swal.fire({
+            icon: 'info', title: 'Selesai sebagian',
+            html: '<div class="text-left text-xs"><p>Batas <b>90 detik</b> tercapai: <b>' + (res.count || questions.length) + '</b> dari <b>' + (res.diminta || '?') + '</b> soal selesai dibuat.</p>' +
+              '<p class="mt-1 text-slate-500">Soal yang sudah jadi tetap bisa disimpan. Untuk sisanya, tekan Generate lagi dengan jumlah lebih kecil.</p></div>',
+            confirmButtonText: 'Mengerti', confirmButtonColor: '#1b3a6b'
+          });
+        } catch (eS) {}
+      }
       if (!wantImages || provider !== 'gemini' || !questions.length) {
         finishPreview(res, 0);
         return;
@@ -22504,6 +22629,7 @@ function handleGenerateAI() {
       });
     })
     .withFailureHandler(err => {
+      if (window._aiGenTimer) { clearInterval(window._aiGenTimer); window._aiGenTimer = null; }
       btn.disabled = false;
       btn.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Generate Soal';
       Swal.fire('Error', 'Koneksi ke server gagal: ' + (err.message || err), 'error');
@@ -24682,5 +24808,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a58bc393bccb3fbc',t:'MTc5NDM4NDAzMw=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a58bc393bccb3fbc',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a58bd40aebcbfe09',t:'MTc5NDM4NDcwOA=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a58bd40aebcbfe09',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
