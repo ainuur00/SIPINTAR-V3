@@ -1897,6 +1897,9 @@
               <div id="menu-akademik" class="sidebar-item" onclick="showAdminTab('dash-akademik', this)">
                 <i class="fas fa-calendar-days"></i> <span class="sidebar-text font-medium">Tahun Ajaran &amp; Mapel</span>
               </div>
+              <div id="menu-buknilai" class="sidebar-item" onclick="showAdminTab('dash-buknilai', this)">
+                <i class="fas fa-clipboard-list"></i> <span class="sidebar-text font-medium">Buku Nilai</span>
+              </div>
             </div>
           </div>
 
@@ -2925,7 +2928,7 @@ function initAdminPanel() {
   const guruAllowedMenus = ['menu-home', 'menu-profil-guru', 'menu-pgw-ujian', 'menu-pgw-koreksi', 'menu-questions', 'menu-materibab', 'menu-exams', 'menu-sesi-bagi', 'menu-results', 'menu-profil', 'menu-kartu', 'menu-hadir', 'menu-users', 'menu-images'];
   const adminOnlyMenus = ['menu-questions', 'menu-kisi', 'menu-ai-generator', 'menu-hermes',
     'menu-report-template', 'menu-users', 'menu-profil', 'menu-kartu', 'menu-hadir',
-    'menu-images', 'menu-music', 'menu-config', 'menu-akademik',
+    'menu-images', 'menu-music', 'menu-config', 'menu-akademik', 'menu-buknilai',
     'menu-master-data', 'menu-pengawas', 'menu-timsoal', 'menu-panitia', 'menu-exams', 'menu-sesi-bagi', 'menu-results',
     'menu-pgw-ujian', 'menu-pgw-koreksi'];
   const guruOnlyMenus = ['menu-pgw-ujian', 'menu-pgw-koreksi'];
@@ -2975,6 +2978,10 @@ function initAdminPanel() {
     // [V6.4] Modul Akademik: KHUSUS Admin — guru (apa pun izinnya) tidak melihatnya
     const elModAkad = document.getElementById('mod-akademik');
     if (elModAkad) elModAkad.classList.add('hidden');
+    // [V6.5] Buku Nilai: guru PENGAMPU tetap dapat membuka menunya. Modul
+    // dibuka kembali HANYA untuk menampung menu Buku Nilai; menu "Tahun
+    // Ajaran &amp; Mapel" tetap khusus Admin (ditutup lagi di fungsi ini).
+    try { sipBukuNilaiCekMenuGuru_(); } catch (eBnMenu) {}
   } else {
     adminOnlyMenus.forEach(id => {
       const el = document.getElementById(id);
@@ -4082,7 +4089,9 @@ function showAdminTab(tabId, el) {
   if (currentUser && currentUser.role === 'Guru') {
     // [PENGAWAS] Guru hanya boleh: Dashboard, Jadwal Ujian, Bank Soal, Hasil & Nilai
     const _pgwIzinTab = (currentUser && currentUser.pengawas) || {};
-    const allowedGuruTabs = ['dash-home', 'dash-profil-guru'];
+    // [V6.5] Buku Nilai untuk guru PENGAMPU (server tetap membatasi: guru
+    // hanya menerima baris nilai mapel & kelas yang diampu).
+    const allowedGuruTabs = ['dash-home', 'dash-profil-guru', 'dash-buknilai'];
     // [V3] Izin harus EKSPLISIT true dari penunjukan Admin
     // [V6.2] PENGAWAS: hanya pantau lewat Monitor Ujian (Manajemen User)
     if (_pgwIzinTab.izinUjian === true) allowedGuruTabs.push('dash-users');
@@ -4212,6 +4221,10 @@ function showAdminTab(tabId, el) {
   } else if (tabId === 'dash-akademik') {
     title.innerText = 'Akademik — Tahun Ajaran & Mata Pelajaran';
     renderAkademikPage(content);
+
+  } else if (tabId === 'dash-buknilai') {
+    title.innerText = 'Buku Nilai';
+    renderBukuNilaiPage(content);
 
   } else if (tabId === 'dash-master-data') {
     title.innerText = 'Data Master';
@@ -4556,7 +4569,9 @@ function renderSiswaNilai_() {
           '<div class="w-14 h-14 mx-auto mb-3 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-300"><i class="fas fa-chart-line text-xl"></i></div>' +
           '<h2 class="font-bold text-slate-800">Nilai & Hasil Belajar</h2>' +
           '<p class="text-sm text-slate-500 mt-2">Belum ada data. Halaman ini hanya tampil setelah kamu mengerjakan ujian.</p>' +
-          '</div>';
+          '</div>' +
+          '<div id="siswa-buku-nilai" class="mt-6"></div>';
+        sipBukuNilaiSiswaMuat_(); // [V6.5] kartu Buku Nilai Saya (kosong = tanpa kartu)
         return;
       }
       const cards = items.map(function (it) {
@@ -4581,7 +4596,9 @@ function renderSiswaNilai_() {
       box.innerHTML = '<div class="space-y-5 max-w-xl mx-auto">' +
         '<div class="text-center sm:text-left"><h2 class="font-bold text-slate-800 text-lg">Nilai & Hasil Belajar</h2>' +
         '<p class="text-xs text-slate-400">Hanya ujian yang sudah kamu kerjakan.</p></div>' +
-        cards + '</div>';
+        cards + '</div>' +
+        '<div id="siswa-buku-nilai" class="mt-6"></div>'; // [V6.5] Buku Nilai Saya
+      sipBukuNilaiSiswaMuat_();
 
     })
     .withFailureHandler(function () {
@@ -6431,6 +6448,350 @@ function sipKategoriLabel_(k) {
 
 var _akademikData = null;
 var _akadMpMode = 'tambah'; // 'tambah' | 'ubah'
+
+/* ===========================================================================
+   [V6.5] BUKU NILAI — nilai per siswa x mapel x kategori
+   Sumber nilai: UJIAN (otomatis dari Responses) + MANUAL (input Admin/Guru
+   pengampu). Nilai manual menimpa nilai ujian pada kategori yang sama.
+   Admin: semua mapel & kelas. Guru: hanya mapel & kelas yang diampu.
+   =========================================================================== */
+var _bukuNilaiData = null;
+var _bnUbah = null; // { id, siswaID, kodeMapel, kategori } saat menimpa/mengubah
+
+function sipBnKatWarna_(k) {
+  var m = {
+    SUMATIF: 'bg-indigo-50 text-indigo-700 border-indigo-100',
+    STS: 'bg-sky-50 text-sky-700 border-sky-100',
+    SAS: 'bg-violet-50 text-violet-700 border-violet-100',
+    SELEKSI: 'bg-amber-50 text-amber-700 border-amber-100',
+    LATIHAN: 'bg-teal-50 text-teal-700 border-teal-100'
+  };
+  return m[String(k || '').toUpperCase()] || m.SUMATIF;
+}
+
+function renderBukuNilaiPage(container) {
+  _bnUbah = null;
+  var eh = escapeHtmlProfil_;
+  container.innerHTML =
+    '<div class="fade-in w-full space-y-6">' +
+      '<div class="dash-card p-6">' +
+        '<div class="flex items-start justify-between gap-3 flex-wrap">' +
+          '<div class="flex items-center gap-3">' +
+            '<div class="w-10 h-10 rounded-lg bg-indigo-600 flex items-center justify-center text-white shadow-md"><i class="fas fa-clipboard-list"></i></div>' +
+            '<div><h2 class="text-xl font-bold text-slate-800 tracking-tight">Buku Nilai</h2>' +
+            '<p class="text-slate-500 text-sm">Nilai ujian masuk otomatis; nilai praktik/tugas dapat diinput manual.</p></div>' +
+          '</div>' +
+          '<div id="bn-ta" class="text-xs font-bold text-indigo-700"></div>' +
+        '</div>' +
+        '<div id="bn-ringkas" class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4"></div>' +
+      '</div>' +
+      '<div class="dash-card p-5">' +
+        '<div class="flex flex-wrap gap-2 items-end">' +
+          '<div class="min-w-[170px]"><label class="text-[10px] font-bold text-slate-500 uppercase">Mata Pelajaran</label>' +
+            '<select id="bn-f-mapel" onchange="sipBukuNilaiMuat_()" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white"><option value="">Semua mapel</option></select></div>' +
+          '<div class="min-w-[120px]"><label class="text-[10px] font-bold text-slate-500 uppercase">Kelas</label>' +
+            '<select id="bn-f-kelas" onchange="sipBukuNilaiMuat_()" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white"><option value="">Semua kelas</option></select></div>' +
+          '<div class="min-w-[130px]"><label class="text-[10px] font-bold text-slate-500 uppercase">Kategori</label>' +
+            '<select id="bn-f-kat" onchange="sipBukuNilaiMuat_()" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white"><option value="">Semua kategori</option></select></div>' +
+          '<div class="flex-1 min-w-[160px]"><label class="text-[10px] font-bold text-slate-500 uppercase">Cari siswa</label>' +
+            '<input id="bn-f-q" onkeydown="if(event.key===\'Enter\'){sipBukuNilaiMuat_();}" placeholder="Nama siswa\u2026" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"></div>' +
+          '<button type="button" onclick="sipBnFormBuka_()" class="px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700"><i class="fas fa-plus mr-1"></i>Input Nilai Manual</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="dash-card p-5 hidden" id="bn-form-card">' +
+        '<div class="flex items-center justify-between mb-3">' +
+          '<h3 class="font-bold text-slate-800 text-sm"><i class="fas fa-pen-to-square text-indigo-500 mr-2"></i><span id="bn-form-judul">Input Nilai Manual</span></h3>' +
+          '<button type="button" onclick="sipBnFormTutup_()" class="text-slate-400 hover:text-rose-500"><i class="fas fa-xmark"></i></button>' +
+        '</div>' +
+        '<p id="bn-form-info" class="text-[11px] text-slate-400 mb-3">Nilai manual <b>menimpa</b> nilai ujian pada kategori &amp; mapel yang sama.</p>' +
+        '<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">' +
+          '<div class="lg:col-span-2"><label class="text-[10px] font-bold text-slate-500 uppercase">Siswa</label><select id="bn-i-siswa" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white"></select></div>' +
+          '<div><label class="text-[10px] font-bold text-slate-500 uppercase">Mapel</label><select id="bn-i-mapel" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white"></select></div>' +
+          '<div><label class="text-[10px] font-bold text-slate-500 uppercase">Kategori</label><select id="bn-i-kat" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white"><option value="SUMATIF">Sumatif</option><option value="STS">STS</option><option value="SAS">SAS</option><option value="LATIHAN">Latihan</option><option value="SELEKSI">Seleksi</option></select></div>' +
+          '<div><label class="text-[10px] font-bold text-slate-500 uppercase">Nilai</label><input id="bn-i-nilai" type="number" min="0" max="100" step="0.01" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"></div>' +
+          '<div><label class="text-[10px] font-bold text-slate-500 uppercase">Keterangan</label><input id="bn-i-ket" maxlength="200" placeholder="mis. Praktik bab 3" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"></div>' +
+        '</div>' +
+        '<div class="flex gap-2 mt-4">' +
+          '<button type="button" onclick="sipBnSimpan_()" class="px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700"><i class="fas fa-save mr-1"></i>Simpan Nilai</button>' +
+          '<button type="button" onclick="sipBnFormTutup_()" class="px-4 py-2 rounded-lg bg-slate-100 text-slate-600 text-xs font-bold">Batal</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="dash-card p-5">' +
+        '<div class="overflow-x-auto"><table class="w-full text-sm">' +
+          '<thead><tr class="text-left text-[10px] uppercase text-slate-400 border-b">' +
+            '<th class="py-2">Siswa</th><th>Kelas</th><th>Mapel</th><th>Kategori</th><th>Sumber</th>' +
+            '<th class="text-center">Nilai</th><th class="text-center">KKTP</th><th>Status</th><th>Keterangan</th><th class="text-right">Aksi</th>' +
+          '</tr></thead>' +
+          '<tbody id="bn-list"><tr><td colspan="10" class="py-6 text-center text-slate-400 text-xs">Memuat\u2026</td></tr></tbody>' +
+        '</table></div>' +
+      '</div>' +
+    '</div>';
+  sipBukuNilaiMuat_();
+}
+
+function sipBnFilter_() {
+  function val(id) { var el = document.getElementById(id); return el ? el.value : ''; }
+  return { kodeMapel: val('bn-f-mapel'), kelas: val('bn-f-kelas'), kategori: val('bn-f-kat'), q: val('bn-f-q') };
+}
+
+function sipBukuNilaiMuat_() {
+  if (!currentUser) return;
+  var body = document.getElementById('bn-list');
+  if (body) body.innerHTML = '<tr><td colspan="10" class="py-6 text-center text-slate-400 text-xs"><i class="fas fa-circle-notch fa-spin mr-1"></i>Memuat nilai\u2026</td></tr>';
+  google.script.run
+    .withSuccessHandler(function (d) { _bukuNilaiData = d || {}; sipBukuNilaiIsi_(); })
+    .withFailureHandler(function (e) {
+      if (body) body.innerHTML = '<tr><td colspan="10" class="py-6 text-center text-rose-500 text-xs">Gagal memuat: ' + escapeHtmlProfil_(String((e && e.message) || e)) + '</td></tr>';
+    })
+    .getBukuNilaiData(sipBnFilter_(), currentUser.userID, currentUser.token);
+}
+
+function sipBnJagaOpsi_(id, opsi, nilaiLama) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = opsi;
+  if (nilaiLama) {
+    for (var i = 0; i < el.options.length; i++) {
+      if (el.options[i].value === nilaiLama) { el.selectedIndex = i; return; }
+    }
+  }
+}
+
+function sipBukuNilaiIsi_() {
+  var d = _bukuNilaiData || {};
+  var eh = escapeHtmlProfil_;
+  var ta = document.getElementById('bn-ta');
+  if (ta) ta.innerHTML = d.tahunAktif
+    ? '<i class="fas fa-calendar-check mr-1"></i>TA ' + eh(d.tahunAktif)
+    : '<span class="text-amber-600"><i class="fas fa-triangle-exclamation mr-1"></i>Belum ada tahun ajaran aktif</span>';
+
+  // ── Ringkasan ────────────────────────────────────────────────
+  var r = d.ringkasan || {};
+  var rg = document.getElementById('bn-ringkas');
+  if (rg) {
+    function chip(label, nilai, warna) {
+      return '<div class="rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2">' +
+        '<p class="text-[9px] uppercase font-bold text-slate-400 tracking-wider">' + label + '</p>' +
+        '<p class="text-lg font-black ' + warna + '">' + eh(nilai) + '</p></div>';
+    }
+    rg.innerHTML = chip('Nilai tercatat', r.jumlah || 0, 'text-slate-800') +
+      chip('Rata-rata', r.rata2 || 0, 'text-indigo-700') +
+      chip('Tuntas', r.tuntas || 0, 'text-emerald-600') +
+      chip('Belum tuntas', r.belum || 0, 'text-rose-600');
+  }
+
+  // ── Isi dropdown filter (nilai pilihan lama dipertahankan) ────
+  var fM = document.getElementById('bn-f-mapel');
+  if (fM) {
+    var lamaM = fM.value;
+    var isiM = '<option value="">Semua mapel</option>' + (d.mapelList || []).map(function (m) {
+      return '<option value="' + eh(m.kode) + '">' + eh(m.nama) + '</option>';
+    }).join('');
+    sipBnJagaOpsi_('bn-f-mapel', isiM, lamaM);
+  }
+  var fK = document.getElementById('bn-f-kelas');
+  if (fK) {
+    var lamaK = fK.value;
+    sipBnJagaOpsi_('bn-f-kelas', '<option value="">Semua kelas</option>' + (d.kelasList || []).map(function (k) {
+      return '<option value="' + eh(k) + '">' + eh(k) + '</option>';
+    }).join(''), lamaK);
+  }
+  var fKat = document.getElementById('bn-f-kat');
+  if (fKat) {
+    var lamaKat = fKat.value;
+    sipBnJagaOpsi_('bn-f-kat', '<option value="">Semua kategori</option>' + (d.kategoriList || []).map(function (k) {
+      return '<option value="' + eh(k) + '">' + eh(sipKategoriLabel_(k)) + '</option>';
+    }).join(''), lamaKat);
+  }
+
+  // ── Dropdown form input ─────────────────────────────────────
+  if (document.getElementById('bn-i-siswa')) {
+    var lamaS = (document.getElementById('bn-i-siswa') || {}).value || '';
+    sipBnJagaOpsi_('bn-i-siswa', '<option value="">-- Pilih siswa --</option>' + (d.siswaList || []).map(function (s) {
+      return '<option value="' + eh(s.userID) + '">' + eh(s.nama) + ' (' + eh(s.kelas) + ')</option>';
+    }).join(''), lamaS);
+  }
+  if (document.getElementById('bn-i-mapel')) {
+    var lamaMp = (document.getElementById('bn-i-mapel') || {}).value || '';
+    sipBnJagaOpsi_('bn-i-mapel', '<option value="">-- Mapel --</option>' + (d.mapelList || []).map(function (m) {
+      return '<option value="' + eh(m.kode) + '">' + eh(m.nama) + '</option>';
+    }).join(''), lamaMp);
+  }
+
+  // ── Tabel nilai ─────────────────────────────────────────────
+  var body = document.getElementById('bn-list');
+  if (!body) return;
+  var rows = d.rows || [];
+  if (!rows.length) {
+    var pesan = (d.mode === 'guru' && !(d.mapelList || []).length)
+      ? 'Anda belum ditugaskan sebagai <b>Guru Pengampu</b> pada tahun ajaran aktif. Hubungi Admin untuk penugasan mapel &amp; kelas.'
+      : 'Belum ada nilai pada filter ini. Nilai otomatis muncul setelah siswa menyelesaikan ujian.';
+    body.innerHTML = '<tr><td colspan="10" class="py-8 text-center text-slate-400 text-xs">' + pesan + '</td></tr>';
+    return;
+  }
+  body.innerHTML = rows.map(function (x, i) {
+    var tuntas = x.nilai >= (x.kktp || 0);
+    var badgeKat = '<span class="text-[10px] font-bold px-2 py-0.5 rounded border ' + sipBnKatWarna_(x.kategori) + '">' + escapeHtmlProfil_(sipKategoriLabel_(x.kategori)) + '</span>';
+    var badgeSumber = x.sumber === 'MANUAL'
+      ? '<span class="text-[10px] font-bold px-2 py-0.5 rounded border bg-amber-50 text-amber-700 border-amber-100"><i class="fas fa-pen mr-1"></i>Manual</span>'
+      : '<span class="text-[10px] font-bold px-2 py-0.5 rounded border bg-slate-100 text-slate-600 border-slate-200"><i class="fas fa-robot mr-1"></i>Ujian</span>';
+    var status = tuntas
+      ? '<span class="text-[10px] font-bold text-emerald-600">Tuntas</span>'
+      : '<span class="text-[10px] font-bold text-rose-500">Belum</span>';
+    var aksi = '<button type="button" onclick="sipBnFormBuka_(' + i + ')" class="text-[11px] font-bold text-indigo-600 hover:underline mr-3">' +
+      (x.sumber === 'MANUAL' ? 'Ubah' : 'Timpa') + '</button>' +
+      (x.sumber === 'MANUAL' ? '<button type="button" onclick="sipBnHapus_(\'' + escapeHtmlProfil_(x.id) + '\')" class="text-[11px] font-bold text-rose-500 hover:underline">Hapus</button>' : '');
+    return '<tr class="border-b border-slate-50 hover:bg-slate-50/60">' +
+      '<td class="py-2 font-medium text-slate-700">' + escapeHtmlProfil_(x.siswa || x.userID) + '</td>' +
+      '<td class="text-xs text-slate-500">' + escapeHtmlProfil_(x.kelas || '-') + '</td>' +
+      '<td class="text-xs text-slate-600">' + escapeHtmlProfil_(x.namaMapel || x.kodeMapel || '-') + '</td>' +
+      '<td>' + badgeKat + '</td>' +
+      '<td>' + badgeSumber + '</td>' +
+      '<td class="text-center font-black ' + (tuntas ? 'text-emerald-600' : 'text-rose-600') + '">' + escapeHtmlProfil_(x.nilai) + '</td>' +
+      '<td class="text-center text-xs text-slate-500">' + escapeHtmlProfil_(x.kktp || 0) + '</td>' +
+      '<td>' + status + '</td>' +
+      '<td class="text-xs text-slate-400 max-w-[170px] truncate" title="' + escapeHtmlProfil_(x.keterangan || '') + '">' + escapeHtmlProfil_(x.keterangan || '\u2014') + '</td>' +
+      '<td class="text-right whitespace-nowrap">' + aksi + '</td></tr>';
+  }).join('');
+}
+
+function sipBnFormBuka_(idx) {
+  var card = document.getElementById('bn-form-card');
+  if (!card) return;
+  card.classList.remove('hidden');
+  var d = _bukuNilaiData || {};
+  var judul = document.getElementById('bn-form-judul');
+  var info = document.getElementById('bn-form-info');
+  _bnUbah = null;
+  if (idx === undefined || idx === null || idx === '') {
+    if (judul) judul.textContent = 'Input Nilai Manual';
+    if (info) info.innerHTML = 'Nilai manual <b>menimpa</b> nilai ujian pada kategori &amp; mapel yang sama.';
+    var s0 = document.getElementById('bn-i-siswa'); if (s0) s0.value = '';
+    var m0 = document.getElementById('bn-i-mapel'); if (m0) m0.value = '';
+    var k0 = document.getElementById('bn-i-kat'); if (k0) k0.value = 'SUMATIF';
+    var n0 = document.getElementById('bn-i-nilai'); if (n0) n0.value = '';
+    var t0 = document.getElementById('bn-i-ket'); if (t0) t0.value = '';
+  } else {
+    var x = (d.rows || [])[idx];
+    if (!x) return;
+    _bnUbah = { id: x.id || '', siswaID: x.userID, kodeMapel: x.kodeMapel, kategori: x.kategori };
+    if (judul) judul.textContent = x.sumber === 'MANUAL' ? 'Ubah Nilai Manual' : 'Timpa Nilai Ujian dengan Nilai Manual';
+    if (info) info.innerHTML = 'Untuk <b>' + escapeHtmlProfil_(x.siswa) + '</b> \u2014 ' + escapeHtmlProfil_(x.namaMapel) + ' (' + escapeHtmlProfil_(sipKategoriLabel_(x.kategori)) + '). Menyimpan akan membuat/mengganti nilai manual pada kategori ini.';
+    var s1 = document.getElementById('bn-i-siswa'); if (s1) s1.value = x.userID;
+    var m1 = document.getElementById('bn-i-mapel'); if (m1) m1.value = x.kodeMapel;
+    var k1 = document.getElementById('bn-i-kat'); if (k1) k1.value = String(x.kategori || 'SUMATIF');
+    var n1 = document.getElementById('bn-i-nilai'); if (n1) n1.value = (x.sumber === 'MANUAL' ? x.nilai : '');
+    var t1 = document.getElementById('bn-i-ket'); if (t1) t1.value = x.keterangan || '';
+  }
+  try { card.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (eScr) {}
+}
+
+function sipBnFormTutup_() {
+  var card = document.getElementById('bn-form-card');
+  if (card) card.classList.add('hidden');
+  _bnUbah = null;
+}
+
+function sipBnSimpan_() {
+  function val(id) { var el = document.getElementById(id); return el ? el.value : ''; }
+  var siswaID = _bnUbah && _bnUbah.siswaID ? _bnUbah.siswaID : val('bn-i-siswa');
+  var kode = _bnUbah && _bnUbah.kodeMapel ? _bnUbah.kodeMapel : val('bn-i-mapel');
+  var kat = _bnUbah && _bnUbah.kategori ? _bnUbah.kategori : val('bn-i-kat');
+  var nilai = val('bn-i-nilai');
+  if (!siswaID) { Swal.fire('Belum lengkap', 'Pilih siswa terlebih dahulu.', 'warning'); return; }
+  if (!kode) { Swal.fire('Belum lengkap', 'Pilih mata pelajaran terlebih dahulu.', 'warning'); return; }
+  if (nilai === '' || isNaN(parseFloat(nilai)) || parseFloat(nilai) < 0 || parseFloat(nilai) > 100) {
+    Swal.fire('Nilai tidak valid', 'Nilai harus angka 0-100.', 'warning'); return;
+  }
+  var payload = { aksi: 'simpan', siswaID: siswaID, kodeMapel: kode, kategori: kat, nilai: nilai, keterangan: val('bn-i-ket') };
+  sipBnKirim_(payload, function (res) {
+    sipBnFormTutup_();
+    if (typeof Swal !== 'undefined') Swal.fire({ title: 'Tersimpan', text: 'Nilai ' + escapeHtmlProfil_(payload.nilai) + ' tersimpan.', icon: 'success', timer: 1400, showConfirmButton: false });
+  });
+}
+
+function sipBnHapus_(id) {
+  Swal.fire({
+    title: 'Hapus nilai manual ini?', text: 'Nilai ujian (bila ada) akan tampil kembali.',
+    icon: 'warning', showCancelButton: true, confirmButtonText: 'Ya, hapus', cancelButtonText: 'Batal', confirmButtonColor: '#e11d48'
+  }).then(function (r) {
+    if (!r.isConfirmed) return;
+    sipBnKirim_({ aksi: 'hapus', id: id }, function () {});
+  });
+}
+
+function sipBnKirim_(payload, lanjut) {
+  document.getElementById('global-loading').classList.remove('hidden');
+  google.script.run
+    .withSuccessHandler(function (res) {
+      document.getElementById('global-loading').classList.add('hidden');
+      if (res && res.success) { sipBukuNilaiMuat_(); if (lanjut) lanjut(res); }
+      else { Swal.fire('Gagal', (res && res.message) || 'Terjadi kesalahan.', 'warning'); }
+    })
+    .withFailureHandler(function (e) {
+      document.getElementById('global-loading').classList.add('hidden');
+      Swal.fire('Gagal', String((e && e.message) || e), 'error');
+    })
+    .simpanNilaiManual(payload, currentUser.userID, currentUser.token);
+}
+
+// [V6.5] Guru pengampu: buka Modul Akademik hanya untuk menu Buku Nilai.
+// Menu "Tahun Ajaran & Mapel" (menu-akademik) TETAP tersembunyi — khusus Admin.
+function sipBukuNilaiCekMenuGuru_() {
+  if (!currentUser || currentUser.role !== 'Guru') return;
+  google.script.run
+    .withSuccessHandler(function (res) {
+      var ada = !!(res && res.daftar && res.daftar.length);
+      window._sipGuruAdaAmpuan_ = ada;
+      var elMenu = document.getElementById('menu-buknilai');
+      if (elMenu) elMenu.classList.toggle('hidden', !ada);
+      var elMod = document.getElementById('mod-akademik');
+      if (elMod) elMod.classList.toggle('hidden', !ada);
+      var elAkad = document.getElementById('menu-akademik');
+      if (elAkad) elAkad.classList.add('hidden'); // tetap khusus Admin
+    })
+    .withFailureHandler(function () {})
+    .getMapelAmpuSaya(currentUser.userID, currentUser.token);
+}
+
+// [V6.5] Kartu "Buku Nilai Saya" untuk siswa (di halaman Nilai & Hasil Belajar)
+function sipBukuNilaiSiswaMuat_() {
+  if (!currentUser || currentUser.role !== 'Siswa') return;
+  var el = document.getElementById('siswa-buku-nilai');
+  if (!el) return;
+  google.script.run
+    .withSuccessHandler(function (d) {
+      var box = document.getElementById('siswa-buku-nilai');
+      if (!box) return;
+      var rows = (d && d.rows) || [];
+      if (!rows.length) { box.innerHTML = ''; return; } // kosong = tanpa kartu
+      var eh = escapeHtmlProfil_;
+      var rk = (d && d.ringkasan) || {};
+      var baris = rows.map(function (x) {
+        var tuntas = x.nilai >= (x.kktp || 0);
+        return '<tr class="border-b border-slate-50">' +
+          '<td class="py-2 text-slate-700 font-medium">' + eh(x.namaMapel || x.kodeMapel) + '</td>' +
+          '<td><span class="text-[10px] font-bold px-2 py-0.5 rounded border ' + sipBnKatWarna_(x.kategori) + '">' + eh(sipKategoriLabel_(x.kategori)) + '</span></td>' +
+          '<td class="text-center font-black ' + (tuntas ? 'text-emerald-600' : 'text-rose-600') + '">' + eh(x.nilai) + '</td>' +
+          '<td class="text-center text-xs text-slate-500">' + eh(x.kktp || 0) + '</td>' +
+          '<td class="text-[11px] font-bold ' + (tuntas ? 'text-emerald-600' : 'text-rose-500') + '">' + (tuntas ? 'Tuntas' : 'Belum tuntas') + '</td>' +
+          '<td class="text-xs text-slate-400">' + eh(x.keterangan || '\u2014') + '</td></tr>';
+      }).join('');
+      box.innerHTML =
+        '<div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-5">' +
+          '<div class="flex items-center justify-between gap-2 flex-wrap mb-3">' +
+            '<div><h2 class="font-bold text-slate-800 text-lg">Buku Nilai Saya</h2>' +
+            '<p class="text-xs text-slate-400">' + eh(d.tahunAktif || '') + ' \u00b7 rata-rata <b>' + eh(rk.rata2 || 0) + '</b> \u00b7 tuntas ' + eh(rk.tuntas || 0) + ' dari ' + eh(rk.jumlah || 0) + '</p></div>' +
+            '<span class="text-[10px] font-bold px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100"><i class="fas fa-clipboard-list mr-1"></i>Buku Nilai</span>' +
+          '</div>' +
+          '<div class="overflow-x-auto"><table class="w-full text-sm">' +
+            '<thead><tr class="text-left text-[10px] uppercase text-slate-400 border-b"><th class="py-2">Mapel</th><th>Kategori</th><th class="text-center">Nilai</th><th class="text-center">KKTP</th><th>Status</th><th>Keterangan</th></tr></thead>' +
+            '<tbody>' + baris + '</tbody></table></div>' +
+        '</div>';
+    })
+    .withFailureHandler(function () {})
+    .getBukuNilaiSiswa(currentUser.userID, currentUser.token);
+}
 
 function renderAkademikPage(container) {
   _akadMpMode = 'tambah';
@@ -21565,5 +21926,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5893e295fddce79',t:'MTc5NDM1NzU5Nw=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5893e295fddce79',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
