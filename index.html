@@ -1900,6 +1900,9 @@
               <div id="menu-buknilai" class="sidebar-item" onclick="showAdminTab('dash-buknilai', this)">
                 <i class="fas fa-clipboard-list"></i> <span class="sidebar-text font-medium">Buku Nilai</span>
               </div>
+              <div id="menu-rapor" class="sidebar-item" onclick="showAdminTab('dash-rapor', this)">
+                <i class="fas fa-file-lines"></i> <span class="sidebar-text font-medium">Rekap Rapor</span>
+              </div>
             </div>
           </div>
 
@@ -2928,7 +2931,7 @@ function initAdminPanel() {
   const guruAllowedMenus = ['menu-home', 'menu-profil-guru', 'menu-pgw-ujian', 'menu-pgw-koreksi', 'menu-questions', 'menu-materibab', 'menu-exams', 'menu-sesi-bagi', 'menu-results', 'menu-profil', 'menu-kartu', 'menu-hadir', 'menu-users', 'menu-images'];
   const adminOnlyMenus = ['menu-questions', 'menu-kisi', 'menu-ai-generator', 'menu-hermes',
     'menu-report-template', 'menu-users', 'menu-profil', 'menu-kartu', 'menu-hadir',
-    'menu-images', 'menu-music', 'menu-config', 'menu-akademik', 'menu-buknilai',
+    'menu-images', 'menu-music', 'menu-config', 'menu-akademik', 'menu-buknilai', 'menu-rapor',
     'menu-master-data', 'menu-pengawas', 'menu-timsoal', 'menu-panitia', 'menu-exams', 'menu-sesi-bagi', 'menu-results',
     'menu-pgw-ujian', 'menu-pgw-koreksi'];
   const guruOnlyMenus = ['menu-pgw-ujian', 'menu-pgw-koreksi'];
@@ -4091,7 +4094,7 @@ function showAdminTab(tabId, el) {
     const _pgwIzinTab = (currentUser && currentUser.pengawas) || {};
     // [V6.5] Buku Nilai untuk guru PENGAMPU (server tetap membatasi: guru
     // hanya menerima baris nilai mapel & kelas yang diampu).
-    const allowedGuruTabs = ['dash-home', 'dash-profil-guru', 'dash-buknilai'];
+    const allowedGuruTabs = ['dash-home', 'dash-profil-guru', 'dash-buknilai', 'dash-rapor'];
     // [V3] Izin harus EKSPLISIT true dari penunjukan Admin
     // [V6.2] PENGAWAS: hanya pantau lewat Monitor Ujian (Manajemen User)
     if (_pgwIzinTab.izinUjian === true) allowedGuruTabs.push('dash-users');
@@ -4225,6 +4228,10 @@ function showAdminTab(tabId, el) {
   } else if (tabId === 'dash-buknilai') {
     title.innerText = 'Buku Nilai';
     renderBukuNilaiPage(content);
+
+  } else if (tabId === 'dash-rapor') {
+    title.innerText = 'Rekap Rapor';
+    renderRekapRaporPage(content);
 
   } else if (tabId === 'dash-master-data') {
     title.innerText = 'Data Master';
@@ -6745,6 +6752,8 @@ function sipBukuNilaiCekMenuGuru_() {
       window._sipGuruAdaAmpuan_ = ada;
       var elMenu = document.getElementById('menu-buknilai');
       if (elMenu) elMenu.classList.toggle('hidden', !ada);
+      var elMenuRapor = document.getElementById('menu-rapor');
+      if (elMenuRapor) elMenuRapor.classList.toggle('hidden', !ada);
       var elMod = document.getElementById('mod-akademik');
       if (elMod) elMod.classList.toggle('hidden', !ada);
       var elAkad = document.getElementById('menu-akademik');
@@ -6791,6 +6800,344 @@ function sipBukuNilaiSiswaMuat_() {
     })
     .withFailureHandler(function () {})
     .getBukuNilaiSiswa(currentUser.userID, currentUser.token);
+}
+
+/* ===========================================================================
+   [V6.6] REKAP RAPOR — nilai akhir berbobot per mapel, predikat, peringkat,
+   ekspor Excel/PDF, dan analisis butir soal.
+   Admin: semua kelas. Guru: hanya mapel & kelas yang diampu (dibatasi server).
+   =========================================================================== */
+var _raporData = null;
+var _butirData = null;
+var _raporDaftarUjian = [];
+
+function sipRaporWarnaPredikat_(kode) {
+  var m = {
+    A: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    B: 'bg-sky-50 text-sky-700 border-sky-200',
+    C: 'bg-amber-50 text-amber-700 border-amber-200',
+    D: 'bg-rose-50 text-rose-700 border-rose-200'
+  };
+  return m[String(kode || '').toUpperCase()] || 'bg-slate-50 text-slate-500 border-slate-200';
+}
+
+function renderRekapRaporPage(container) {
+  _raporData = null;
+  container.innerHTML =
+    '<div class="fade-in w-full space-y-6">' +
+      '<div class="dash-card p-6">' +
+        '<div class="flex items-start justify-between gap-3 flex-wrap">' +
+          '<div class="flex items-center gap-3">' +
+            '<div class="w-10 h-10 rounded-lg bg-indigo-600 flex items-center justify-center text-white shadow-md"><i class="fas fa-file-lines"></i></div>' +
+            '<div><h2 class="text-xl font-bold text-slate-800 tracking-tight">Rekap Rapor</h2>' +
+            '<p class="text-slate-500 text-sm">Nilai akhir per mapel dari bobot Sumatif / STS / SAS / Latihan, predikat, dan peringkat kelas.</p></div>' +
+          '</div>' +
+          '<div id="rapor-ta" class="text-xs font-bold text-indigo-700"></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="dash-card p-5">' +
+        '<div class="flex flex-wrap gap-2 items-end">' +
+          '<div class="min-w-[150px]"><label class="text-[10px] font-bold text-slate-500 uppercase">Kelas</label>' +
+            '<input id="rapor-kelas" list="rapor-kelas-list" placeholder="mis. 7A" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"><datalist id="rapor-kelas-list"></datalist></div>' +
+          '<div class="min-w-[170px]"><label class="text-[10px] font-bold text-slate-500 uppercase">Mata Pelajaran</label>' +
+            '<select id="rapor-mapel" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white"><option value="">Semua mapel</option></select></div>' +
+          '<button type="button" onclick="sipRaporMuat_()" class="px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700"><i class="fas fa-magnifying-glass mr-1"></i>Tampilkan</button>' +
+          '<div class="flex-1"></div>' +
+          '<button type="button" onclick="sipRaporEkspor_(\'xlsx\')" class="px-4 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700"><i class="fas fa-file-excel mr-1"></i>Excel</button>' +
+          '<button type="button" onclick="sipRaporEkspor_(\'pdf\')" class="px-4 py-2 rounded-lg bg-rose-600 text-white text-xs font-bold hover:bg-rose-700"><i class="fas fa-file-pdf mr-1"></i>PDF</button>' +
+        '</div>' +
+        '<p class="text-[11px] text-slate-400 mt-2"><i class="fas fa-circle-info mr-1"></i>Nilai akhir = rata-rata berbobot kategori yang sudah ada nilainya. Bobot diatur di menu Akademik \u2192 Bobot Nilai.</p>' +
+      '</div>' +
+      '<div id="rapor-ringkas" class="grid grid-cols-2 sm:grid-cols-4 gap-3"></div>' +
+      '<div class="dash-card p-5">' +
+        '<div class="overflow-x-auto"><table class="w-full text-sm">' +
+          '<thead id="rapor-head"></thead>' +
+          '<tbody id="rapor-body"><tr><td class="py-8 text-center text-slate-400 text-xs">Pilih kelas lalu tekan Tampilkan.</td></tr></tbody>' +
+        '</table></div>' +
+      '</div>' +
+      '<div class="dash-card p-5">' +
+        '<div class="flex flex-wrap items-center justify-between gap-2 mb-3">' +
+          '<h3 class="font-bold text-slate-800 text-sm"><i class="fas fa-chart-simple text-indigo-500 mr-2"></i>Analisis Butir Soal</h3>' +
+          '<div class="flex flex-wrap gap-2 items-end">' +
+            '<select id="butir-exam" class="px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white"><option value="">-- Pilih ujian --</option></select>' +
+            '<button type="button" onclick="sipButirMuat_()" class="px-4 py-2 rounded-lg bg-slate-700 text-white text-xs font-bold hover:bg-slate-800"><i class="fas fa-calculator mr-1"></i>Analisis</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="overflow-x-auto"><table class="w-full text-sm">' +
+          '<thead><tr class="text-left text-[10px] uppercase text-slate-400 border-b">' +
+            '<th class="py-2">No</th><th>Tipe</th><th>Materi</th><th class="text-center">Dijawab</th><th class="text-center">Benar</th>' +
+            '<th class="text-center">Kesukaran (p)</th><th class="text-center">Daya Beda</th><th>Saran</th>' +
+          '</tr></thead>' +
+          '<tbody id="butir-body"><tr><td colspan="8" class="py-6 text-center text-slate-400 text-xs">Pilih ujian untuk melihat analisis butir.</td></tr></tbody>' +
+        '</table></div>' +
+        '<p id="butir-catatan" class="text-[11px] text-slate-400 mt-2"></p>' +
+      '</div>' +
+    '</div>';
+  sipRaporMuatOpsi_();
+}
+
+function sipRaporMuatOpsi_() {
+  // Kelas dari Master_Data (datalist) + daftar ujian utk analisis butir
+  google.script.run
+    .withSuccessHandler(function (d) {
+      var dl = document.getElementById('rapor-kelas-list');
+      if (dl && d && d.kelasList) {
+        dl.innerHTML = (d.kelasList || []).map(function (k) { return '<option value="' + escapeHtmlProfil_(k) + '">'; }).join('');
+      }
+    })
+    .withFailureHandler(function () {})
+    .getAkademikData(currentUser.userID, currentUser.token);
+  google.script.run
+    .withSuccessHandler(function (list) {
+      _raporDaftarUjian = Array.isArray(list) ? list : [];
+      var sel = document.getElementById('butir-exam');
+      if (!sel) return;
+      sel.innerHTML = '<option value="">-- Pilih ujian --</option>' + _raporDaftarUjian.map(function (e) {
+        return '<option value="' + escapeHtmlProfil_(e.id || e.examID) + '">' +
+          escapeHtmlProfil_(e.subject) + ' \u00b7 ' + escapeHtmlProfil_(e.class || e.kelas || '') +
+          ' \u00b7 ' + escapeHtmlProfil_(sipKategoriLabel_(e.kategori)) + '</option>';
+      }).join('');
+    })
+    .withFailureHandler(function () {})
+    .getExamList(currentUser.userID, currentUser.token);
+}
+
+function sipRaporKelas_() {
+  var el = document.getElementById('rapor-kelas');
+  return el ? String(el.value || '').trim() : '';
+}
+
+function sipRaporMuat_() {
+  var kelas = sipRaporKelas_();
+  if (!kelas) { Swal.fire('Belum lengkap', 'Isi atau pilih kelas terlebih dahulu.', 'warning'); return; }
+  var body = document.getElementById('rapor-body');
+  if (body) body.innerHTML = '<tr><td class="py-8 text-center text-slate-400 text-xs"><i class="fas fa-circle-notch fa-spin mr-1"></i>Menghitung nilai\u2026</td></tr>';
+  var mp = document.getElementById('rapor-mapel');
+  google.script.run
+    .withSuccessHandler(function (d) {
+      _raporData = d || {};
+      sipRaporIsi_();
+    })
+    .withFailureHandler(function (e) {
+      if (body) body.innerHTML = '<tr><td class="py-8 text-center text-rose-500 text-xs">Gagal memuat: ' + escapeHtmlProfil_(String((e && e.message) || e)) + '</td></tr>';
+    })
+    .getRekapRaporData({ kelas: kelas, kodeMapel: mp ? mp.value : '' }, currentUser.userID, currentUser.token);
+}
+
+function sipRaporIsi_() {
+  var d = _raporData || {};
+  var eh = escapeHtmlProfil_;
+  var ta = document.getElementById('rapor-ta');
+  if (ta) ta.innerHTML = d.tahunAktif ? '<i class="fas fa-calendar-check mr-1"></i>TA ' + eh(d.tahunAktif) : '<span class="text-amber-600">Belum ada tahun ajaran aktif</span>';
+
+  if (d.success === false) {
+    var b0 = document.getElementById('rapor-body');
+    if (b0) b0.innerHTML = '<tr><td class="py-8 text-center text-rose-500 text-xs">' + eh(d.message || 'Gagal memuat.') + '</td></tr>';
+    return;
+  }
+
+  // dropdown mapel (pertahankan pilihan)
+  var sel = document.getElementById('rapor-mapel');
+  if (sel) {
+    var lama = sel.value;
+    sel.innerHTML = '<option value="">Semua mapel</option>' + (d.mapelList || []).map(function (m) {
+      return '<option value="' + eh(m.kodeMapel) + '">' + eh(m.namaMapel) + '</option>';
+    }).join('');
+    if (lama) sel.value = lama;
+  }
+
+  var r = d.ringkasan || {};
+  var rg = document.getElementById('rapor-ringkas');
+  if (rg) {
+    var chip = function (label, nilai, warna) {
+      return '<div class="dash-card px-4 py-3"><p class="text-[9px] uppercase font-bold text-slate-400 tracking-wider">' + label + '</p>' +
+        '<p class="text-xl font-black ' + warna + '">' + eh(nilai) + '</p></div>';
+    };
+    rg.innerHTML = chip('Jumlah siswa', r.jumlahSiswa || 0, 'text-slate-800') +
+      chip('Rata-rata kelas', r.rata2Kelas || 0, 'text-indigo-700') +
+      chip('Tuntas (mapel)', r.tuntas || 0, 'text-emerald-600') +
+      chip('Belum tuntas', r.belum || 0, 'text-rose-600');
+  }
+
+  var mapel = d.mapelList || [];
+  var head = document.getElementById('rapor-head');
+  if (head) {
+    head.innerHTML = '<tr class="text-left text-[10px] uppercase text-slate-400 border-b">' +
+      '<th class="py-2">Siswa</th>' +
+      mapel.map(function (m) {
+        return '<th class="text-center px-1">' + eh(m.namaMapel) + '<div class="font-normal normal-case text-[9px] text-slate-400">KKTP ' + eh(m.kktp) + '</div></th>';
+      }).join('') +
+      '<th class="text-center">Rata\u00b2</th><th class="text-center">Peringkat</th></tr>';
+  }
+  var body = document.getElementById('rapor-body');
+  if (!body) return;
+  var daftar = d.daftar || [];
+  if (!daftar.length) {
+    body.innerHTML = '<tr><td class="py-8 text-center text-slate-400 text-xs">Belum ada data untuk kelas ini.</td></tr>';
+    return;
+  }
+  body.innerHTML = daftar.map(function (s) {
+    var sel = mapel.map(function (m) {
+      var mk = s.mapel[m.kodeMapel];
+      var na = mk ? mk.nilaiAkhir : '';
+      if (na === '') return '<td class="text-center text-slate-300">\u2013</td>';
+      return '<td class="text-center cursor-pointer" title="' + eh(mk.deskripsi || '') + '" onclick="sipRaporDetail_(\'' + eh(s.userID) + '\',\'' + eh(m.kodeMapel) + '\')">' +
+        '<span class="inline-flex items-center gap-1"><b class="' + (mk.tuntas ? 'text-emerald-700' : 'text-rose-600') + '">' + eh(na) + '</b>' +
+        '<span class="text-[9px] font-black px-1 rounded border ' + sipRaporWarnaPredikat_(mk.predikat) + '">' + eh(mk.predikat) + '</span></span></td>';
+    }).join('');
+    return '<tr class="border-b border-slate-50 hover:bg-slate-50/60">' +
+      '<td class="py-2 font-medium text-slate-700">' + eh(s.nama) + '</td>' + sel +
+      '<td class="text-center font-black text-indigo-700">' + eh(s.rata2 === '' ? '\u2013' : s.rata2) + '</td>' +
+      '<td class="text-center"><span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">' + eh(s.peringkat || '\u2013') + '</span></td></tr>';
+  }).join('');
+}
+
+function sipRaporDetail_(userID, kodeMapel) {
+  var d = _raporData || {};
+  var s = (d.daftar || []).find(function (x) { return String(x.userID) === String(userID); });
+  if (!s) return;
+  var mk = s.mapel[kodeMapel];
+  if (!mk) return;
+  var eh = escapeHtmlProfil_;
+  var rincian = Object.keys(mk.rincian || {}).sort().map(function (kat) {
+    var r = mk.rincian[kat];
+    var w = (mk.bobot || {})[kat];
+    return '<tr class="border-b border-slate-100"><td class="py-1">' + eh(sipKategoriLabel_(kat)) + '</td>' +
+      '<td class="text-center">' + eh(r.jumlah) + ' nilai</td>' +
+      '<td class="text-center font-bold">' + eh(r.rata2) + '</td>' +
+      '<td class="text-center text-slate-400">' + eh(w === undefined ? '\u2013' : w) + '</td></tr>';
+  }).join('');
+  Swal.fire({
+    title: 'Rincian Nilai',
+    html: '<div class="text-left"><p class="text-sm font-bold text-slate-800 mb-1">' + eh(s.nama) + ' \u00b7 ' + eh(mk.namaMapel) + '</p>' +
+      '<p class="text-xs text-slate-500 mb-2">Nilai akhir <b>' + eh(mk.nilaiAkhir) + '</b> \u00b7 predikat <b>' + eh(mk.predikat) + '</b> (' + eh(mk.predikatTeks) + ') \u00b7 KKTP ' + eh(mk.kktp) + '</p>' +
+      '<table class="w-full text-xs"><thead><tr class="text-left text-[9px] uppercase text-slate-400 border-b"><th class="py-1">Kategori</th><th class="text-center">Jumlah</th><th class="text-center">Rata\u00b2</th><th class="text-center">Bobot</th></tr></thead><tbody>' +
+      rincian + '</tbody></table>' +
+      '<p class="text-[11px] text-slate-500 mt-3 italic">' + eh(mk.deskripsi || '') + '</p></div>',
+    width: 520
+  });
+}
+
+function sipRaporEkspor_(format) {
+  var kelas = sipRaporKelas_();
+  if (!kelas) { Swal.fire('Belum lengkap', 'Tampilkan dulu rekap satu kelas, baru ekspor.', 'warning'); return; }
+  if (!_raporData || !(_raporData.daftar || []).length) { Swal.fire('Belum ada data', 'Tekan Tampilkan dulu agar rekap terbaca.', 'warning'); return; }
+  var mp = document.getElementById('rapor-mapel');
+  Swal.fire({ title: 'Menyiapkan ' + (format === 'xlsx' ? 'Excel' : 'PDF') + '\u2026', html: '<i class="fas fa-circle-notch fa-spin text-2xl text-indigo-500"></i>', allowOutsideClick: false, showConfirmButton: false });
+  google.script.run
+    .withSuccessHandler(function (res) {
+      if (!res || !res.success) { Swal.fire('Gagal', (res && res.message) || 'Ekspor gagal.', 'error'); return; }
+      Swal.fire({
+        icon: 'success', title: 'Ekspor selesai',
+        html: '<p class="text-sm">' + escapeHtmlProfil_(res.message || '') + '</p><p class="text-xs text-slate-500 mt-1">Berkas tersimpan di Drive (folder sistem + SIPINTAR-Export).</p>',
+        showCancelButton: true, confirmButtonText: 'Buka berkas', cancelButtonText: 'Tutup', confirmButtonColor: '#1b3a6b'
+      }).then(function (r) {
+        if (r.isConfirmed && res.url) window.open(res.url, '_blank');
+      });
+    })
+    .withFailureHandler(function (e) { Swal.fire('Gagal', String((e && e.message) || e), 'error'); })
+    .eksporRekapRapor({ kelas: kelas, kodeMapel: mp ? mp.value : '', format: format }, currentUser.userID, currentUser.token);
+}
+
+function sipButirMuat_() {
+  var sel = document.getElementById('butir-exam');
+  var eid = sel ? sel.value : '';
+  if (!eid) { Swal.fire('Belum lengkap', 'Pilih ujian terlebih dahulu.', 'warning'); return; }
+  var body = document.getElementById('butir-body');
+  if (body) body.innerHTML = '<tr><td colspan="8" class="py-6 text-center text-slate-400 text-xs"><i class="fas fa-circle-notch fa-spin mr-1"></i>Menghitung analisis\u2026</td></tr>';
+  google.script.run
+    .withSuccessHandler(function (d) {
+      _butirData = d || {};
+      var b = document.getElementById('butir-body');
+      var cat = document.getElementById('butir-catatan');
+      if (!b) return;
+      if (!d || d.success === false) {
+        b.innerHTML = '<tr><td colspan="8" class="py-6 text-center text-rose-500 text-xs">' + escapeHtmlProfil_((d && d.message) || 'Gagal.') + '</td></tr>';
+        if (cat) cat.textContent = '';
+        return;
+      }
+      b.innerHTML = (d.butir || []).map(function (x) {
+        var p = (x.p === null || x.p === undefined) ? '\u2013' : x.p;
+        var dd = (x.d === null || x.d === undefined) ? '\u2013' : x.d;
+        var warnaP = (x.p === null) ? 'text-slate-400' : (x.p >= 0.70 ? 'text-amber-600' : (x.p >= 0.30 ? 'text-emerald-600' : 'text-rose-600'));
+        return '<tr class="border-b border-slate-50"><td class="py-2 font-bold text-slate-600">' + escapeHtmlProfil_(x.no) + '</td>' +
+          '<td class="text-xs">' + escapeHtmlProfil_(x.tipe) + '</td>' +
+          '<td class="text-xs text-slate-500">' + escapeHtmlProfil_(x.materi || '\u2013') + '</td>' +
+          '<td class="text-center text-xs">' + escapeHtmlProfil_(x.dijawab) + '</td>' +
+          '<td class="text-center text-xs">' + escapeHtmlProfil_(x.benar) + '</td>' +
+          '<td class="text-center"><b class="' + warnaP + '">' + escapeHtmlProfil_(p) + '</b><div class="text-[9px] text-slate-400">' + escapeHtmlProfil_(x.kesukaran) + '</div></td>' +
+          '<td class="text-center text-xs">' + escapeHtmlProfil_(dd) + '<div class="text-[9px] text-slate-400">' + escapeHtmlProfil_(x.dayaBeda) + '</div></td>' +
+          '<td class="text-[11px] text-slate-500">' + escapeHtmlProfil_(x.saran) + '</td></tr>';
+      }).join('') || '<tr><td colspan="8" class="py-6 text-center text-slate-400 text-xs">Tidak ada butir untuk dianalisis.</td></tr>';
+      if (cat) {
+        var rk = d.ringkasan || {};
+        cat.textContent = 'Peserta: ' + d.jumlahPeserta + ' \u00b7 Soal: ' + d.jumlahSoal +
+          ' \u00b7 Rata-rata kesukaran: ' + (rk.rerataKesukaran || 0) +
+          ' \u00b7 Perlu revisi: ' + (rk.perluRevisi || 0) + (rk.catatan ? ' \u00b7 ' + rk.catatan : '');
+      }
+    })
+    .withFailureHandler(function (e) {
+      var b = document.getElementById('butir-body');
+      if (b) b.innerHTML = '<tr><td colspan="8" class="py-6 text-center text-rose-500 text-xs">Gagal: ' + escapeHtmlProfil_(String((e && e.message) || e)) + '</td></tr>';
+    })
+    .getAnalisisButirData(eid, currentUser.userID, currentUser.token);
+}
+
+// [V6.6] Kartu pengaturan BOBOT NILAI di halaman Akademik (khusus Admin)
+function sipBobotKartuHTML_() {
+  return '<div class="dash-card p-6">' +
+    '<h3 class="font-bold text-slate-800 text-sm mb-1"><i class="fas fa-scale-balanced text-indigo-500 mr-2"></i>Bobot Nilai per Mata Pelajaran</h3>' +
+    '<p class="text-[11px] text-slate-400 mb-3">Dipakai untuk menghitung <b>nilai akhir rapor</b>. Total tidak harus 100 \u2014 sistem menormalkan sendiri sesuai kategori yang ada nilainya. Bawaan: Sumatif 40 \u00b7 STS 20 \u00b7 SAS 30 \u00b7 Latihan 10.</p>' +
+    '<div class="flex flex-wrap gap-2 items-end mb-4">' +
+      '<div class="min-w-[180px]"><label class="text-[10px] font-bold text-slate-500 uppercase">Mata Pelajaran</label>' +
+        '<select id="bobot-mapel" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white"></select></div>' +
+      '<div><label class="text-[10px] font-bold text-slate-500 uppercase">Sumatif</label><input id="bobot-sumatif" type="number" min="0" max="100" value="40" class="mt-1 w-20 px-3 py-2 rounded-lg border border-slate-300 text-sm"></div>' +
+      '<div><label class="text-[10px] font-bold text-slate-500 uppercase">STS</label><input id="bobot-sts" type="number" min="0" max="100" value="20" class="mt-1 w-20 px-3 py-2 rounded-lg border border-slate-300 text-sm"></div>' +
+      '<div><label class="text-[10px] font-bold text-slate-500 uppercase">SAS</label><input id="bobot-sas" type="number" min="0" max="100" value="30" class="mt-1 w-20 px-3 py-2 rounded-lg border border-slate-300 text-sm"></div>' +
+      '<div><label class="text-[10px] font-bold text-slate-500 uppercase">Latihan</label><input id="bobot-latihan" type="number" min="0" max="100" value="10" class="mt-1 w-20 px-3 py-2 rounded-lg border border-slate-300 text-sm"></div>' +
+      '<button type="button" onclick="sipBobotSimpan_()" class="px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700"><i class="fas fa-save mr-1"></i>Simpan Bobot</button>' +
+    '</div>' +
+    '<div id="bobot-info" class="text-[11px] text-slate-500"></div>' +
+    '</div>';
+}
+
+function sipBobotIsiPilihan_() {
+  var d = _akademikData || {};
+  var sel = document.getElementById('bobot-mapel');
+  if (!sel) return;
+  var lama = sel.value;
+  sel.innerHTML = '<option value="">-- Pilih mapel --</option>' + (d.mapelList || []).map(function (m) {
+    return '<option value="' + escapeHtmlProfil_(m.kode) + '">' + escapeHtmlProfil_(m.nama) + '</option>';
+  }).join('');
+  if (lama) sel.value = lama;
+  var info = document.getElementById('bobot-info');
+  if (info && d.bobotList) {
+    info.innerHTML = (d.bobotList || []).length
+      ? (d.bobotList || []).map(function (b) {
+        return '<span class="inline-block mr-3 mb-1"><b>' + escapeHtmlProfil_(b.nama) + '</b>: ' +
+          escapeHtmlProfil_(b.SUMATIF) + '/' + escapeHtmlProfil_(b.STS) + '/' + escapeHtmlProfil_(b.SAS) + '/' + escapeHtmlProfil_(b.LATIHAN) + '</span>';
+      }).join('')
+      : '<span class="text-slate-400">Semua mapel masih memakai bobot bawaan (40/20/30/10).</span>';
+  }
+}
+
+function sipBobotSimpan_() {
+  var val = function (id) { var el = document.getElementById(id); return el ? el.value : ''; };
+  var kode = val('bobot-mapel');
+  if (!kode) { Swal.fire('Belum lengkap', 'Pilih mata pelajaran terlebih dahulu.', 'warning'); return; }
+  var payload = { kodeMapel: kode, bobot: { SUMATIF: val('bobot-sumatif'), STS: val('bobot-sts'), SAS: val('bobot-sas'), LATIHAN: val('bobot-latihan') } };
+  document.getElementById('global-loading').classList.remove('hidden');
+  google.script.run
+    .withSuccessHandler(function (res) {
+      document.getElementById('global-loading').classList.add('hidden');
+      if (res && res.success) { Swal.fire({ icon: 'success', title: 'Tersimpan', text: res.message || 'Bobot disimpan.', timer: 1600, showConfirmButton: false }); sipAkademikMuat_(); }
+      else Swal.fire('Gagal', (res && res.message) || 'Gagal menyimpan bobot.', 'warning');
+    })
+    .withFailureHandler(function (e) {
+      document.getElementById('global-loading').classList.add('hidden');
+      Swal.fire('Gagal', String((e && e.message) || e), 'error');
+    })
+    .simpanBobotNilai(payload, currentUser.userID, currentUser.token);
 }
 
 function renderAkademikPage(container) {
@@ -6841,6 +7188,8 @@ function renderAkademikPage(container) {
     '<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-[10px] uppercase text-slate-400 border-b"><th class="py-2">Guru</th><th>Mapel</th><th>Kelas</th><th>Tahun Ajaran</th><th class="text-right">Aksi</th></tr></thead>' +
     '<tbody id="akad-gm-list"><tr><td colspan="5" class="py-4 text-slate-400 text-xs">Memuat\u2026</td></tr></tbody></table></div>' +
     '</div>' +
+    // ---- KARTU BOBOT NILAI (V6.6) ----
+    sipBobotKartuHTML_() +
     '</div>';
   sipAkademikMuat_();
 }
@@ -6894,6 +7243,7 @@ function sipAkademikIsi_() {
   }).join('');
   var dl = document.getElementById('akad-kelas-list');
   if (dl) dl.innerHTML = (d.kelasList || []).map(function (k) { return '<option value="' + eh(k) + '">'; }).join('');
+  sipBobotIsiPilihan_(); // [V6.6] dropdown bobot nilai
   var gm = document.getElementById('akad-gm-list');
   if (gm) {
     var grows = (d.guruMapelList || []).map(function (g) {
@@ -21949,5 +22299,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a589e3809d51601d',t:'MTc5NDM2NDM3MA=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a589e3809d51601d',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a589eff2dce1fd14',t:'MTc5NDM2NDg3OQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a589eff2dce1fd14',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
