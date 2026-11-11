@@ -1906,6 +1906,21 @@
             </div>
           </div>
 
+          <div class="menu-mod" id="mod-kegiatan">
+            <button type="button" class="menu-mod-head" onclick="toggleMenuMod('mod-kegiatan')" title="Tampilkan / sembunyikan modul">
+              <span class="menu-mod-title"><i class="fas fa-people-group mod-ico"></i><span class="sidebar-text">Modul Kegiatan</span></span>
+              <i class="fas fa-chevron-down menu-mod-chev"></i>
+            </button>
+            <div class="menu-mod-body">
+              <div id="menu-kegiatan" class="sidebar-item" onclick="showAdminTab('dash-kegiatan', this)">
+                <i class="fas fa-list-check"></i> <span class="sidebar-text font-medium">Master Kegiatan</span>
+              </div>
+              <div id="menu-rekrutmen" class="sidebar-item" onclick="showAdminTab('dash-rekrutmen', this)">
+                <i class="fas fa-user-plus"></i> <span class="sidebar-text font-medium">Rekrutmen</span>
+              </div>
+            </div>
+          </div>
+
           <div class="menu-mod" id="mod-sistem">
             <button type="button" class="menu-mod-head" onclick="toggleMenuMod('mod-sistem')" title="Tampilkan / sembunyikan modul">
               <span class="menu-mod-title"><i class="fas fa-sliders-h mod-ico"></i><span class="sidebar-text">Modul Sistem</span></span>
@@ -2932,6 +2947,7 @@ function initAdminPanel() {
   const adminOnlyMenus = ['menu-questions', 'menu-kisi', 'menu-ai-generator', 'menu-hermes',
     'menu-report-template', 'menu-users', 'menu-profil', 'menu-kartu', 'menu-hadir',
     'menu-images', 'menu-music', 'menu-config', 'menu-akademik', 'menu-buknilai', 'menu-rapor',
+    'menu-kegiatan', 'menu-rekrutmen',
     'menu-master-data', 'menu-pengawas', 'menu-timsoal', 'menu-panitia', 'menu-exams', 'menu-sesi-bagi', 'menu-results',
     'menu-pgw-ujian', 'menu-pgw-koreksi'];
   const guruOnlyMenus = ['menu-pgw-ujian', 'menu-pgw-koreksi'];
@@ -2981,6 +2997,13 @@ function initAdminPanel() {
     // [V6.4] Modul Akademik: KHUSUS Admin — guru (apa pun izinnya) tidak melihatnya
     const elModAkad = document.getElementById('mod-akademik');
     if (elModAkad) elModAkad.classList.add('hidden');
+    // [V6.7] Modul Kegiatan: HANYA untuk guru yang ditunjuk PEMBINA kegiatan.
+    const elModKeg = document.getElementById('mod-kegiatan');
+    if (elModKeg) elModKeg.classList.toggle('hidden', _pgwIzin.izinPembina !== true);
+    const elMenuRkm = document.getElementById('menu-rekrutmen');
+    if (elMenuRkm) elMenuRkm.classList.toggle('hidden', _pgwIzin.izinPembina !== true);
+    const elMenuKeg = document.getElementById('menu-kegiatan');
+    if (elMenuKeg) elMenuKeg.classList.add('hidden'); // master kegiatan tetap khusus Admin
     // [V6.5] Buku Nilai: guru PENGAMPU tetap dapat membuka menunya. Modul
     // dibuka kembali HANYA untuk menampung menu Buku Nilai; menu "Tahun
     // Ajaran &amp; Mapel" tetap khusus Admin (ditutup lagi di fungsi ini).
@@ -2994,7 +3017,7 @@ function initAdminPanel() {
       const el = document.getElementById(id);
       if (el) el.classList.add('hidden');
     });
-    ['mod-data', 'mod-sistem', 'mod-akademik'].forEach(id => {
+    ['mod-data', 'mod-sistem', 'mod-akademik', 'mod-kegiatan'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.classList.remove('hidden');
     });
@@ -4094,7 +4117,7 @@ function showAdminTab(tabId, el) {
     const _pgwIzinTab = (currentUser && currentUser.pengawas) || {};
     // [V6.5] Buku Nilai untuk guru PENGAMPU (server tetap membatasi: guru
     // hanya menerima baris nilai mapel & kelas yang diampu).
-    const allowedGuruTabs = ['dash-home', 'dash-profil-guru', 'dash-buknilai', 'dash-rapor'];
+    const allowedGuruTabs = ['dash-home', 'dash-profil-guru', 'dash-buknilai', 'dash-rapor', 'dash-rekrutmen'];
     // [V3] Izin harus EKSPLISIT true dari penunjukan Admin
     // [V6.2] PENGAWAS: hanya pantau lewat Monitor Ujian (Manajemen User)
     if (_pgwIzinTab.izinUjian === true) allowedGuruTabs.push('dash-users');
@@ -4232,6 +4255,14 @@ function showAdminTab(tabId, el) {
   } else if (tabId === 'dash-rapor') {
     title.innerText = 'Rekap Rapor';
     renderRekapRaporPage(content);
+
+  } else if (tabId === 'dash-kegiatan') {
+    title.innerText = 'Master Kegiatan & Rekrutmen';
+    renderKegiatanPage(content);
+
+  } else if (tabId === 'dash-rekrutmen') {
+    title.innerText = 'Rekrutmen & Verifikasi Berkas';
+    renderRekrutmenPage(content);
 
   } else if (tabId === 'dash-master-data') {
     title.innerText = 'Data Master';
@@ -4726,7 +4757,9 @@ function renderSiswaDashboard_() {
           <button type="button" onclick="showSiswaTab('kisi')" class="px-4 py-2 rounded-xl bg-white border border-slate-200 text-sm font-bold"><i class="fas fa-table-list mr-1"></i> Kisi-Kisi Ujian</button>
           <button type="button" onclick="showSiswaTab('nilai')" class="px-4 py-2 rounded-xl bg-white border border-slate-200 text-sm font-bold"><i class="fas fa-chart-line mr-1"></i> Nilai & hasil belajar</button>
           <button type="button" onclick="showSiswaTab('ujian')" class="px-4 py-2 rounded-xl bg-[#1b3a6b] text-white text-sm font-bold"><i class="fas fa-laptop mr-1"></i> Buka modul ujian</button>
-        </div>`;
+        </div>
+        <div id="siswa-rekrutmen" class="mt-6"></div>`; // [V6.7] kartu Rekrutmen (kosong = tanpa kartu)
+      try { sipRekrutmenSiswaMuat_(); } catch (eRkmS) {}
     })
     .withFailureHandler(function () {
       box.innerHTML = '<div class="bg-white rounded-2xl p-5 border">Informasi dashboard belum tersedia.</div>';
@@ -6819,6 +6852,604 @@ function sipRaporWarnaPredikat_(kode) {
     D: 'bg-rose-50 text-rose-700 border-rose-200'
   };
   return m[String(kode || '').toUpperCase()] || 'bg-slate-50 text-slate-500 border-slate-200';
+}
+
+/* ===========================================================================
+   [V6.7] MODUL KEGIATAN — Master Kegiatan, Gelombang Rekrutmen, Verifikasi
+   Admin: semua kegiatan. Guru PEMBINA: hanya kegiatan yang dibinanya.
+   Siswa: kartu Rekrutmen di dashboard (daftar online + pantau status).
+   =========================================================================== */
+var _kegData = null;
+var _kegMode = 'tambah';   // tambah | ubah (kegiatan)
+var _rkmMode = 'tambah';   // tambah | ubah (gelombang)
+var _pendData = null;
+
+function sipKegStatusWarna_(st) {
+  var m = {
+    'Menunggu': 'bg-amber-50 text-amber-700 border-amber-200',
+    'Lolos Berkas': 'bg-sky-50 text-sky-700 border-sky-200',
+    'Ditolak': 'bg-rose-50 text-rose-700 border-rose-200',
+    'Tes': 'bg-violet-50 text-violet-700 border-violet-200',
+    'Wawancara': 'bg-indigo-50 text-indigo-700 border-indigo-200',
+    'Diterima': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    'Cadangan': 'bg-slate-100 text-slate-600 border-slate-200',
+    'Buka': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    'Tutup': 'bg-slate-100 text-slate-600 border-slate-200',
+    'Draf': 'bg-slate-50 text-slate-400 border-slate-200'
+  };
+  return m[String(st || '')] || 'bg-slate-50 text-slate-500 border-slate-200';
+}
+
+function sipTglTampil_(v) {
+  if (!v) return '\u2013';
+  var d = new Date(v);
+  if (isNaN(d.getTime())) return String(v);
+  try {
+    return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) + ' ' +
+      d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  } catch (e) { return String(v); }
+}
+function sipTglInput_(v) {
+  if (!v) return '';
+  var d = new Date(v);
+  if (isNaN(d.getTime())) return '';
+  try {
+    var p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+  } catch (e) { return ''; }
+}
+
+/* ---------------------------- MASTER KEGIATAN ---------------------------- */
+function renderKegiatanPage(container) {
+  _kegMode = 'tambah'; _rkmMode = 'tambah';
+  var eh = escapeHtmlProfil_;
+  container.innerHTML =
+    '<div class="fade-in w-full space-y-6">' +
+      '<div class="dash-card p-6">' +
+        '<div class="flex items-start justify-between gap-3 flex-wrap">' +
+          '<div class="flex items-center gap-3">' +
+            '<div class="w-10 h-10 rounded-lg bg-indigo-600 flex items-center justify-center text-white shadow-md"><i class="fas fa-people-group"></i></div>' +
+            '<div><h2 class="text-xl font-bold text-slate-800 tracking-tight">Master Kegiatan</h2>' +
+            '<p class="text-slate-500 text-sm">Intrakurikuler (OSIS, MPK) &amp; ekstrakurikuler: kuota, jadwal latihan, dan <b>Pembina</b>.</p></div>' +
+          '</div>' +
+          '<div id="keg-ta" class="text-xs font-bold text-indigo-700"></div>' +
+        '</div>' +
+        '<p id="keg-izin" class="text-[11px] text-slate-400 mt-2"></p>' +
+      '</div>' +
+      // ---- FORM KEGIATAN ----
+      '<div class="dash-card p-5">' +
+        '<h3 class="font-bold text-slate-800 text-sm mb-3"><i class="fas fa-plus text-indigo-500 mr-2"></i><span id="keg-form-judul">Tambah Kegiatan</span></h3>' +
+        '<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">' +
+          '<div class="lg:col-span-2"><label class="text-[10px] font-bold text-slate-500 uppercase">Nama Kegiatan</label><input id="keg-nama" placeholder="mis. Pramuka" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"></div>' +
+          '<div><label class="text-[10px] font-bold text-slate-500 uppercase">Kategori</label><select id="keg-kategori" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white"><option value="Ekstrakurikuler">Ekstrakurikuler</option><option value="Intrakurikuler">Intrakurikuler</option></select></div>' +
+          '<div><label class="text-[10px] font-bold text-slate-500 uppercase">Kuota</label><input id="keg-kuota" type="number" min="1" max="500" value="30" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"></div>' +
+          '<div><label class="text-[10px] font-bold text-slate-500 uppercase">Hari Latihan</label><input id="keg-hari" placeholder="Sabtu" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"></div>' +
+          '<div><label class="text-[10px] font-bold text-slate-500 uppercase">Waktu</label><input id="keg-waktu" placeholder="08.00-10.00" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"></div>' +
+          '<div><label class="text-[10px] font-bold text-slate-500 uppercase">Tempat</label><input id="keg-tempat" placeholder="Lapangan" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"></div>' +
+          '<div><label class="text-[10px] font-bold text-slate-500 uppercase">Pembina</label><select id="keg-pembina" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white"></select></div>' +
+          '<div class="lg:col-span-4"><label class="text-[10px] font-bold text-slate-500 uppercase">Deskripsi singkat</label><input id="keg-deskripsi" maxlength="400" placeholder="Tujuan / kegiatan utama" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"></div>' +
+        '</div>' +
+        '<div class="flex gap-2 mt-3">' +
+          '<button type="button" id="keg-btn" onclick="sipKegSimpan_()" class="px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700"><i class="fas fa-save mr-1"></i>Simpan</button>' +
+          '<button type="button" onclick="sipKegReset_()" class="px-4 py-2 rounded-lg bg-slate-100 text-slate-600 text-xs font-bold">Bersihkan</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="dash-card p-5">' +
+        '<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-[10px] uppercase text-slate-400 border-b">' +
+          '<th class="py-2">Kegiatan</th><th>Kategori</th><th class="text-center">Kuota</th><th>Jadwal</th><th>Pembina</th><th class="text-center">Status</th><th class="text-right">Aksi</th>' +
+        '</tr></thead><tbody id="keg-list"><tr><td colspan="7" class="py-6 text-center text-slate-400 text-xs">Memuat\u2026</td></tr></tbody></table></div>' +
+      '</div>' +
+      // ---- GELOMBANG REKRUTMEN ----
+      '<div class="dash-card p-5">' +
+        '<h3 class="font-bold text-slate-800 text-sm mb-1"><i class="fas fa-bullhorn text-indigo-500 mr-2"></i><span id="rkm-form-judul">Gelombang Rekrutmen Baru</span></h3>' +
+        '<p class="text-[11px] text-slate-400 mb-3">Tentukan periode buka-tutup, syarat kelas, kuota, dan <b>bobot seleksi</b> (berkas/tes/wawancara). Siswa hanya bisa mendaftar saat status <b>Buka</b> dan dalam periode.</p>' +
+        '<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">' +
+          '<div><label class="text-[10px] font-bold text-slate-500 uppercase">Kegiatan</label><select id="rkm-kegiatan" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white"></select></div>' +
+          '<div><label class="text-[10px] font-bold text-slate-500 uppercase">Nama Gelombang</label><input id="rkm-nama" placeholder="Gelombang 1" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"></div>' +
+          '<div><label class="text-[10px] font-bold text-slate-500 uppercase">Buka</label><input id="rkm-buka" type="datetime-local" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"></div>' +
+          '<div><label class="text-[10px] font-bold text-slate-500 uppercase">Tutup</label><input id="rkm-tutup" type="datetime-local" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"></div>' +
+          '<div><label class="text-[10px] font-bold text-slate-500 uppercase">Syarat Kelas</label><input id="rkm-syarat" list="keg-kelas-list" placeholder="7A, 7B (kosong = semua)" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"><datalist id="keg-kelas-list"></datalist></div>' +
+          '<div><label class="text-[10px] font-bold text-slate-500 uppercase">Kuota (0 = ikut kegiatan)</label><input id="rkm-kuota" type="number" min="0" max="500" value="0" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"></div>' +
+          '<div class="grid grid-cols-3 gap-1 lg:col-span-2"><div><label class="text-[9px] font-bold text-slate-500 uppercase">Berkas %</label><input id="rkm-b-berkas" type="number" min="0" max="100" value="20" class="mt-1 w-full px-2 py-2 rounded-lg border border-slate-300 text-sm"></div>' +
+            '<div><label class="text-[9px] font-bold text-slate-500 uppercase">Tes %</label><input id="rkm-b-tes" type="number" min="0" max="100" value="50" class="mt-1 w-full px-2 py-2 rounded-lg border border-slate-300 text-sm"></div>' +
+            '<div><label class="text-[9px] font-bold text-slate-500 uppercase">Wawancara %</label><input id="rkm-b-waw" type="number" min="0" max="100" value="30" class="mt-1 w-full px-2 py-2 rounded-lg border border-slate-300 text-sm"></div></div>' +
+        '</div>' +
+        '<div class="flex gap-2 mt-3">' +
+          '<button type="button" id="rkm-btn" onclick="sipRkmSimpan_()" class="px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700"><i class="fas fa-save mr-1"></i>Simpan Gelombang</button>' +
+          '<button type="button" onclick="sipRkmReset_()" class="px-4 py-2 rounded-lg bg-slate-100 text-slate-600 text-xs font-bold">Bersihkan</button>' +
+        '</div>' +
+        '<div class="overflow-x-auto mt-4"><table class="w-full text-sm"><thead><tr class="text-left text-[10px] uppercase text-slate-400 border-b">' +
+          '<th class="py-2">Kegiatan</th><th>Gelombang</th><th>Periode</th><th>Syarat</th><th class="text-center">Kuota</th><th class="text-center">Pendaftar</th><th class="text-center">Status</th><th class="text-right">Aksi</th>' +
+        '</tr></thead><tbody id="rkm-list"><tr><td colspan="8" class="py-6 text-center text-slate-400 text-xs">Memuat\u2026</td></tr></tbody></table></div>' +
+      '</div>' +
+    '</div>';
+  sipKegMuat_();
+}
+
+function sipKegMuat_() {
+  google.script.run
+    .withSuccessHandler(function (d) { _kegData = d || {}; sipKegIsi_(); })
+    .withFailureHandler(function (e) {
+      var el = document.getElementById('keg-list');
+      if (el) el.innerHTML = '<tr><td colspan="7" class="py-6 text-center text-rose-500 text-xs">Gagal memuat: ' + escapeHtmlProfil_(String((e && e.message) || e)) + '</td></tr>';
+    })
+    .getKegiatanData(currentUser.userID, currentUser.token);
+}
+
+function sipKegIsi_() {
+  var d = _kegData || {};
+  var eh = escapeHtmlProfil_;
+  var ta = document.getElementById('keg-ta');
+  if (ta) ta.innerHTML = '<i class="fas fa-calendar-check mr-1"></i>TA ' + eh(d.tahunAktif || '-');
+  var iz = d.izin || {};
+  var izEl = document.getElementById('keg-izin');
+  if (izEl) {
+    izEl.innerHTML = iz.admin
+      ? '<i class="fas fa-shield-halved mr-1 text-emerald-600"></i>Anda Admin — seluruh kegiatan &amp; gelombang dapat dikelola.'
+      : '<i class="fas fa-user-tie mr-1 text-indigo-600"></i>Anda Pembina: ' + eh((iz.kegiatanPembina || []).join(', ') || '-') + ' (hanya kegiatan ini yang tampil).';
+  }
+
+  // dropdown pembina
+  var selP = document.getElementById('keg-pembina');
+  if (selP) {
+    var lamaP = selP.value;
+    selP.innerHTML = '<option value="">-- Belum ditentukan --</option>' + (d.guruList || []).map(function (g) {
+      return '<option value="' + eh(g.userID) + '">' + eh(g.nama) + '</option>';
+    }).join('');
+    if (lamaP) selP.value = lamaP;
+    selP.disabled = !!iz.pembina && !iz.admin && (d.guruList || []).length === 0;
+  }
+  // dropdown kegiatan utk gelombang
+  var selK = document.getElementById('rkm-kegiatan');
+  if (selK) {
+    var lamaK = selK.value;
+    selK.innerHTML = '<option value="">-- Pilih kegiatan --</option>' + (d.kegiatanList || []).map(function (k) {
+      return '<option value="' + eh(k.id) + '">' + eh(k.nama) + '</option>';
+    }).join('');
+    if (lamaK) selK.value = lamaK;
+  }
+  var dl = document.getElementById('keg-kelas-list');
+  if (dl) dl.innerHTML = (d.kelasList || []).map(function (k) { return '<option value="' + eh(k) + '"><\/option>'; }).join('');
+
+  // tabel kegiatan
+  var body = document.getElementById('keg-list');
+  if (body) {
+    var ks = d.kegiatanList || [];
+    body.innerHTML = ks.length ? ks.map(function (k) {
+      return '<tr class="border-b border-slate-50 hover:bg-slate-50/60">' +
+        '<td class="py-2"><div class="font-medium text-slate-700">' + eh(k.nama) + '</div>' +
+        (k.deskripsi ? '<div class="text-[11px] text-slate-400">' + eh(k.deskripsi) + '</div>' : '') + '</td>' +
+        '<td><span class="text-[10px] font-bold px-2 py-0.5 rounded border ' + (k.kategori === 'Intrakurikuler' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-teal-50 text-teal-700 border-teal-200') + '">' + eh(k.kategori) + '</span></td>' +
+        '<td class="text-center text-xs">' + eh(k.kuota) + '</td>' +
+        '<td class="text-xs text-slate-500">' + eh([k.hari, k.waktu, k.tempat].filter(Boolean).join(' \u00b7 ') || '\u2013') + '</td>' +
+        '<td class="text-xs">' + eh(k.pembinaNama || '\u2013') + '</td>' +
+        '<td class="text-center">' + (k.aktif
+          ? '<span class="text-[10px] font-bold px-2 py-0.5 rounded border bg-emerald-50 text-emerald-700 border-emerald-200">Aktif</span>'
+          : '<span class="text-[10px] font-bold px-2 py-0.5 rounded border bg-slate-100 text-slate-500 border-slate-200">Nonaktif</span>') + '</td>' +
+        '<td class="text-right whitespace-nowrap">' +
+          '<button type="button" onclick="sipKegUbah_(\'' + eh(k.id) + '\')" class="text-[11px] font-bold text-indigo-600 hover:underline mr-3">Ubah</button>' +
+          '<button type="button" onclick="sipKegAktif_(\'' + eh(k.id) + '\',' + (k.aktif ? 'false' : 'true') + ')" class="text-[11px] font-bold text-slate-500 hover:underline mr-3">' + (k.aktif ? 'Nonaktifkan' : 'Aktifkan') + '</button>' +
+          '<button type="button" onclick="sipKegHapus_(\'' + eh(k.id) + '\')" class="text-[11px] font-bold text-rose-500 hover:underline">Hapus</button>' +
+        '</td></tr>';
+    }).join('') : '<tr><td colspan="7" class="py-6 text-center text-slate-400 text-xs">Belum ada kegiatan. Tambahkan di form atas.</td></tr>';
+  }
+
+  // tabel gelombang
+  var bodyR = document.getElementById('rkm-list');
+  if (bodyR) {
+    var rs = d.rekrutmenList || [];
+    bodyR.innerHTML = rs.length ? rs.map(function (r) {
+      var h = r.hitung || { total: 0, menunggu: 0, lolos: 0, ditolak: 0 };
+      return '<tr class="border-b border-slate-50 hover:bg-slate-50/60">' +
+        '<td class="py-2 text-slate-700 text-xs">' + eh(r.namaKegiatan || r.kegiatanID) + '</td>' +
+        '<td class="text-xs">' + eh(r.gelombang) + '</td>' +
+        '<td class="text-[11px] text-slate-500">' + eh(sipTglTampil_(r.buka)) + '<br>' + eh(sipTglTampil_(r.tutup)) + '</td>' +
+        '<td class="text-[11px] text-slate-500">' + eh(r.syaratKelas || 'Semua kelas') + '</td>' +
+        '<td class="text-center text-xs">' + eh(r.kuota > 0 ? r.kuota : '\u2013') + '</td>' +
+        '<td class="text-center text-xs"><b>' + eh(h.total) + '</b><div class="text-[9px] text-slate-400">' + eh(h.menunggu) + ' menunggu \u00b7 ' + eh(h.lolos) + ' lolos</div></td>' +
+        '<td class="text-center"><span class="text-[10px] font-bold px-2 py-0.5 rounded border ' + sipKegStatusWarna_(r.status) + '">' + eh(r.status) + '</span></td>' +
+        '<td class="text-right whitespace-nowrap">' +
+          '<button type="button" onclick="sipRkmLihat_(\'' + eh(r.id) + '\')" class="text-[11px] font-bold text-indigo-600 hover:underline mr-3">Pendaftar</button>' +
+          (String(r.status).toLowerCase() === 'buka'
+            ? '<button type="button" onclick="sipRkmStatus_(\'' + eh(r.id) + '\',\'Tutup\')" class="text-[11px] font-bold text-amber-600 hover:underline mr-3">Tutup</button>'
+            : '<button type="button" onclick="sipRkmStatus_(\'' + eh(r.id) + '\',\'Buka\')" class="text-[11px] font-bold text-emerald-600 hover:underline mr-3">Buka</button>') +
+          '<button type="button" onclick="sipRkmUbah_(\'' + eh(r.id) + '\')" class="text-[11px] font-bold text-slate-600 hover:underline mr-3">Ubah</button>' +
+          '<button type="button" onclick="sipRkmHapus_(\'' + eh(r.id) + '\')" class="text-[11px] font-bold text-rose-500 hover:underline">Hapus</button>' +
+        '</td></tr>';
+    }).join('') : '<tr><td colspan="8" class="py-6 text-center text-slate-400 text-xs">Belum ada gelombang rekrutmen.</td></tr>';
+  }
+}
+
+function sipKegKirim_(payload, lanjut) {
+  document.getElementById('global-loading').classList.remove('hidden');
+  google.script.run
+    .withSuccessHandler(function (res) {
+      document.getElementById('global-loading').classList.add('hidden');
+      if (res && res.success) { sipKegMuat_(); if (lanjut) lanjut(res); }
+      else Swal.fire('Gagal', (res && res.message) || 'Terjadi kesalahan.', 'warning');
+    })
+    .withFailureHandler(function (e) {
+      document.getElementById('global-loading').classList.add('hidden');
+      Swal.fire('Gagal', String((e && e.message) || e), 'error');
+    })
+    .simpanKegiatan(payload, currentUser.userID, currentUser.token);
+}
+
+function sipKegSimpan_() {
+  function v(id) { var el = document.getElementById(id); return el ? el.value : ''; }
+  var payload = {
+    aksi: _kegMode === 'ubah' ? 'ubah' : 'tambah',
+    id: window._kegIdEdit || '',
+    nama: v('keg-nama'), kategori: v('keg-kategori'), kuota: v('keg-kuota'),
+    hari: v('keg-hari'), waktu: v('keg-waktu'), tempat: v('keg-tempat'),
+    pembinaID: v('keg-pembina'), deskripsi: v('keg-deskripsi')
+  };
+  if (!String(payload.nama).trim()) { Swal.fire('Belum lengkap', 'Nama kegiatan wajib diisi.', 'warning'); return; }
+  sipKegKirim_(payload, function () {
+    sipKegReset_();
+    Swal.fire({ icon: 'success', title: 'Tersimpan', timer: 1400, showConfirmButton: false });
+  });
+}
+
+function sipKegUbah_(id) {
+  var k = ((_kegData || {}).kegiatanList || []).filter(function (x) { return x.id === id; })[0];
+  if (!k) return;
+  _kegMode = 'ubah'; window._kegIdEdit = k.id;
+  var set = function (i, val) { var el = document.getElementById(i); if (el) el.value = val; };
+  set('keg-nama', k.nama); set('keg-kategori', k.kategori); set('keg-kuota', k.kuota);
+  set('keg-hari', k.hari); set('keg-waktu', k.waktu); set('keg-tempat', k.tempat);
+  set('keg-pembina', k.pembinaID); set('keg-deskripsi', k.deskripsi);
+  var judul = document.getElementById('keg-form-judul'); if (judul) judul.textContent = 'Ubah Kegiatan: ' + k.nama;
+  var btn = document.getElementById('keg-btn'); if (btn) btn.innerHTML = '<i class="fas fa-save mr-1"></i>Simpan Perubahan';
+  try { document.getElementById('keg-nama').scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+}
+
+function sipKegReset_() {
+  _kegMode = 'tambah'; window._kegIdEdit = '';
+  ['keg-nama', 'keg-hari', 'keg-waktu', 'keg-tempat', 'keg-deskripsi'].forEach(function (i) { var el = document.getElementById(i); if (el) el.value = ''; });
+  var q = document.getElementById('keg-kuota'); if (q) q.value = '30';
+  var p = document.getElementById('keg-pembina'); if (p) p.value = '';
+  var judul = document.getElementById('keg-form-judul'); if (judul) judul.textContent = 'Tambah Kegiatan';
+  var btn = document.getElementById('keg-btn'); if (btn) btn.innerHTML = '<i class="fas fa-save mr-1"></i>Simpan';
+}
+
+function sipKegAktif_(id, aktif) {
+  sipKegKirim_({ aksi: 'aktif', id: id, aktif: aktif }, null);
+}
+function sipKegHapus_(id) {
+  Swal.fire({ title: 'Hapus kegiatan ini?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Ya, hapus', cancelButtonText: 'Batal', confirmButtonColor: '#e11d48' })
+    .then(function (r) { if (r.isConfirmed) sipKegKirim_({ aksi: 'hapus', id: id }, null); });
+}
+
+/* ---------------------- GELOMBANG REKRUTMEN (simpan) ---------------------- */
+function sipRkmKirim_(payload, lanjut) {
+  document.getElementById('global-loading').classList.remove('hidden');
+  google.script.run
+    .withSuccessHandler(function (res) {
+      document.getElementById('global-loading').classList.add('hidden');
+      if (res && res.success) { sipKegMuat_(); if (lanjut) lanjut(res); }
+      else Swal.fire('Gagal', (res && res.message) || 'Terjadi kesalahan.', 'warning');
+    })
+    .withFailureHandler(function (e) {
+      document.getElementById('global-loading').classList.add('hidden');
+      Swal.fire('Gagal', String((e && e.message) || e), 'error');
+    })
+    .simpanRekrutmen(payload, currentUser.userID, currentUser.token);
+}
+
+function sipRkmSimpan_() {
+  function v(id) { var el = document.getElementById(id); return el ? el.value : ''; }
+  var payload = {
+    aksi: _rkmMode === 'ubah' ? 'ubah' : 'tambah',
+    id: window._rkmIdEdit || '',
+    kegiatanID: v('rkm-kegiatan'), gelombang: v('rkm-nama'),
+    buka: v('rkm-buka'), tutup: v('rkm-tutup'),
+    syaratKelas: v('rkm-syarat'), kuota: v('rkm-kuota'),
+    bobotBerkas: v('rkm-b-berkas'), bobotTes: v('rkm-b-tes'), bobotWawancara: v('rkm-b-waw')
+  };
+  if (!payload.kegiatanID) { Swal.fire('Belum lengkap', 'Pilih kegiatan terlebih dahulu.', 'warning'); return; }
+  if (!payload.buka || !payload.tutup) { Swal.fire('Belum lengkap', 'Isi tanggal buka & tutup.', 'warning'); return; }
+  var totalB = (parseFloat(payload.bobotBerkas) || 0) + (parseFloat(payload.bobotTes) || 0) + (parseFloat(payload.bobotWawancara) || 0);
+  if (totalB <= 0) { Swal.fire('Bobot salah', 'Total bobot seleksi harus lebih dari 0.', 'warning'); return; }
+  sipRkmKirim_(payload, function () {
+    sipRkmReset_();
+    Swal.fire({ icon: 'success', title: 'Gelombang tersimpan', text: 'Status awal Draf — tekan Buka saat siap menerima pendaftar.', timer: 2200, showConfirmButton: false });
+  });
+}
+
+function sipRkmUbah_(id) {
+  var r = ((_kegData || {}).rekrutmenList || []).filter(function (x) { return x.id === id; })[0];
+  if (!r) return;
+  _rkmMode = 'ubah'; window._rkmIdEdit = r.id;
+  var set = function (i, val) { var el = document.getElementById(i); if (el) el.value = val; };
+  set('rkm-kegiatan', r.kegiatanID); set('rkm-nama', r.gelombang);
+  set('rkm-buka', sipTglInput_(r.buka)); set('rkm-tutup', sipTglInput_(r.tutup));
+  set('rkm-syarat', r.syaratKelas); set('rkm-kuota', r.kuota);
+  set('rkm-b-berkas', r.bobotBerkas); set('rkm-b-tes', r.bobotTes); set('rkm-b-waw', r.bobotWawancara);
+  var judul = document.getElementById('rkm-form-judul'); if (judul) judul.textContent = 'Ubah Gelombang: ' + r.gelombang;
+  var btn = document.getElementById('rkm-btn'); if (btn) btn.innerHTML = '<i class="fas fa-save mr-1"></i>Simpan Perubahan';
+  try { document.getElementById('rkm-kegiatan').scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+}
+
+function sipRkmReset_() {
+  _rkmMode = 'tambah'; window._rkmIdEdit = '';
+  ['rkm-nama', 'rkm-buka', 'rkm-tutup', 'rkm-syarat'].forEach(function (i) { var el = document.getElementById(i); if (el) el.value = ''; });
+  var q = document.getElementById('rkm-kuota'); if (q) q.value = '0';
+  var b1 = document.getElementById('rkm-b-berkas'); if (b1) b1.value = '20';
+  var b2 = document.getElementById('rkm-b-tes'); if (b2) b2.value = '50';
+  var b3 = document.getElementById('rkm-b-waw'); if (b3) b3.value = '30';
+  var judul = document.getElementById('rkm-form-judul'); if (judul) judul.textContent = 'Gelombang Rekrutmen Baru';
+  var btn = document.getElementById('rkm-btn'); if (btn) btn.innerHTML = '<i class="fas fa-save mr-1"></i>Simpan Gelombang';
+}
+
+function sipRkmStatus_(id, status) {
+  sipRkmKirim_({ aksi: 'status', id: id, status: status }, function () {
+    Swal.fire({ icon: 'success', title: 'Status: ' + status, timer: 1200, showConfirmButton: false });
+  });
+}
+function sipRkmHapus_(id) {
+  Swal.fire({ title: 'Hapus gelombang ini?', text: 'Gelombang yang sudah punya pendaftar tidak dapat dihapus.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Ya, hapus', cancelButtonText: 'Batal', confirmButtonColor: '#e11d48' })
+    .then(function (r) { if (r.isConfirmed) sipRkmKirim_({ aksi: 'hapus', id: id }, null); });
+}
+function sipRkmLihat_(id) { showAdminTab('dash-rekrutmen'); window._pendRkmAwal = id; sipPendMuat_(id); }
+
+/* -------------------- HALAMAN PENDAFTAR & VERIFIKASI -------------------- */
+function renderRekrutmenPage(container) {
+  var eh = escapeHtmlProfil_;
+  container.innerHTML =
+    '<div class="fade-in w-full space-y-6">' +
+      '<div class="dash-card p-6">' +
+        '<div class="flex items-center gap-3">' +
+          '<div class="w-10 h-10 rounded-lg bg-indigo-600 flex items-center justify-center text-white shadow-md"><i class="fas fa-user-plus"></i></div>' +
+          '<div><h2 class="text-xl font-bold text-slate-800 tracking-tight">Rekrutmen &amp; Verifikasi Berkas</h2>' +
+          '<p class="text-slate-500 text-sm">Pilih gelombang, lalu verifikasi pendaftar: <b>Lolos Berkas</b> atau <b>Ditolak</b>.</p></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="dash-card p-5">' +
+        '<div class="flex flex-wrap gap-2 items-end">' +
+          '<div class="min-w-[230px]"><label class="text-[10px] font-bold text-slate-500 uppercase">Gelombang</label><select id="pend-rkm" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white"></select></div>' +
+          '<div class="min-w-[150px]"><label class="text-[10px] font-bold text-slate-500 uppercase">Status</label><select id="pend-status" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">' +
+            '<option value="">Semua status</option><option>Menunggu</option><option>Lolos Berkas</option><option>Ditolak</option><option>Tes</option><option>Wawancara</option><option>Diterima</option><option>Cadangan</option></select></div>' +
+          '<button type="button" onclick="sipPendMuat_()" class="px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700"><i class="fas fa-magnifying-glass mr-1"></i>Tampilkan</button>' +
+          '<div class="flex-1"></div>' +
+          '<button type="button" onclick="sipPendVerifikasi_(\'Lolos Berkas\')" class="px-4 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700"><i class="fas fa-check mr-1"></i>Lolos Berkas</button>' +
+          '<button type="button" onclick="sipPendVerifikasi_(\'Ditolak\')" class="px-4 py-2 rounded-lg bg-rose-600 text-white text-xs font-bold hover:bg-rose-700"><i class="fas fa-xmark mr-1"></i>Tolak</button>' +
+        '</div>' +
+        '<p id="pend-info" class="text-[11px] text-slate-400 mt-2"></p>' +
+      '</div>' +
+      '<div id="pend-ringkas" class="grid grid-cols-2 sm:grid-cols-4 gap-3"></div>' +
+      '<div class="dash-card p-5">' +
+        '<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-[10px] uppercase text-slate-400 border-b">' +
+          '<th class="py-2 w-8"><input type="checkbox" id="pend-all" onchange="sipPendPilihSemua_(this.checked)" class="accent-indigo-600"></th>' +
+          '<th>Pendaftar</th><th>Kelas</th><th>Pilihan 1</th><th>Pilihan 2</th><th class="text-center">Status</th><th>Catatan</th><th class="text-right">Aksi</th>' +
+        '</tr></thead><tbody id="pend-list"><tr><td colspan="8" class="py-8 text-center text-slate-400 text-xs">Pilih gelombang lalu tekan Tampilkan.</td></tr></tbody></table></div>' +
+      '</div>' +
+    '</div>';
+  sipPendMuatOpsi_();
+}
+
+function sipPendMuatOpsi_() {
+  google.script.run
+    .withSuccessHandler(function (d) {
+      _kegData = d || {};
+      var sel = document.getElementById('pend-rkm');
+      if (!sel) return;
+      sel.innerHTML = '<option value="">-- Pilih gelombang --</option>' + ((d && d.rekrutmenList) || []).map(function (r) {
+        return '<option value="' + escapeHtmlProfil_(r.id) + '">' + escapeHtmlProfil_(r.namaKegiatan || '') + ' \u00b7 ' +
+          escapeHtmlProfil_(r.gelombang) + ' (' + escapeHtmlProfil_(r.status) + ')</option>';
+      }).join('');
+      if (window._pendRkmAwal) { sel.value = window._pendRkmAwal; window._pendRkmAwal = ''; sipPendMuat_(); }
+    })
+    .withFailureHandler(function (e) {
+      Swal.fire('Gagal', String((e && e.message) || e), 'error');
+    })
+    .getKegiatanData(currentUser.userID, currentUser.token);
+}
+
+function sipPendMuat_(rkmID) {
+  var sel = document.getElementById('pend-rkm');
+  var rid = rkmID || (sel ? sel.value : '');
+  if (!rid) { Swal.fire('Belum lengkap', 'Pilih gelombang rekrutmen terlebih dahulu.', 'warning'); return; }
+  var stSel = document.getElementById('pend-status');
+  var body = document.getElementById('pend-list');
+  if (body) body.innerHTML = '<tr><td colspan="8" class="py-8 text-center text-slate-400 text-xs"><i class="fas fa-circle-notch fa-spin mr-1"></i>Memuat pendaftar\u2026</td></tr>';
+  google.script.run
+    .withSuccessHandler(function (d) { _pendData = d || {}; sipPendIsi_(); })
+    .withFailureHandler(function (e) {
+      if (body) body.innerHTML = '<tr><td colspan="8" class="py-8 text-center text-rose-500 text-xs">Gagal: ' + escapeHtmlProfil_(String((e && e.message) || e)) + '</td></tr>';
+    })
+    .getPendaftarKegiatan({ rekrutmenID: rid, status: stSel ? stSel.value : '' }, currentUser.userID, currentUser.token);
+}
+
+function sipPendIsi_() {
+  var d = _pendData || {};
+  var eh = escapeHtmlProfil_;
+  if (d.success === false) {
+    var b0 = document.getElementById('pend-list');
+    if (b0) b0.innerHTML = '<tr><td colspan="8" class="py-8 text-center text-rose-500 text-xs">' + eh(d.message || 'Gagal.') + '</td></tr>';
+    return;
+  }
+  var rk = d.rekrutmen || {};
+  var info = document.getElementById('pend-info');
+  if (info) {
+    info.innerHTML = '<i class="fas fa-circle-info mr-1"></i><b>' + eh(rk.kegiatan || '') + '</b> \u00b7 ' + eh(rk.gelombang || '') +
+      ' \u00b7 status gelombang <b>' + eh(rk.status) + '</b> \u00b7 syarat kelas: ' + eh(rk.syaratKelas || 'semua') +
+      ' \u00b7 periode ' + eh(sipTglTampil_(rk.buka)) + ' s/d ' + eh(sipTglTampil_(rk.tutup));
+  }
+  var h = d.ringkasan || {};
+  var rg = document.getElementById('pend-ringkas');
+  if (rg) {
+    var chip = function (l, v, w) { return '<div class="dash-card px-4 py-3"><p class="text-[9px] uppercase font-bold text-slate-400 tracking-wider">' + l + '</p><p class="text-xl font-black ' + w + '">' + eh(v) + '</p></div>'; };
+    rg.innerHTML = chip('Total pendaftar', h.total || 0, 'text-slate-800') + chip('Menunggu', h.menunggu || 0, 'text-amber-600') +
+      chip('Lolos berkas', h.lolos || 0, 'text-emerald-600') + chip('Ditolak', h.ditolak || 0, 'text-rose-600');
+  }
+  var body = document.getElementById('pend-list');
+  if (!body) return;
+  var list = d.daftar || [];
+  if (!list.length) {
+    body.innerHTML = '<tr><td colspan="8" class="py-8 text-center text-slate-400 text-xs">Belum ada pendaftar pada gelombang ini.</td></tr>';
+    return;
+  }
+  body.innerHTML = list.map(function (x) {
+    return '<tr class="border-b border-slate-50 hover:bg-slate-50/60">' +
+      '<td class="py-2"><input type="checkbox" class="pend-cb accent-indigo-600" value="' + eh(x.id) + '"></td>' +
+      '<td><div class="font-medium text-slate-700">' + eh(x.nama) + '</div><div class="text-[10px] text-slate-400 font-mono">' + eh(x.userID) + '</div></td>' +
+      '<td class="text-xs">' + eh(x.kelas) + '</td>' +
+      '<td class="text-xs text-slate-600">' + eh(x.pilihan1 || '\u2013') + '</td>' +
+      '<td class="text-xs text-slate-500">' + eh(x.pilihan2 || '\u2013') + '</td>' +
+      '<td class="text-center"><span class="text-[10px] font-bold px-2 py-0.5 rounded border ' + sipKegStatusWarna_(x.status) + '">' + eh(x.status) + '</span></td>' +
+      '<td class="text-[11px] text-slate-500 max-w-[160px] truncate" title="' + eh(x.catatan || '') + '">' + eh(x.catatan || '\u2013') + '</td>' +
+      '<td class="text-right whitespace-nowrap"><button type="button" onclick="sipPendDetail_(\'' + eh(x.id) + '\')" class="text-[11px] font-bold text-indigo-600 hover:underline">Lihat</button></td></tr>';
+  }).join('');
+}
+
+function sipPendPilihSemua_(centang) {
+  document.querySelectorAll('.pend-cb').forEach(function (cb) { cb.checked = !!centang; });
+}
+
+function sipPendDetail_(id) {
+  var x = ((_pendData || {}).daftar || []).filter(function (y) { return y.id === id; })[0];
+  if (!x) return;
+  var eh = escapeHtmlProfil_;
+  Swal.fire({
+    title: 'Formulir Pendaftaran',
+    html: '<div class="text-left text-sm space-y-2">' +
+      '<p><b>' + eh(x.nama) + '</b> \u00b7 ' + eh(x.kelas) + ' \u00b7 <span class="font-mono text-xs">' + eh(x.userID) + '</span></p>' +
+      '<p class="text-xs"><b>Pilihan 1:</b> ' + eh(x.pilihan1 || '\u2013') + '<br><b>Pilihan 2:</b> ' + eh(x.pilihan2 || '\u2013') + '</p>' +
+      '<p class="text-xs"><b>Motivasi:</b><br><span class="text-slate-600">' + eh(x.motivasi || '\u2013') + '</span></p>' +
+      '<p class="text-xs"><b>Pengalaman:</b><br><span class="text-slate-600">' + eh(x.pengalaman || '\u2013') + '</span></p>' +
+      '<p class="text-xs"><b>Status:</b> ' + eh(x.status) + (x.catatan ? ' \u00b7 ' + eh(x.catatan) : '') + '</p></div>',
+    width: 560
+  });
+}
+
+function sipPendVerifikasi_(status) {
+  var ids = [];
+  document.querySelectorAll('.pend-cb').forEach(function (cb) { if (cb.checked) ids.push(cb.value); });
+  if (!ids.length) { Swal.fire('Belum ada pilihan', 'Centang dulu pendaftar yang akan diverifikasi.', 'warning'); return; }
+  var judul = status === 'Ditolak' ? 'Tolak ' + ids.length + ' pendaftar?' : 'Loloskan berkas ' + ids.length + ' pendaftar?';
+  Swal.fire({
+    title: judul,
+    input: 'text',
+    inputLabel: 'Catatan (opsional, tampil ke siswa)',
+    inputPlaceholder: 'mis. Berkas lengkap / foto belum sesuai',
+    showCancelButton: true, confirmButtonText: 'Ya, lanjutkan', cancelButtonText: 'Batal',
+    confirmButtonColor: status === 'Ditolak' ? '#e11d48' : '#059669'
+  }).then(function (r) {
+    if (!r.isConfirmed) return;
+    document.getElementById('global-loading').classList.remove('hidden');
+    google.script.run
+      .withSuccessHandler(function (res) {
+        document.getElementById('global-loading').classList.add('hidden');
+        if (res && res.success) {
+          Swal.fire({ icon: 'success', title: 'Terverifikasi', text: res.message || '', timer: 1800, showConfirmButton: false });
+          sipPendMuat_();
+        } else Swal.fire('Gagal', (res && res.message) || 'Gagal.', 'warning');
+      })
+      .withFailureHandler(function (e) {
+        document.getElementById('global-loading').classList.add('hidden');
+        Swal.fire('Gagal', String((e && e.message) || e), 'error');
+      })
+      .verifikasiPendaftar({ ids: ids, status: status, catatan: String((r && r.value) || '') }, currentUser.userID, currentUser.token);
+  });
+}
+
+/* ------------------- KARTU REKRUTMEN UNTUK SISWA ------------------- */
+function sipRekrutmenSiswaMuat_() {
+  if (!currentUser || currentUser.role !== 'Siswa') return;
+  var el = document.getElementById('siswa-rekrutmen');
+  if (!el) return;
+  google.script.run
+    .withSuccessHandler(function (d) {
+      var box = document.getElementById('siswa-rekrutmen');
+      if (!box) return;
+      var daftar = (d && d.daftar) || [];
+      if (!daftar.length) { box.innerHTML = ''; return; } // tidak ada lowongan = tanpa kartu
+      var eh = escapeHtmlProfil_;
+      var kartu = daftar.map(function (r, i) {
+        var badge = r.sudahDaftar
+          ? '<span class="text-[10px] font-bold px-2 py-0.5 rounded border ' + sipKegStatusWarna_(r.statusSaya) + '">' + eh(r.statusSaya) + '</span>'
+          : (r.bolehDaftar
+            ? '<span class="text-[10px] font-bold px-2 py-0.5 rounded border bg-emerald-50 text-emerald-700 border-emerald-200">Dibuka</span>'
+            : '<span class="text-[10px] font-bold px-2 py-0.5 rounded border bg-slate-100 text-slate-500 border-slate-200">Tidak tersedia</span>');
+        var aksi = r.sudahDaftar
+          ? '<p class="text-[11px] text-slate-400">Pantau status di sini. ' + (r.catatanSaya ? 'Catatan pembina: ' + eh(r.catatanSaya) : '') + '</p>'
+          : (r.bolehDaftar
+            ? '<button type="button" onclick="sipRekrutmenForm_(' + i + ')" class="px-4 py-2 rounded-xl bg-[#1b3a6b] text-white text-xs font-bold"><i class="fas fa-pen-to-square mr-1"></i>Daftar Sekarang</button>'
+            : '<p class="text-[11px] text-slate-400">' + eh(r.alasan || '') + '</p>');
+        return '<article class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">' +
+          '<div class="flex items-start justify-between gap-2">' +
+            '<div><p class="text-[10px] uppercase tracking-[0.16em] text-sky-600 font-bold">' + eh(r.kategori) + ' \u00b7 ' + eh(r.gelombang) + '</p>' +
+            '<h3 class="font-black text-slate-800 text-base">' + eh(r.namaKegiatan) + '</h3>' +
+            '<p class="text-[11px] text-slate-500 mt-1">' + eh([r.hari, r.waktu, r.tempat].filter(Boolean).join(' \u00b7 ') || '') + '</p>' +
+            '<p class="text-[11px] text-slate-400">Pembina: ' + eh(r.pembina || '\u2013') + ' \u00b7 kuota ' + eh(r.terisi) + '/' + eh(r.kuota) + '</p></div>' +
+            '<div>' + badge + '</div>' +
+          '</div>' +
+          (r.deskripsi ? '<p class="text-xs text-slate-600 mt-2">' + eh(r.deskripsi) + '</p>' : '') +
+          '<p class="text-[10px] text-slate-400 mt-2">Pendaftaran: ' + eh(sipTglTampil_(r.buka)) + ' s/d ' + eh(sipTglTampil_(r.tutup)) + '</p>' +
+          '<div class="mt-3">' + aksi + '</div></article>';
+      }).join('');
+      box.innerHTML = '<div class="space-y-3">' +
+        '<div class="flex items-center justify-between"><h2 class="font-bold text-slate-800 text-lg">Rekrutmen &amp; Kegiatan</h2>' +
+        '<span class="text-[10px] font-bold px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100"><i class="fas fa-bullhorn mr-1"></i>' + daftar.length + ' lowongan</span></div>' +
+        kartu + '</div>';
+      window._sipRekrutmenSiswa = daftar;
+    })
+    .withFailureHandler(function () {})
+    .getRekrutmenSiswa(currentUser.userID, currentUser.token);
+}
+
+function sipRekrutmenForm_(idx) {
+  var r = (window._sipRekrutmenSiswa || [])[idx];
+  if (!r) return;
+  var eh = escapeHtmlProfil_;
+  var opsi = function (arr, terpilih) {
+    return arr.map(function (x) {
+      return '<option value="' + eh(x.id) + '"' + (x.id === terpilih ? ' selected' : '') + '>' + eh(x.nama) + '</option>';
+    }).join('');
+  };
+  Swal.fire({
+    title: 'Formulir Pendaftaran',
+    html: '<div class="text-left space-y-3">' +
+      '<p class="text-xs text-slate-500">Mendaftar <b>' + eh(r.namaKegiatan) + '</b> \u00b7 ' + eh(r.gelombang) + '. Biodata &amp; foto profil Anda dipakai otomatis \u2014 tidak perlu diisi ulang.</p>' +
+      '<label class="block text-xs font-bold text-slate-600">Pilihan 1<select id="sip-daftar-p1" class="mt-1 w-full border rounded-xl px-3 py-2 text-sm font-normal">' + opsi(r.pilihan, r.kegiatanID) + '</select></label>' +
+      '<label class="block text-xs font-bold text-slate-600">Pilihan 2 (opsional)<select id="sip-daftar-p2" class="mt-1 w-full border rounded-xl px-3 py-2 text-sm font-normal"><option value="">\u2014 Tidak ada \u2014</option>' + opsi(r.pilihan, '') + '</select></label>' +
+      '<label class="block text-xs font-bold text-slate-600">Alasan / motivasi <span class="font-normal text-slate-400">(min. 20 karakter)</span>' +
+      '<textarea id="sip-daftar-motivasi" rows="3" maxlength="1000" class="mt-1 w-full border rounded-xl px-3 py-2 text-sm font-normal" placeholder="Mengapa ingin mengikuti kegiatan ini?"></textarea></label>' +
+      '<label class="block text-xs font-bold text-slate-600">Pengalaman (opsional)' +
+      '<textarea id="sip-daftar-pengalaman" rows="2" maxlength="600" class="mt-1 w-full border rounded-xl px-3 py-2 text-sm font-normal" placeholder="Pengalaman organisasi / kegiatan sebelumnya"></textarea></label>' +
+      '</div>',
+    width: 620, showCancelButton: true, confirmButtonText: 'Kirim Pendaftaran', cancelButtonText: 'Batal', confirmButtonColor: '#1b3a6b',
+    preConfirm: function () {
+      return {
+        rekrutmenID: r.id,
+        pilihan1: (document.getElementById('sip-daftar-p1') || {}).value || '',
+        pilihan2: (document.getElementById('sip-daftar-p2') || {}).value || '',
+        motivasi: (document.getElementById('sip-daftar-motivasi') || {}).value || '',
+        pengalaman: (document.getElementById('sip-daftar-pengalaman') || {}).value || ''
+      };
+    }
+  }).then(function (res) {
+    if (!res.isConfirmed || !res.value) return;
+    if (String(res.value.motivasi).trim().length < 20) {
+      Swal.fire('Motivasi terlalu singkat', 'Tulis minimal 20 karakter agar pembina dapat menilai.', 'warning');
+      return;
+    }
+    document.getElementById('global-loading').classList.remove('hidden');
+    google.script.run
+      .withSuccessHandler(function (out) {
+        document.getElementById('global-loading').classList.add('hidden');
+        if (out && out.success) {
+          Swal.fire({ icon: 'success', title: 'Pendaftaran terkirim', text: out.message || '', confirmButtonColor: '#1b3a6b' });
+          sipRekrutmenSiswaMuat_();
+        } else Swal.fire('Gagal', (out && out.message) || 'Pendaftaran gagal.', 'warning');
+      })
+      .withFailureHandler(function (e) {
+        document.getElementById('global-loading').classList.add('hidden');
+        Swal.fire('Gagal', String((e && e.message) || e), 'error');
+      })
+      .daftarKegiatan(res.value, currentUser.userID, currentUser.token);
+  });
 }
 
 function renderRekapRaporPage(container) {
@@ -22299,5 +22930,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a589eff2dce1fd14',t:'MTc5NDM2NDg3OQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a589eff2dce1fd14',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a589f88ceeaada70',t:'MTc5NDM2NTIzMg=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a589f88ceeaada70',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
