@@ -1888,6 +1888,18 @@
             </div>
           </div>
 
+          <div class="menu-mod" id="mod-akademik">
+            <button type="button" class="menu-mod-head" onclick="toggleMenuMod('mod-akademik')" title="Tampilkan / sembunyikan modul">
+              <span class="menu-mod-title"><i class="fas fa-graduation-cap mod-ico"></i><span class="sidebar-text">Modul Akademik</span></span>
+              <i class="fas fa-chevron-down menu-mod-chev"></i>
+            </button>
+            <div class="menu-mod-body">
+              <div id="menu-akademik" class="sidebar-item" onclick="showAdminTab('dash-akademik', this)">
+                <i class="fas fa-calendar-days"></i> <span class="sidebar-text font-medium">Tahun Ajaran &amp; Mapel</span>
+              </div>
+            </div>
+          </div>
+
           <div class="menu-mod" id="mod-sistem">
             <button type="button" class="menu-mod-head" onclick="toggleMenuMod('mod-sistem')" title="Tampilkan / sembunyikan modul">
               <span class="menu-mod-title"><i class="fas fa-sliders-h mod-ico"></i><span class="sidebar-text">Modul Sistem</span></span>
@@ -2913,7 +2925,7 @@ function initAdminPanel() {
   const guruAllowedMenus = ['menu-home', 'menu-profil-guru', 'menu-pgw-ujian', 'menu-pgw-koreksi', 'menu-questions', 'menu-materibab', 'menu-exams', 'menu-sesi-bagi', 'menu-results', 'menu-profil', 'menu-kartu', 'menu-hadir', 'menu-users', 'menu-images'];
   const adminOnlyMenus = ['menu-questions', 'menu-kisi', 'menu-ai-generator', 'menu-hermes',
     'menu-report-template', 'menu-users', 'menu-profil', 'menu-kartu', 'menu-hadir',
-    'menu-images', 'menu-music', 'menu-config',
+    'menu-images', 'menu-music', 'menu-config', 'menu-akademik',
     'menu-master-data', 'menu-pengawas', 'menu-timsoal', 'menu-panitia', 'menu-exams', 'menu-sesi-bagi', 'menu-results',
     'menu-pgw-ujian', 'menu-pgw-koreksi'];
   const guruOnlyMenus = ['menu-pgw-ujian', 'menu-pgw-koreksi'];
@@ -2960,6 +2972,9 @@ function initAdminPanel() {
     const elModSistem = document.getElementById('mod-sistem');
     // [V3.9] Tim Soal butuh Folder Gambar (menu lain Modul Sistem tetap tersembunyi)
     if (elModSistem) elModSistem.classList.toggle('hidden', !izinBankGuru);
+    // [V6.4] Modul Akademik: KHUSUS Admin — guru (apa pun izinnya) tidak melihatnya
+    const elModAkad = document.getElementById('mod-akademik');
+    if (elModAkad) elModAkad.classList.add('hidden');
   } else {
     adminOnlyMenus.forEach(id => {
       const el = document.getElementById(id);
@@ -2969,7 +2984,7 @@ function initAdminPanel() {
       const el = document.getElementById(id);
       if (el) el.classList.add('hidden');
     });
-    ['mod-data', 'mod-sistem'].forEach(id => {
+    ['mod-data', 'mod-sistem', 'mod-akademik'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.classList.remove('hidden');
     });
@@ -3819,6 +3834,7 @@ function renderProfilGuruPage(container) {
         '<h2 class="text-xl font-bold text-slate-800 tracking-tight">Profil Saya (Guru)</h2></div>' +
         '<p class="text-slate-500 text-sm ml-14">Lengkapi data diri Anda. Saat disimpan, sistem otomatis membuat <b>folder Drive pribadi</b> dan menyimpan <b>data diri + foto</b> ke folder tersebut.</p>' +
         '</div>' +
+        '<div id="pfg-ampu-card" class="dash-card p-6 hidden"></div>' +
         '<div class="dash-card p-6 grid grid-cols-1 md:grid-cols-3 gap-6">' +
         '<div class="text-center">' +
         '<div class="mx-auto" style="width:150px;height:200px;border-radius:14px;overflow:hidden;border:3px solid #e2e8f0;background:#f1f5f9;display:flex;align-items:center;justify-content:center">' +
@@ -4150,6 +4166,7 @@ function showAdminTab(tabId, el) {
   } else if (tabId === 'dash-profil-guru') {
     title.innerText = 'Profil Saya';
     renderProfilGuruPage(content);
+    try { sipAmpuMuat_(0); } catch (eAmpu64) {} // [V6.4] kartu mapel ampuan
 
   } else if (tabId === 'dash-pgw-ujian') {
     title.innerText = (currentUser && (currentUser.role === 'Admin' || ((currentUser.pengawas || {}).izinPanitia === true))) ? 'Sesi & PIN Ujian' : 'Jadwal Ujian (Pengawas)';
@@ -4192,6 +4209,10 @@ function showAdminTab(tabId, el) {
     title.innerText = 'Konfigurasi Sistem';
     renderConfigPage(content);
  
+  } else if (tabId === 'dash-akademik') {
+    title.innerText = 'Akademik — Tahun Ajaran & Mata Pelajaran';
+    renderAkademikPage(content);
+
   } else if (tabId === 'dash-master-data') {
     title.innerText = 'Data Master';
     renderMasterDataPage(content);
@@ -6399,6 +6420,221 @@ function setRowValidasi(responseId, studentId, status) {
    5. MASTER DATA MANAGEMENT
    ========================================================================== */
 
+
+/* ============================================================================
+   [V6.4] HALAMAN AKADEMIK (KHUSUS ADMIN) + helper kategori & mapel ampuan
+   ============================================================================ */
+function sipKategoriLabel_(k) {
+  var m = { SUMATIF: 'Sumatif', STS: 'STS', SAS: 'SAS', SELEKSI: 'Seleksi', LATIHAN: 'Latihan' };
+  return m[String(k || '').toUpperCase()] || 'Sumatif';
+}
+
+var _akademikData = null;
+var _akadMpMode = 'tambah'; // 'tambah' | 'ubah'
+
+function renderAkademikPage(container) {
+  _akadMpMode = 'tambah';
+  container.innerHTML =
+    '<div class="fade-in w-full space-y-6">' +
+    '<div class="dash-card p-6">' +
+    '<div class="flex items-center gap-3 mb-1"><div class="w-10 h-10 rounded-lg bg-indigo-600 flex items-center justify-center text-white shadow-md"><i class="fas fa-graduation-cap"></i></div>' +
+    '<h2 class="text-xl font-bold text-slate-800 tracking-tight">Fondasi Akademik</h2></div>' +
+    '<p class="text-slate-500 text-sm ml-14">Tetapkan <b>Tahun Ajaran aktif</b>, kelola <b>Master Mata Pelajaran</b> (kode, nama, KKTP), dan tunjuk <b>Guru Pengampu</b> per mapel &amp; kelas. Data ini menjadi dasar Buku Nilai &amp; Rekap Rapor (tahap berikutnya).</p>' +
+    '<div id="akad-ta-aktif" class="ml-14 mt-2 text-xs font-bold text-indigo-700"></div>' +
+    '</div>' +
+    '<div class="grid grid-cols-1 xl:grid-cols-2 gap-6">' +
+    // ---- KARTU TAHUN AJARAN ----
+    '<div class="dash-card p-6">' +
+    '<h3 class="font-bold text-slate-800 text-sm mb-3"><i class="fas fa-calendar-days text-indigo-500 mr-2"></i>Tahun Ajaran &amp; Semester</h3>' +
+    '<div class="flex flex-wrap gap-2 items-end mb-4">' +
+    '<div><label class="text-[10px] font-bold text-slate-500 uppercase">Tahun Ajaran</label><input id="akad-ta-tahun" placeholder="2026/2027" class="mt-1 w-32 px-3 py-2 rounded-lg border border-slate-300 text-sm"></div>' +
+    '<div><label class="text-[10px] font-bold text-slate-500 uppercase">Semester</label><select id="akad-ta-semester" class="mt-1 px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white"><option>Ganjil</option><option>Genap</option></select></div>' +
+    '<button type="button" onclick="sipTaTambah_()" class="px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700"><i class="fas fa-plus mr-1"></i>Tambah</button>' +
+    '</div>' +
+    '<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-[10px] uppercase text-slate-400 border-b"><th class="py-2">Tahun</th><th>Semester</th><th>Status</th><th class="text-right">Aksi</th></tr></thead>' +
+    '<tbody id="akad-ta-list"><tr><td colspan="4" class="py-4 text-slate-400 text-xs">Memuat\u2026</td></tr></tbody></table></div>' +
+    '</div>' +
+    // ---- KARTU MAPEL ----
+    '<div class="dash-card p-6">' +
+    '<h3 class="font-bold text-slate-800 text-sm mb-3"><i class="fas fa-book text-indigo-500 mr-2"></i>Master Mata Pelajaran</h3>' +
+    '<div class="flex flex-wrap gap-2 items-end mb-4">' +
+    '<div><label class="text-[10px] font-bold text-slate-500 uppercase">Kode</label><input id="akad-mp-kode" placeholder="MTK" maxlength="10" class="mt-1 w-24 px-3 py-2 rounded-lg border border-slate-300 text-sm uppercase"></div>' +
+    '<div class="flex-1 min-w-[140px]"><label class="text-[10px] font-bold text-slate-500 uppercase">Nama Mapel</label><input id="akad-mp-nama" placeholder="Matematika" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"></div>' +
+    '<div><label class="text-[10px] font-bold text-slate-500 uppercase">KKTP</label><input id="akad-mp-kktp" type="number" min="0" max="100" value="70" class="mt-1 w-20 px-3 py-2 rounded-lg border border-slate-300 text-sm"></div>' +
+    '<button type="button" id="akad-mp-btn" onclick="sipMpSimpan_()" class="px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700"><i class="fas fa-plus mr-1"></i>Tambah</button>' +
+    '</div>' +
+    '<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-[10px] uppercase text-slate-400 border-b"><th class="py-2">Kode</th><th>Nama</th><th>KKTP</th><th class="text-right">Aksi</th></tr></thead>' +
+    '<tbody id="akad-mp-list"><tr><td colspan="4" class="py-4 text-slate-400 text-xs">Memuat\u2026</td></tr></tbody></table></div>' +
+    '</div>' +
+    '</div>' +
+    // ---- KARTU GURU PENGAMPU ----
+    '<div class="dash-card p-6">' +
+    '<h3 class="font-bold text-slate-800 text-sm mb-1"><i class="fas fa-chalkboard-user text-indigo-500 mr-2"></i>Guru Pengampu (tahun ajaran aktif)</h3>' +
+    '<p class="text-[11px] text-slate-400 mb-3">Penugasan ini murni data akademik (dasar Buku Nilai V6.5). <b>Tidak mengubah</b> izin Pengawas / Tim Soal / Panitia yang sudah berjalan.</p>' +
+    '<div class="flex flex-wrap gap-2 items-end mb-4">' +
+    '<div class="min-w-[180px]"><label class="text-[10px] font-bold text-slate-500 uppercase">Guru</label><select id="akad-gm-guru" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white"></select></div>' +
+    '<div><label class="text-[10px] font-bold text-slate-500 uppercase">Mapel</label><select id="akad-gm-mapel" class="mt-1 px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white"></select></div>' +
+    '<div class="min-w-[160px]"><label class="text-[10px] font-bold text-slate-500 uppercase">Kelas (pisahkan koma)</label><input id="akad-gm-kelas" list="akad-kelas-list" placeholder="7A, 7B" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"><datalist id="akad-kelas-list"></datalist></div>' +
+    '<button type="button" onclick="sipGmTambah_()" class="px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700"><i class="fas fa-user-plus mr-1"></i>Tugaskan</button>' +
+    '</div>' +
+    '<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-[10px] uppercase text-slate-400 border-b"><th class="py-2">Guru</th><th>Mapel</th><th>Kelas</th><th>Tahun Ajaran</th><th class="text-right">Aksi</th></tr></thead>' +
+    '<tbody id="akad-gm-list"><tr><td colspan="5" class="py-4 text-slate-400 text-xs">Memuat\u2026</td></tr></tbody></table></div>' +
+    '</div>' +
+    '</div>';
+  sipAkademikMuat_();
+}
+
+function sipAkademikMuat_() {
+  google.script.run
+    .withSuccessHandler(function (d) { _akademikData = d || {}; sipAkademikIsi_(); })
+    .withFailureHandler(function (e) {
+      var el = document.getElementById('akad-ta-aktif');
+      if (el) el.innerHTML = '<span class="text-rose-600">Gagal memuat: ' + escapeHtmlProfil_(String((e && e.message) || e)) + '</span>';
+    })
+    .getAkademikData(currentUser.userID, currentUser.token);
+}
+
+function sipAkademikIsi_() {
+  var d = _akademikData || {};
+  var eh = escapeHtmlProfil_;
+  var banner = document.getElementById('akad-ta-aktif');
+  if (banner) banner.innerHTML = d.tahunAktif
+    ? '<i class="fas fa-circle-check mr-1"></i>Tahun ajaran aktif: ' + eh(d.tahunAktif)
+    : '<span class="text-amber-600"><i class="fas fa-triangle-exclamation mr-1"></i>Belum ada tahun ajaran AKTIF \u2014 tambah lalu klik Aktifkan.</span>';
+  var ta = document.getElementById('akad-ta-list');
+  if (ta) {
+    var rows = (d.tahunList || []).map(function (t) {
+      return '<tr class="border-b border-slate-50"><td class="py-2 font-medium text-slate-700">' + eh(t.tahun) + '</td><td>' + eh(t.semester) + '</td>' +
+        '<td>' + (t.aktif ? '<span class="text-[10px] font-bold bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded border border-emerald-100">AKTIF</span>' : '<span class="text-[10px] text-slate-400">\u2014</span>') + '</td>' +
+        '<td class="text-right whitespace-nowrap">' +
+        (t.aktif ? '' : '<button onclick="sipTaAksi_(\'aktifkan\',\'' + eh(t.id) + '\')" class="text-[11px] font-bold text-indigo-600 hover:underline mr-3">Aktifkan</button>' +
+          '<button onclick="sipTaAksi_(\'hapus\',\'' + eh(t.id) + '\')" class="text-[11px] font-bold text-rose-500 hover:underline">Hapus</button>') +
+        '</td></tr>';
+    });
+    ta.innerHTML = rows.length ? rows.join('') : '<tr><td colspan="4" class="py-4 text-slate-400 text-xs">Belum ada tahun ajaran. Tambahkan di atas.</td></tr>';
+  }
+  var mp = document.getElementById('akad-mp-list');
+  if (mp) {
+    var mrows = (d.mapelList || []).map(function (m) {
+      return '<tr class="border-b border-slate-50"><td class="py-2 font-mono text-xs font-bold text-slate-600">' + eh(m.kode) + '</td><td class="text-slate-700">' + eh(m.nama) + '</td><td>' + eh(m.kktp) + '</td>' +
+        '<td class="text-right whitespace-nowrap">' +
+        '<button onclick="sipMpIsiForm_(\'' + eh(m.kode) + '\')" class="text-[11px] font-bold text-indigo-600 hover:underline mr-3">Ubah</button>' +
+        '<button onclick="sipMpHapus_(\'' + eh(m.kode) + '\')" class="text-[11px] font-bold text-rose-500 hover:underline">Hapus</button></td></tr>';
+    });
+    mp.innerHTML = mrows.length ? mrows.join('') : '<tr><td colspan="4" class="py-4 text-slate-400 text-xs">Belum ada mapel.</td></tr>';
+  }
+  var selG = document.getElementById('akad-gm-guru');
+  if (selG) selG.innerHTML = '<option value="">-- Pilih Guru --</option>' + (d.guruList || []).map(function (g) {
+    return '<option value="' + eh(g.userID) + '">' + eh(g.nama || g.userID) + '</option>';
+  }).join('');
+  var selM = document.getElementById('akad-gm-mapel');
+  if (selM) selM.innerHTML = '<option value="">-- Mapel --</option>' + (d.mapelList || []).map(function (m) {
+    return '<option value="' + eh(m.kode) + '">' + eh(m.nama) + '</option>';
+  }).join('');
+  var dl = document.getElementById('akad-kelas-list');
+  if (dl) dl.innerHTML = (d.kelasList || []).map(function (k) { return '<option value="' + eh(k) + '">'; }).join('');
+  var gm = document.getElementById('akad-gm-list');
+  if (gm) {
+    var grows = (d.guruMapelList || []).map(function (g) {
+      return '<tr class="border-b border-slate-50"><td class="py-2 text-slate-700">' + eh(g.guruNama || g.guruID) + '</td><td class="font-mono text-xs font-bold text-slate-600">' + eh(g.kodeMapel) + '</td><td>' + eh(g.kelas) + '</td><td class="text-xs text-slate-500">' + eh(g.ta || '\u2014') + '</td>' +
+        '<td class="text-right"><button onclick="sipGmHapus_(\'' + eh(g.id) + '\')" class="text-[11px] font-bold text-rose-500 hover:underline">Hapus</button></td></tr>';
+    });
+    gm.innerHTML = grows.length ? grows.join('') : '<tr><td colspan="5" class="py-4 text-slate-400 text-xs">Belum ada penugasan guru pengampu.</td></tr>';
+  }
+}
+
+function sipAkadKirim_(fnName, payload) {
+  document.getElementById('global-loading').classList.remove('hidden');
+  var runner = google.script.run
+    .withSuccessHandler(function (res) {
+      document.getElementById('global-loading').classList.add('hidden');
+      if (res && res.success) { sipAkademikMuat_(); }
+      else { Swal.fire('Gagal', (res && res.message) || 'Terjadi kesalahan.', 'warning'); }
+    })
+    .withFailureHandler(function (e) {
+      document.getElementById('global-loading').classList.add('hidden');
+      Swal.fire('Gagal', String((e && e.message) || e), 'error');
+    });
+  runner[fnName](payload, currentUser.userID, currentUser.token);
+}
+
+function sipTaTambah_() {
+  var tahun = (document.getElementById('akad-ta-tahun') || {}).value || '';
+  var sem = (document.getElementById('akad-ta-semester') || {}).value || 'Ganjil';
+  if (!/^20\d{2}\/20\d{2}$/.test(String(tahun).trim())) { Swal.fire('Format salah', 'Tulis tahun ajaran seperti 2026/2027.', 'warning'); return; }
+  sipAkadKirim_('simpanTahunAjaran', { aksi: 'tambah', tahun: String(tahun).trim(), semester: sem });
+}
+function sipTaAksi_(aksi, id) {
+  if (aksi === 'hapus') {
+    Swal.fire({ title: 'Hapus tahun ajaran?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Ya, hapus', cancelButtonText: 'Batal', confirmButtonColor: '#e11d48' })
+      .then(function (r) { if (r.isConfirmed) sipAkadKirim_('simpanTahunAjaran', { aksi: 'hapus', id: id }); });
+    return;
+  }
+  sipAkadKirim_('simpanTahunAjaran', { aksi: aksi, id: id });
+}
+function sipMpIsiForm_(kode) {
+  var d = _akademikData || {};
+  var m = (d.mapelList || []).find(function (x) { return x.kode === kode; });
+  if (!m) return;
+  _akadMpMode = 'ubah';
+  var k = document.getElementById('akad-mp-kode'); if (k) { k.value = m.kode; k.readOnly = true; k.classList.add('bg-slate-100'); }
+  var n = document.getElementById('akad-mp-nama'); if (n) n.value = m.nama;
+  var p = document.getElementById('akad-mp-kktp'); if (p) p.value = m.kktp;
+  var b = document.getElementById('akad-mp-btn'); if (b) b.innerHTML = '<i class="fas fa-save mr-1"></i>Simpan Perubahan';
+}
+function sipMpSimpan_() {
+  var kode = (document.getElementById('akad-mp-kode') || {}).value || '';
+  var nama = (document.getElementById('akad-mp-nama') || {}).value || '';
+  var kktp = (document.getElementById('akad-mp-kktp') || {}).value || '';
+  sipAkadKirim_('simpanMapel', { aksi: _akadMpMode === 'ubah' ? 'ubah' : 'tambah', kode: kode, nama: nama, kktp: kktp });
+  _akadMpMode = 'tambah';
+  var k = document.getElementById('akad-mp-kode'); if (k) { k.readOnly = false; k.classList.remove('bg-slate-100'); k.value = ''; }
+  var n = document.getElementById('akad-mp-nama'); if (n) n.value = '';
+  var b = document.getElementById('akad-mp-btn'); if (b) b.innerHTML = '<i class="fas fa-plus mr-1"></i>Tambah';
+}
+function sipMpHapus_(kode) {
+  Swal.fire({ title: 'Hapus mapel ' + kode + '?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Ya, hapus', cancelButtonText: 'Batal', confirmButtonColor: '#e11d48' })
+    .then(function (r) { if (r.isConfirmed) sipAkadKirim_('simpanMapel', { aksi: 'hapus', kode: kode, nama: 'x', kktp: 0 }); });
+}
+function sipGmTambah_() {
+  var guruID = (document.getElementById('akad-gm-guru') || {}).value || '';
+  var kode = (document.getElementById('akad-gm-mapel') || {}).value || '';
+  var kelas = (document.getElementById('akad-gm-kelas') || {}).value || '';
+  if (!guruID || !kode || !String(kelas).trim()) { Swal.fire('Belum lengkap', 'Pilih guru, mapel, dan isi kelas.', 'warning'); return; }
+  sipAkadKirim_('simpanGuruMapel', { aksi: 'tambah', guruID: guruID, kodeMapel: kode, kelas: String(kelas).trim() });
+}
+function sipGmHapus_(id) {
+  Swal.fire({ title: 'Hapus penugasan ini?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Ya, hapus', cancelButtonText: 'Batal', confirmButtonColor: '#e11d48' })
+    .then(function (r) { if (r.isConfirmed) sipAkadKirim_('simpanGuruMapel', { aksi: 'hapus', id: id }); });
+}
+
+// [V6.4] Kartu "Mapel yang Diampu" di Profil Guru (coba beberapa kali
+// karena kartu baru ada setelah render async profil selesai)
+function sipAmpuMuat_(coba) {
+  coba = coba || 0;
+  if (!currentUser || currentUser.role !== 'Guru') return;
+  google.script.run
+    .withSuccessHandler(function (res) { sipAmpuTampil_(res || {}, 0); })
+    .withFailureHandler(function () {})
+    .getMapelAmpuSaya(currentUser.userID, currentUser.token);
+}
+function sipAmpuTampil_(res, coba) {
+  var card = document.getElementById('pfg-ampu-card');
+  if (!card) {
+    if (coba < 8) setTimeout(function () { sipAmpuTampil_(res, coba + 1); }, 700);
+    return;
+  }
+  var daftar = res.daftar || [];
+  if (!daftar.length) { card.classList.add('hidden'); return; }
+  var eh = escapeHtmlProfil_;
+  card.classList.remove('hidden');
+  card.innerHTML = '<h3 class="font-bold text-slate-800 text-sm mb-2"><i class="fas fa-chalkboard-user text-indigo-500 mr-2"></i>Mapel yang Saya Ampu' +
+    (res.tahunAktif ? ' <span class="text-[10px] font-normal text-slate-400">(' + eh(res.tahunAktif) + ')</span>' : '') + '</h3>' +
+    '<div class="flex flex-wrap gap-2">' + daftar.map(function (a) {
+      return '<span class="text-xs font-bold bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg border border-indigo-100">' + eh(a.namaMapel) + ' <span class="font-normal text-indigo-400">\u2014 ' + eh(a.kelas) + '</span></span>';
+    }).join('') + '</div>';
+}
+
 function renderMasterDataPage(container) {
 
   // --- Helper: Render Item List ---
@@ -7234,6 +7470,7 @@ function renderExamForm(container) {
                         <div class="font-bold text-slate-800 text-sm line-clamp-1" title="${exam.subject}">${exam.subject}</div>
                         <div class="flex items-center gap-2 mt-1 flex-wrap">
                             <span class="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200">${exam.class}</span>
+                            <span class="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded border border-indigo-100" title="Kategori penilaian [V6.4]">${sipKategoriLabel_(exam.kategori)}</span>
                             ${rcChip}
                         </div>
                     </div>
@@ -7324,6 +7561,14 @@ function initExamModalComponent() {
                              <select name="subject" id="input-subject" class="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition text-sm bg-white text-slate-700" required>
                                  <option value="">-- Pilih Mapel --</option>
                              </select>
+                             <label class="block text-xs font-bold text-slate-500 uppercase mb-1 mt-3">Kategori Penilaian</label>
+                             <select name="kategori" id="input-kategori" class="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition text-sm bg-white text-slate-700">
+                                 <option value="SUMATIF">Sumatif Lingkup Materi</option>
+                                 <option value="STS">STS — Sumatif Tengah Semester</option>
+                                 <option value="SAS">SAS — Sumatif Akhir Semester</option>
+                                 <option value="LATIHAN">Latihan / Uji Coba</option>
+                             </select>
+                             <p class="text-[10px] text-slate-400 mt-1">[V6.4] Dipakai Buku Nilai &amp; Rekap Rapor. Jadwal lama otomatis terhitung Sumatif.</p>
                          </div>
                          <div>
                              <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Kelas Peserta (otomatis)</label>
@@ -17380,6 +17625,8 @@ function openExamModal(data = null) {
         document.getElementById('input-date').value = toLocalISO(data.date);
         document.getElementById('input-endDate').value = toLocalISO(data.endDate);
         document.getElementById('input-duration').value = data.duration;
+        const katEdit64 = document.getElementById('input-kategori');
+        if (katEdit64) katEdit64.value = String(data.kategori || 'SUMATIF');
         document.getElementById('input-pin').value = data.pin;
         const sjEdit = document.getElementById('input-sesi-jam');
         if (sjEdit) sjEdit.value = (Array.isArray(data.sesiJam) ? data.sesiJam.map(function (s) { return 'Sesi ' + s.sesi + ' = ' + s.jam; }).join('\n') : '');
@@ -17442,6 +17689,8 @@ function openExamModal(data = null) {
         document.getElementById('input-date').value = toLocalISO(now);
         document.getElementById('input-endDate').value = toLocalISO(next);
         document.getElementById('input-duration').value = '60';
+        const katNew64 = document.getElementById('input-kategori');
+        if (katNew64) katNew64.value = 'SUMATIF';
         document.getElementById('input-pin').value = Math.floor(10000 + Math.random() * 90000);
         // [V6.3] Reset builder sesi — jadwal baru wajib memilih sesi lagi.
         try {
@@ -21316,5 +21565,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5508b90be3e6bdc',t:'MTc5Mzc2MzA3OQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5508b90be3e6bdc',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5893e295fddce79',t:'MTc5NDM1NzU5Nw=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5893e295fddce79',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
