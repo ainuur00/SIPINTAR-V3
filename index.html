@@ -1900,8 +1900,14 @@
               <div id="menu-buknilai" class="sidebar-item" onclick="showAdminTab('dash-buknilai', this)">
                 <i class="fas fa-clipboard-list"></i> <span class="sidebar-text font-medium">Buku Nilai</span>
               </div>
+              <div id="menu-pimpinan" class="sidebar-item" onclick="showAdminTab('dash-pimpinan', this)">
+                <i class="fas fa-chart-column"></i> <span class="sidebar-text font-medium">Dashboard Pimpinan</span>
+              </div>
               <div id="menu-rapor" class="sidebar-item" onclick="showAdminTab('dash-rapor', this)">
                 <i class="fas fa-file-lines"></i> <span class="sidebar-text font-medium">Rekap Rapor</span>
+              </div>
+              <div id="menu-arsip" class="sidebar-item" onclick="showAdminTab('dash-arsip', this)">
+                <i class="fas fa-box-archive"></i> <span class="sidebar-text font-medium">Arsip Tahun Ajaran</span>
               </div>
             </div>
           </div>
@@ -2960,6 +2966,7 @@ function initAdminPanel() {
     'menu-report-template', 'menu-users', 'menu-profil', 'menu-kartu', 'menu-hadir',
     'menu-images', 'menu-music', 'menu-config', 'menu-akademik', 'menu-buknilai', 'menu-rapor',
     'menu-kegiatan', 'menu-rekrutmen', 'menu-seleksi', 'menu-anggota', 'menu-presensi', 'menu-ekskul',
+    'menu-pimpinan', 'menu-arsip',
     'menu-master-data', 'menu-pengawas', 'menu-timsoal', 'menu-panitia', 'menu-exams', 'menu-sesi-bagi', 'menu-results',
     'menu-pgw-ujian', 'menu-pgw-koreksi'];
   const guruOnlyMenus = ['menu-pgw-ujian', 'menu-pgw-koreksi'];
@@ -4292,6 +4299,14 @@ function showAdminTab(tabId, el) {
   } else if (tabId === 'dash-kegiatan') {
     title.innerText = 'Master Kegiatan & Rekrutmen';
     renderKegiatanPage(content);
+
+  } else if (tabId === 'dash-pimpinan') {
+    title.innerText = 'Dashboard Pimpinan';
+    renderDashboardPimpinanPage(content);
+
+  } else if (tabId === 'dash-arsip') {
+    title.innerText = 'Arsip Tahun Ajaran';
+    renderArsipPage(content);
 
   } else if (tabId === 'dash-rekrutmen') {
     title.innerText = 'Rekrutmen & Verifikasi Berkas';
@@ -6992,6 +7007,362 @@ function sipHadirLabel_(k) {
 }
 
 /* ============================ PRESENSI & JURNAL ========================== */
+/* ===========================================================================
+   [V7.0] DASHBOARD PIMPINAN + ARSIP TAHUN AJARAN (khusus Admin)
+   Grafik dibuat dengan div CSS (tanpa pustaka luar) agar tetap ringan.
+   =========================================================================== */
+var _pimData = null;
+var _arsipData = null;
+
+function sipBarWarna_(v) {
+  var n = parseFloat(v);
+  if (isNaN(n)) return 'bg-slate-300';
+  if (n >= 85) return 'bg-emerald-500';
+  if (n >= 75) return 'bg-sky-500';
+  if (n >= 65) return 'bg-amber-500';
+  return 'bg-rose-500';
+}
+
+function sipBarisBar_(label, nilai, maks, warna, ket) {
+  var eh = escapeHtmlProfil_;
+  var n = parseFloat(nilai);
+  var lebar = isNaN(n) || !maks ? 0 : Math.max(2, Math.min(100, (n / maks) * 100));
+  return '<div class="mb-2">' +
+    '<div class="flex items-center justify-between text-[11px] mb-1">' +
+      '<span class="font-medium text-slate-700 truncate">' + eh(label) + '</span>' +
+      '<span class="font-bold text-slate-600">' + eh(isNaN(n) ? '-' : nilai) + (ket || '') + '</span>' +
+    '</div>' +
+    '<div class="h-2 rounded-full bg-slate-100 overflow-hidden"><div class="h-full ' + warna + '" style="width:' + lebar + '%"></div></div>' +
+  '</div>';
+}
+
+/* --------------------------- DASHBOARD PIMPINAN -------------------------- */
+function renderDashboardPimpinanPage(container) {
+  var eh = escapeHtmlProfil_;
+  container.innerHTML =
+    '<div class="fade-in w-full space-y-6">' +
+      '<div class="dash-card p-6">' +
+        '<div class="flex items-start justify-between gap-3 flex-wrap">' +
+          '<div class="flex items-center gap-3">' +
+            '<div class="w-10 h-10 rounded-lg bg-[#1b3a6b] flex items-center justify-center text-amber-300 shadow-md"><i class="fas fa-chart-column"></i></div>' +
+            '<div><h2 class="text-xl font-bold text-slate-800 tracking-tight">Dashboard Pimpinan</h2>' +
+            '<p class="text-slate-500 text-sm">Ringkasan ujian &amp; daya serap, keaktifan ekstrakurikuler, dan rekrutmen dalam satu halaman.</p></div>' +
+          '</div>' +
+          '<div class="text-right"><p id="pim-ta" class="text-xs font-bold text-indigo-700"></p><p id="pim-sem" class="text-[11px] text-slate-400"></p></div>' +
+        '</div>' +
+        '<div class="flex flex-wrap gap-2 items-end mt-4">' +
+          '<div class="min-w-[150px]"><label class="text-[10px] font-bold text-slate-500 uppercase">Kelas</label>' +
+            '<select id="pim-kelas" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white"><option value="">Semua kelas</option></select></div>' +
+          '<button type="button" onclick="sipPimMuat_()" class="px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700"><i class="fas fa-rotate mr-1"></i>Muat Ulang</button>' +
+        '</div>' +
+      '</div>' +
+      '<div id="pim-kartu" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3"></div>' +
+      '<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">' +
+        '<div class="dash-card p-5"><h3 class="font-bold text-slate-800 text-sm mb-3"><i class="fas fa-book text-indigo-500 mr-2"></i>Daya Serap per Mapel</h3><div id="pim-dayaserap"></div></div>' +
+        '<div class="dash-card p-5"><h3 class="font-bold text-slate-800 text-sm mb-3"><i class="fas fa-users-rectangle text-indigo-500 mr-2"></i>Rata-rata per Kelas</h3><div id="pim-perkelas"></div></div>' +
+      '</div>' +
+      '<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">' +
+        '<div class="dash-card p-5"><h3 class="font-bold text-slate-800 text-sm mb-3"><i class="fas fa-medal text-emerald-500 mr-2"></i>Peserta Terbaik</h3><div id="pim-terbaik"></div></div>' +
+        '<div class="dash-card p-5"><h3 class="font-bold text-slate-800 text-sm mb-3"><i class="fas fa-triangle-exclamation text-amber-500 mr-2"></i>Perlu Perhatian</h3><div id="pim-perhatian"></div></div>' +
+        '<div class="dash-card p-5"><h3 class="font-bold text-slate-800 text-sm mb-3"><i class="fas fa-bullhorn text-indigo-500 mr-2"></i>Rekrutmen</h3><div id="pim-rekrut"></div></div>' +
+      '</div>' +
+      '<div class="dash-card p-5">' +
+        '<div class="flex items-center justify-between gap-2 flex-wrap mb-3">' +
+          '<h3 class="font-bold text-slate-800 text-sm"><i class="fas fa-people-group text-indigo-500 mr-2"></i>Keaktifan Ekstrakurikuler</h3>' +
+          '<span id="pim-eksinfo" class="text-[11px] text-slate-400"></span>' +
+        '</div>' +
+        '<div id="pim-eks"></div>' +
+      '</div>' +
+    '</div>';
+  sipPimMuat_();
+}
+
+function sipPimMuat_() {
+  var sel = document.getElementById('pim-kelas');
+  var kelas = sel ? sel.value : '';
+  google.script.run
+    .withSuccessHandler(function (d) {
+      _pimData = d || {};
+      if (!d || d.success === false) {
+        Swal.fire('Gagal', (d && d.message) || 'Dashboard tidak dapat dimuat.', 'warning');
+        return;
+      }
+      sipPimIsi_();
+    })
+    .withFailureHandler(function (e) { Swal.fire('Gagal', String((e && e.message) || e), 'error'); })
+    .getDashboardPimpinan({ kelas: kelas }, currentUser.userID, currentUser.token);
+}
+
+function sipPimIsi_() {
+  var d = _pimData || {};
+  var eh = escapeHtmlProfil_;
+  var ta = document.getElementById('pim-ta');
+  if (ta) ta.innerHTML = '<i class="fas fa-calendar-check mr-1"></i>' + eh(d.tahunAktif || '-');
+  var sem = document.getElementById('pim-sem');
+  if (sem) sem.textContent = 'Semester ' + (d.semester || '-');
+
+  var selK = document.getElementById('pim-kelas');
+  if (selK) {
+    var lama = selK.value;
+    selK.innerHTML = '<option value="">Semua kelas</option>' + (d.kelasList || []).map(function (k) {
+      return '<option value="' + eh(k) + '">' + eh(k) + '</option>';
+    }).join('');
+    selK.value = lama || '';
+  }
+
+  var u = d.ujian || {}, rg = document.getElementById('pim-kartu');
+  if (rg) {
+    var chip = function (l, v, w, ico) {
+      return '<div class="dash-card px-4 py-3"><p class="text-[9px] uppercase font-bold text-slate-400 tracking-wider">' + l +
+        '</p><p class="text-xl font-black ' + w + '">' + eh(v) + '</p></div>';
+    };
+    rg.innerHTML = chip('Ujian', u.jumlah || 0, 'text-slate-800') +
+      chip('Respons', u.respons || 0, 'text-indigo-600') +
+      chip('Rata-rata nilai', u.rata || 0, 'text-sky-600') +
+      chip('Tertinggi', u.tertinggi || 0, 'text-emerald-600') +
+      chip('Terendah', u.terendah || 0, 'text-rose-600') +
+      chip('Nilai terhitung', u.nilaiTerhitung || 0, 'text-violet-600');
+  }
+
+  var ds = document.getElementById('pim-dayaserap');
+  if (ds) {
+    var arr = d.dayaSerap || [];
+    ds.innerHTML = arr.length ? arr.map(function (m) {
+      return sipBarisBar_(m.mapel, m.rata, 100, sipBarWarna_(m.rata), '%') +
+        '<p class="text-[10px] text-slate-400 -mt-1 mb-2">' + eh(m.jumlah) + ' nilai \u00b7 terendah ' + eh(m.min) + ' \u00b7 tertinggi ' + eh(m.max) + '</p>';
+    }).join('') : '<p class="text-[11px] text-slate-400">Belum ada nilai ujian.</p>';
+  }
+
+  var pk = document.getElementById('pim-perkelas');
+  if (pk) {
+    var k = d.perKelas || [];
+    pk.innerHTML = k.length ? k.map(function (x) {
+      return sipBarisBar_('Kelas ' + x.kelas, x.rata, 100, sipBarWarna_(x.rata), '%') +
+        '<p class="text-[10px] text-slate-400 -mt-1 mb-2">' + eh(x.jumlah) + ' nilai tercatat</p>';
+    }).join('') : '<p class="text-[11px] text-slate-400">Belum ada data kelas.</p>';
+  }
+
+  var tb = document.getElementById('pim-terbaik');
+  if (tb) {
+    var t = d.terbaik || [];
+    tb.innerHTML = t.length ? '<ol class="space-y-1">' + t.map(function (s, i) {
+      return '<li class="flex items-center justify-between text-xs border-b border-slate-50 py-1">' +
+        '<span class="text-slate-700"><span class="text-slate-400 font-bold mr-1">' + (i + 1) + '.</span>' + eh(s.nama) +
+        ' <span class="text-[10px] text-slate-400">' + eh(s.kelas) + '</span></span>' +
+        '<span class="font-black text-emerald-600">' + eh(s.rata) + '</span></li>';
+    }).join('') + '</ol>' : '<p class="text-[11px] text-slate-400">Belum ada nilai.</p>';
+  }
+
+  var ph = document.getElementById('pim-perhatian');
+  if (ph) {
+    var p = d.perluPerhatian || [];
+    ph.innerHTML = p.length ? '<ol class="space-y-1">' + p.map(function (s, i) {
+      return '<li class="flex items-center justify-between text-xs border-b border-slate-50 py-1">' +
+        '<span class="text-slate-700">' + eh(s.nama) + ' <span class="text-[10px] text-slate-400">' + eh(s.kelas) + '</span></span>' +
+        '<span class="font-black text-rose-600">' + eh(s.rata) + '</span></li>';
+    }).join('') + '</ol>' : '<p class="text-[11px] text-emerald-600">Tidak ada siswa di bawah 70. Bagus.</p>';
+  }
+
+  var rk = document.getElementById('pim-rekrut');
+  if (rk) {
+    var r = d.rekrutmen || {};
+    var bar = function (l, v, w) {
+      return '<div class="flex items-center justify-between text-xs py-1 border-b border-slate-50"><span class="text-slate-500">' + l +
+        '</span><span class="font-black ' + w + '">' + eh(v) + '</span></div>';
+    };
+    rk.innerHTML = bar('Gelombang', (r.gelombang || 0) + ' (' + (r.buka || 0) + ' buka)', 'text-slate-700') +
+      bar('Pendaftar', r.pendaftar || 0, 'text-indigo-600') +
+      bar('Menunggu verifikasi', r.menunggu || 0, 'text-amber-600') +
+      bar('Diterima', r.diterima || 0, 'text-emerald-600') +
+      bar('Cadangan', r.cadangan || 0, 'text-sky-600') +
+      bar('Ditolak', r.ditolak || 0, 'text-rose-600');
+  }
+
+  var ex = document.getElementById('pim-eks');
+  var info = document.getElementById('pim-eksinfo');
+  var e = d.ekskul || {};
+  if (info) {
+    info.innerHTML = eh(e.kegiatan || 0) + ' kegiatan (' + eh(e.kegiatanAktif || 0) + ' aktif) \u00b7 ' + eh(e.anggota || 0) +
+      ' anggota \u00b7 ' + eh(e.pertemuan || 0) + ' pertemuan \u00b7 kehadiran ' + eh(e.kehadiran === '' ? '-' : e.kehadiran + '%');
+  }
+  if (ex) {
+    var list = e.perKegiatan || [];
+    ex.innerHTML = list.length ? list.map(function (k) {
+      var dist = k.distribusi || {};
+      return '<div class="border border-slate-200 rounded-xl p-3 mb-2">' +
+        '<div class="flex items-start justify-between gap-2 flex-wrap">' +
+          '<div><p class="text-sm font-bold text-slate-800">' + eh(k.nama) + '</p>' +
+          '<p class="text-[10px] text-slate-400">' + eh(k.kategori) + ' \u00b7 pembina ' + eh(k.pembina || '-') + ' \u00b7 ' +
+          eh(k.anggota) + '/' + eh(k.kuota) + ' anggota \u00b7 ' + eh(k.pertemuan) + ' pertemuan</p></div>' +
+          '<div class="text-right"><p class="text-[9px] uppercase font-bold text-slate-400">Kehadiran</p>' +
+          '<p class="text-base font-black ' + (parseFloat(k.kehadiran) >= 80 ? 'text-emerald-600' : parseFloat(k.kehadiran) >= 65 ? 'text-amber-600' : 'text-rose-600') + '">' +
+          eh(k.kehadiran === '' ? '-' : k.kehadiran + '%') + '</p></div>' +
+        '</div>' +
+        '<div class="flex flex-wrap gap-2 mt-2 text-[10px]">' +
+          '<span class="px-2 py-0.5 rounded border bg-emerald-50 text-emerald-700 border-emerald-200 font-bold">A ' + eh(dist.A || 0) + '</span>' +
+          '<span class="px-2 py-0.5 rounded border bg-sky-50 text-sky-700 border-sky-200 font-bold">B ' + eh(dist.B || 0) + '</span>' +
+          '<span class="px-2 py-0.5 rounded border bg-amber-50 text-amber-700 border-amber-200 font-bold">C ' + eh(dist.C || 0) + '</span>' +
+          '<span class="px-2 py-0.5 rounded border bg-rose-50 text-rose-700 border-rose-200 font-bold">D ' + eh(dist.D || 0) + '</span>' +
+          '<span class="text-slate-400 ml-1">' + eh(k.dinilai) + ' siswa sudah dinilai semester ini</span>' +
+        '</div></div>';
+    }).join('') : '<p class="text-[11px] text-slate-400">Belum ada kegiatan.</p>';
+  }
+}
+
+/* ------------------------------ ARSIP TA -------------------------------- */
+function renderArsipPage(container) {
+  var eh = escapeHtmlProfil_;
+  container.innerHTML =
+    '<div class="fade-in w-full space-y-6">' +
+      '<div class="dash-card p-6">' +
+        '<div class="flex items-start gap-3">' +
+          '<div class="w-10 h-10 rounded-lg bg-[#1b3a6b] flex items-center justify-center text-amber-300 shadow-md"><i class="fas fa-box-archive"></i></div>' +
+          '<div><h2 class="text-xl font-bold text-slate-800 tracking-tight">Arsip Tahun Ajaran</h2>' +
+          '<p class="text-slate-500 text-sm">Pindahkan data transaksional tahun ajaran lama ke spreadsheet arsip di Google Drive, supaya spreadsheet kerja tetap ringan dan cepat.</p></div>' +
+        '</div>' +
+        '<div class="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-3 text-[11px] text-amber-800">' +
+          '<i class="fas fa-triangle-exclamation mr-1"></i><b>Baca dulu:</b> data yang diarsipkan <b>dipindahkan</b> (bukan disalin ganda) ke file arsip di Drive. ' +
+          'Tahun ajaran yang sedang aktif <b>tidak bisa</b> diarsipkan. Selalu jalankan <b>Pratinjau</b> sebelum memindahkan.' +
+        '</div>' +
+        '<div class="flex flex-wrap gap-2 items-end mt-4">' +
+          '<div class="min-w-[230px] flex-1"><label class="text-[10px] font-bold text-slate-500 uppercase">Tahun ajaran</label>' +
+          '<select id="arsip-ta" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white"></select></div>' +
+          '<button type="button" onclick="sipArsipPratinjau_()" class="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 text-xs font-bold hover:bg-slate-200"><i class="fas fa-magnifying-glass mr-1"></i>Pratinjau</button>' +
+          '<button type="button" onclick="sipArsipJalan_()" class="px-4 py-2 rounded-lg bg-[#1b3a6b] text-white text-xs font-bold hover:bg-[#152f57]"><i class="fas fa-box-archive mr-1"></i>Arsipkan Sekarang</button>' +
+        '</div>' +
+        '<p id="arsip-info" class="text-[11px] text-slate-400 mt-2"></p>' +
+      '</div>' +
+      '<div class="dash-card p-5">' +
+        '<h3 class="font-bold text-slate-800 text-sm mb-2"><i class="fas fa-table-list text-indigo-500 mr-2"></i>Isi Data per Tahun Ajaran</h3>' +
+        '<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-[10px] uppercase text-slate-400 border-b">' +
+          '<th class="py-2">Tahun Ajaran</th><th class="text-center">Buku Nilai</th><th class="text-center">Presensi</th>' +
+          '<th class="text-center">Jurnal</th><th class="text-center">Nilai Ekskul</th><th class="text-center">Skor Wawancara</th><th class="text-center">Total</th>' +
+        '</tr></thead><tbody id="arsip-list"><tr><td colspan="7" class="py-8 text-center text-slate-400 text-xs">Memuat\u2026</td></tr></tbody></table></div>' +
+      '</div>' +
+      '<div class="dash-card p-5">' +
+        '<h3 class="font-bold text-slate-800 text-sm mb-2"><i class="fas fa-clock-rotate-left text-indigo-500 mr-2"></i>Riwayat Arsip</h3>' +
+        '<div id="arsip-log"><p class="text-[11px] text-slate-400">Belum ada riwayat arsip.</p></div>' +
+      '</div>' +
+    '</div>';
+  sipArsipMuat_();
+}
+
+function sipArsipMuat_() {
+  google.script.run
+    .withSuccessHandler(function (d) { _arsipData = d || {}; sipArsipIsi_(); })
+    .withFailureHandler(function (e) { Swal.fire('Gagal', String((e && e.message) || e), 'error'); })
+    .getArsipData(currentUser.userID, currentUser.token);
+}
+
+function sipArsipIsi_() {
+  var d = _arsipData || {};
+  var eh = escapeHtmlProfil_;
+  if (d.success === false) { Swal.fire('Gagal', d.message || 'Gagal memuat data arsip.', 'warning'); return; }
+  var sel = document.getElementById('arsip-ta');
+  if (sel) {
+    var lama = sel.value;
+    sel.innerHTML = (d.daftarTA || []).map(function (t) {
+      var aktif = (String(t).toLowerCase() === String(d.tahunAktif || '').toLowerCase());
+      return '<option value="' + eh(t) + '">' + eh(t) + (aktif ? ' \u2014 AKTIF (tidak bisa diarsipkan)' : '') + '</option>';
+    }).join('');
+    if (lama) sel.value = lama;
+  }
+  var info = document.getElementById('arsip-info');
+  if (info) info.innerHTML = 'Tahun ajaran aktif: <b>' + eh(d.tahunAktif || '-') + '</b> \u00b7 ' + (d.daftarTA || []).length + ' tahun ajaran terdeteksi.';
+
+  var body = document.getElementById('arsip-list');
+  if (body) {
+    var list = d.daftarTA || [];
+    body.innerHTML = list.length ? list.map(function (t) {
+      var r = (d.rincian || {})[t] || [];
+      var cari = function (n) { var x = r.filter(function (y) { return y.sheet === n; })[0]; return x ? x.baris : 0; };
+      var total = r.reduce(function (a, x) { return a + (x.baris || 0); }, 0);
+      var aktif = String(t).toLowerCase() === String(d.tahunAktif || '').toLowerCase();
+      return '<tr class="border-b border-slate-50">' +
+        '<td class="py-2 text-slate-700">' + eh(t) + (aktif ? ' <span class="text-[9px] font-bold text-emerald-600">AKTIF</span>' : '') + '</td>' +
+        '<td class="text-center text-xs">' + cari('BukuNilai') + '</td>' +
+        '<td class="text-center text-xs">' + cari('PresensiKegiatan') + '</td>' +
+        '<td class="text-center text-xs">' + cari('JurnalKegiatan') + '</td>' +
+        '<td class="text-center text-xs">' + cari('NilaiEkskul') + '</td>' +
+        '<td class="text-center text-xs">' + cari('SkorWawancara') + '</td>' +
+        '<td class="text-center text-xs font-bold">' + total + '</td></tr>';
+    }).join('') : '<tr><td colspan="7" class="py-8 text-center text-slate-400 text-xs">Belum ada data.</td></tr>';
+  }
+
+  var log = document.getElementById('arsip-log');
+  if (log) {
+    var rows = d.log || [];
+    log.innerHTML = rows.length ? '<div class="space-y-2">' + rows.map(function (x) {
+      return '<div class="border border-slate-200 rounded-xl px-3 py-2 flex items-start justify-between gap-2">' +
+        '<div><p class="text-xs font-bold text-slate-700">' + eh(x.tahun) + ' \u00b7 ' + eh(x.jumlah) + ' baris</p>' +
+        '<p class="text-[10px] text-slate-400">' + eh(sipTglTampil_(x.waktu)) + ' \u00b7 ' + eh(x.rincian || '') + '</p></div>' +
+        (x.url ? '<a href="' + eh(x.url) + '" target="_blank" class="text-[11px] font-bold text-indigo-600 hover:underline whitespace-nowrap">Buka arsip</a>' : '') +
+        '</div>';
+    }).join('') + '</div>' : '<p class="text-[11px] text-slate-400">Belum ada riwayat arsip.</p>';
+  }
+}
+
+function sipArsipPratinjau_() {
+  var tahun = (document.getElementById('arsip-ta') || {}).value || '';
+  if (!tahun) { Swal.fire('Pilih tahun ajaran', 'Pilih tahun ajaran yang akan diperiksa.', 'warning'); return; }
+  document.getElementById('global-loading').classList.remove('hidden');
+  google.script.run
+    .withSuccessHandler(function (res) {
+      document.getElementById('global-loading').classList.add('hidden');
+      if (!res || res.success === false) { Swal.fire('Tidak bisa', (res && res.message) || 'Gagal.', 'warning'); return; }
+      var r = res.rincian || [];
+      Swal.fire({
+        title: 'Pratinjau arsip',
+        html: '<div class="text-left text-xs"><p class="mb-2 text-slate-600">' + escapeHtmlProfil_(res.message) + '</p>' +
+          '<table class="w-full"><thead><tr class="text-slate-400 text-left"><th>Sheet</th><th class="text-right">Baris</th></tr></thead><tbody>' +
+          r.map(function (x) {
+            return '<tr><td class="py-0.5">' + escapeHtmlProfil_(x.sheet) + '</td><td class="text-right font-bold">' + escapeHtmlProfil_(x.baris) + '</td></tr>';
+          }).join('') + '</tbody></table>' +
+          '<p class="mt-2 text-slate-400">Belum ada data yang dipindahkan.</p></div>',
+        width: 460, confirmButtonText: 'Tutup', confirmButtonColor: '#1b3a6b'
+      });
+    })
+    .withFailureHandler(function (e) {
+      document.getElementById('global-loading').classList.add('hidden');
+      Swal.fire('Gagal', String((e && e.message) || e), 'error');
+    })
+    .arsipkanTahunAjaran({ tahun: tahun, uji: true }, currentUser.userID, currentUser.token);
+}
+
+function sipArsipJalan_() {
+  var tahun = (document.getElementById('arsip-ta') || {}).value || '';
+  if (!tahun) { Swal.fire('Pilih tahun ajaran', 'Pilih tahun ajaran yang akan diarsipkan.', 'warning'); return; }
+  Swal.fire({
+    title: 'Arsipkan ' + tahun + '?',
+    html: '<div class="text-left text-xs"><p>Data tahun ajaran ini akan <b>dipindahkan</b> ke spreadsheet arsip di Drive dan <b>dihapus</b> dari spreadsheet kerja.</p>' +
+      '<p class="mt-1 text-slate-500">Jalankan Pratinjau lebih dulu bila belum yakin. Tindakan ini tidak bisa dibatalkan dari aplikasi.</p></div>',
+    icon: 'warning', showCancelButton: true, confirmButtonText: 'Ya, arsipkan', cancelButtonText: 'Batal', confirmButtonColor: '#1b3a6b'
+  }).then(function (r) {
+    if (!r.isConfirmed) return;
+    document.getElementById('global-loading').classList.remove('hidden');
+    google.script.run
+      .withSuccessHandler(function (res) {
+        document.getElementById('global-loading').classList.add('hidden');
+        if (res && res.success) {
+          sipArsipMuat_();
+          Swal.fire({
+            icon: 'success', title: 'Arsip selesai',
+            html: '<div class="text-left text-xs"><p>' + escapeHtmlProfil_(res.message) + '</p>' +
+              (res.rincianTeks ? '<p class="text-slate-500 mt-1">' + escapeHtmlProfil_(res.rincianTeks) + '</p>' : '') +
+              (res.url ? '<p class="mt-2"><a href="' + escapeHtmlProfil_(res.url) + '" target="_blank" class="text-indigo-600 font-bold underline">Buka spreadsheet arsip</a></p>' : '') +
+              '</div>',
+            confirmButtonText: 'Tutup', confirmButtonColor: '#1b3a6b'
+          });
+        } else Swal.fire('Gagal', (res && res.message) || 'Gagal mengarsipkan.', 'warning');
+      })
+      .withFailureHandler(function (e) {
+        document.getElementById('global-loading').classList.add('hidden');
+        Swal.fire('Gagal', String((e && e.message) || e), 'error');
+      })
+      .arsipkanTahunAjaran({ tahun: tahun, uji: false }, currentUser.userID, currentUser.token);
+  });
+}
+
 function renderPresensiPage(container) {
   var eh = escapeHtmlProfil_;
   container.innerHTML =
@@ -24264,5 +24635,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a58a0eff8e21880b',t:'MTc5NDM2NjE1MQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a58a0eff8e21880b',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a58a16b11e4b880b',t:'MTc5NDM2NjQ2Ng=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a58a16b11e4b880b',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
