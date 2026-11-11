@@ -8803,7 +8803,7 @@ function sipBabTopikChange_() {
 }
 
 /* ===== [V5.12] AI PERBAIKAN DRAF SOAL (form Bank Soal, sebelum disimpan) ===== */
-function aiPerbaikiDrafSoal_() {
+function aiPerbaikiDrafSoal_(segar) {
   if (!(currentUser && (currentUser.role === 'Admin' || ((currentUser.pengawas || {}).izinBankSoal === true)))) {
     Swal.fire('Akses dibatasi', 'Fitur AI ini untuk Admin atau Guru Tim Pembuat Soal.', 'info');
     return;
@@ -8843,18 +8843,18 @@ function aiPerbaikiDrafSoal_() {
   } else {
     correct = (document.getElementById('correct-input') || {}).value || '';
   }
-  Swal.fire({
-    title: 'AI sedang memperbaiki draf...',
-    html: '<i class="fas fa-circle-notch fa-spin text-3xl text-blue-500"></i><p class="text-xs text-slate-400 mt-3">Menyesuaikan rumusan ke level ' + lvl + ' tanpa mengubah jenis soal &amp; materi/bab.</p>',
-    allowOutsideClick: false, showConfirmButton: false
-  });
+  sipAiLoading_('AI sedang memperbaiki draf...', 'Menyesuaikan rumusan ke level ' + lvl + ' tanpa mengubah jenis soal &amp; materi/bab.');
   google.script.run
     .withSuccessHandler(function (res) {
+      sipAiLoadingStop_();
       if (!res || !res.success) { Swal.fire('Gagal', (res && res.message) || 'AI tidak merespon.', 'error'); return; }
       aiDrafTampilkanUsulan_(res);
     })
-    .withFailureHandler(function (err) { Swal.fire('Error', (err && err.message) || String(err), 'error'); })
-    .perbaikiDraftSoalAI({ type: tipe, content: konten, options: opts, correct: correct, materi: materi }, lvl, 'gemini', currentUser.userID, currentUser.token);
+    .withFailureHandler(function (err) {
+      sipAiLoadingStop_();
+      Swal.fire('Error', (err && err.message) || String(err), 'error');
+    })
+    .perbaikiDraftSoalAI({ type: tipe, content: konten, options: opts, correct: correct, materi: materi }, lvl, 'gemini', currentUser.userID, currentUser.token, { segar: !!segar });
 }
 
 function aiDrafTampilkanUsulan_(res) {
@@ -8892,7 +8892,7 @@ function aiDrafTampilkanUsulan_(res) {
     denyButtonColor: '#7c3aed',
     didOpen: function () { try { sipTypesetMath_(Swal.getPopup()); } catch (eM) {} }
   }).then(function (r2) {
-    if (r2.isDenied) { aiPerbaikiDrafSoal_(); return; }
+    if (r2.isDenied) { aiPerbaikiDrafSoal_(true); return; } // [V6.5b] segar = jangan ambil dari cache
     if (!r2.isConfirmed) return;
     sipTerapkanDrafKeForm_(res);
     Swal.fire({ icon: 'success', title: 'Diterapkan ke draf', html: '<p class="text-sm">Periksa isi form, lengkapi bila perlu, lalu tekan <b>Simpan Pertanyaan</b>.</p>', confirmButtonColor: '#1b3a6b' });
@@ -14106,8 +14106,32 @@ function resetQuestionForm() {
 
 /* --- FUNGSI ISI FORM SAAT EDIT --- */
 /* --- FUNGSI ISI FORM SAAT EDIT (SUDAH DIPERBAIKI UNTUK PG KOMPLEKS) --- */
+/* ===== [V6.5b] Dialog tunggu AI: penghitung waktu berjalan ==================
+   Dipakai bersama oleh perbaikan level kognitif (bank soal & draf). Pengguna
+   melihat prosesnya benar-benar berjalan, bukan layar beku tanpa informasi. */
+var _sipAiTimer = null;
+function sipAiLoadingStop_() {
+  if (_sipAiTimer) { clearInterval(_sipAiTimer); _sipAiTimer = null; }
+}
+function sipAiLoading_(judul, sub) {
+  sipAiLoadingStop_();
+  var t0 = Date.now();
+  var isi = function () {
+    var d = Math.floor((Date.now() - t0) / 1000);
+    return '<i class="fas fa-circle-notch fa-spin text-3xl text-violet-500"></i>' +
+      '<p class="text-xs text-slate-500 mt-3">' + sub + '</p>' +
+      '<p class="text-[11px] text-slate-400 mt-2">Berjalan <b id="sip-ai-detik">' + d + '</b> detik · biasanya 5–20 detik</p>';
+  };
+  Swal.fire({ title: judul, html: isi(), allowOutsideClick: false, showConfirmButton: false });
+  _sipAiTimer = setInterval(function () {
+    var el = document.getElementById('sip-ai-detik');
+    if (!el) return;
+    el.textContent = String(Math.floor((Date.now() - t0) / 1000));
+  }, 1000);
+}
+
 /* ===== [V5.9] AI PERBAIKAN LEVEL KOGNITIF SOAL (khusus Admin) ===== */
-function aiLevelSoalAt(idx) {
+function aiLevelSoalAt(idx, segar) {
   const q = (filteredQuestions || [])[idx];
   if (!q) { Swal.fire('Gagal', 'Data soal tidak ditemukan.', 'error'); return; }
   if (!(currentUser && (currentUser.role === 'Admin' || ((currentUser.pengawas || {}).izinBankSoal === true)))) {
@@ -14119,6 +14143,7 @@ function aiLevelSoalAt(idx) {
     html:
       '<div class="text-left space-y-3">' +
       '<p class="text-xs text-slate-500">AI menulis ulang <b>deskripsi soal</b> agar mencapai level kognitif target. Tipe soal, Materi/Bab, bobot, dan jumlah soal per bab <b>tidak berubah</b>. Hasil berupa usulan — Anda meninjau dulu sebelum diterapkan.</p>' +
+      '<p class="text-[11px] text-emerald-600"><i class="fas fa-bolt mr-1"></i>Mode cepat: biasanya selesai 5–20 detik. Soal & level yang sama tidak diulang ke AI (langsung tampil).</p>' +
       '<label class="block text-xs font-bold text-slate-600">Level Kognitif Target' +
       '<select id="swal-ai-level" class="mt-1 w-full border rounded-xl px-3 py-2 text-sm font-normal">' +
       '<option value="C1">C1 — Mengingat (menyebutkan, mengidentifikasi)</option>' +
@@ -14147,13 +14172,10 @@ function aiLevelSoalAt(idx) {
     }
   }).then(function (r) {
     if (!r.isConfirmed) return;
-    Swal.fire({
-      title: 'AI sedang memperbaiki soal...',
-      html: '<i class="fas fa-circle-notch fa-spin text-3xl text-violet-500"></i><p class="text-xs text-slate-400 mt-3">Menyesuaikan rumusan ke level ' + r.value.level + ' tanpa mengubah tipe & bab.</p>',
-      allowOutsideClick: false, showConfirmButton: false
-    });
+    sipAiLoading_('AI sedang memperbaiki soal...', 'Menyesuaikan rumusan ke level ' + r.value.level + ' tanpa mengubah tipe &amp; bab.');
     google.script.run
       .withSuccessHandler(function (res) {
+        sipAiLoadingStop_();
         if (!res || !res.success) {
           Swal.fire('Gagal', (res && res.message) || 'AI tidak merespon.', 'error');
           return;
@@ -14161,9 +14183,10 @@ function aiLevelSoalAt(idx) {
         aiLevelTampilkanUsulan_(res);
       })
       .withFailureHandler(function (err) {
+        sipAiLoadingStop_();
         Swal.fire('Error', (err && err.message) || String(err), 'error');
       })
-      .perbaikiSoalLevelAI(q.id, r.value.level, r.value.prov, currentUser.userID, currentUser.token);
+      .perbaikiSoalLevelAI(q.id, r.value.level, r.value.prov, currentUser.userID, currentUser.token, { segar: !!segar });
   });
 }
 
@@ -14203,7 +14226,7 @@ function aiLevelTampilkanUsulan_(res) {
   }).then(function (r2) {
     if (r2.isDenied) {
       const idx = (filteredQuestions || []).findIndex(function (x) { return String(x.id) === String(res.questionId); });
-      if (idx >= 0) aiLevelSoalAt(idx);
+      if (idx >= 0) aiLevelSoalAt(idx, true); // [V6.5b] segar = jangan ambil dari cache
       return;
     }
     if (!r2.isConfirmed) return;
@@ -21926,5 +21949,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a589e3809d51601d',t:'MTc5NDM2NDM3MA=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a589e3809d51601d',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
