@@ -11533,11 +11533,16 @@ function aiPerbaikiDrafSoal_(segar) {
   google.script.run
     .withSuccessHandler(function (res) {
       sipAiLoadingStop_();
-      if (!res || !res.success) { Swal.fire('Gagal', (res && res.message) || 'AI tidak merespon.', 'error'); return; }
+      if (sipAiSudahKedaluwarsa_()) return;
+      if (!res || !res.success) {
+        Swal.fire(res && res.aiTimeout ? 'Melebihi batas waktu' : 'Gagal', (res && res.message) || 'AI tidak merespon.', res && res.aiTimeout ? 'warning' : 'error');
+        return;
+      }
       aiDrafTampilkanUsulan_(res);
     })
     .withFailureHandler(function (err) {
       sipAiLoadingStop_();
+      if (sipAiSudahKedaluwarsa_()) return;
       Swal.fire('Error', (err && err.message) || String(err), 'error');
     })
     .perbaikiDraftSoalAI({ type: tipe, content: konten, options: opts, correct: correct, materi: materi }, lvl, 'gemini', currentUser.userID, currentUser.token, { segar: !!segar });
@@ -11563,6 +11568,7 @@ function aiDrafTampilkanUsulan_(res) {
       '<p class="text-[11px] font-bold text-slate-500 uppercase">Draf saat ini</p>' +
       '<div class="border rounded-xl p-3 text-xs bg-slate-50 text-slate-600">' + esc(res.lama && res.lama.content) + '</div>' +
       '<p class="text-[11px] font-bold text-blue-600 uppercase">Usulan AI</p>' +
+      '<p class="text-[10px] text-slate-400 -mt-1">' + (res.dariCache ? '<i class="fas fa-bolt mr-1"></i>Dari simpanan: instan' : '<i class="fas fa-stopwatch mr-1"></i>AI selesai dalam ' + (res.detik !== undefined ? res.detik : '?') + ' detik · batas ' + (res.batasDetik || 90) + ' detik') + '</p>' +
       '<div class="border-2 border-blue-200 rounded-xl p-3 text-xs bg-blue-50 text-slate-700">' + esc(res.baru && res.baru.content) + '</div>' +
       optHtml +
       (res.baru && res.baru.correct ? '<p class="text-[11px] text-emerald-700 mt-1"><b>Kunci baru:</b> ' + String(JSON.stringify(res.baru.correct)).replace(/</g, '&lt;') + '</p>' : '') +
@@ -16796,24 +16802,62 @@ function resetQuestionForm() {
    Dipakai bersama oleh perbaikan level kognitif (bank soal & draf). Pengguna
    melihat prosesnya benar-benar berjalan, bukan layar beku tanpa informasi. */
 var _sipAiTimer = null;
+var _sipAiBatasTimer = null;
+var _sipAiKedaluwarsa = false;
+var SIP_AI_BATAS_DETIK_ = 90;   // [V7.1] batas keras: AI tidak boleh lebih dari 90 detik
 function sipAiLoadingStop_() {
   if (_sipAiTimer) { clearInterval(_sipAiTimer); _sipAiTimer = null; }
+  if (_sipAiBatasTimer) { clearTimeout(_sipAiBatasTimer); _sipAiBatasTimer = null; }
+}
+// true bila dialog sudah ditutup karena lewat 90 detik → jawaban AI yang telat diabaikan
+function sipAiSudahKedaluwarsa_() {
+  if (_sipAiKedaluwarsa) { _sipAiKedaluwarsa = false; return true; }
+  return false;
 }
 function sipAiLoading_(judul, sub) {
   sipAiLoadingStop_();
+  _sipAiKedaluwarsa = false;
   var t0 = Date.now();
+  var batas = SIP_AI_BATAS_DETIK_;
   var isi = function () {
     var d = Math.floor((Date.now() - t0) / 1000);
+    var sisa = Math.max(0, batas - d);
+    var persen = Math.min(100, (d / batas) * 100);
+    var warnaBar = d < 45 ? 'bg-violet-500' : (d < 75 ? 'bg-amber-500' : 'bg-rose-500');
     return '<i class="fas fa-circle-notch fa-spin text-3xl text-violet-500"></i>' +
       '<p class="text-xs text-slate-500 mt-3">' + sub + '</p>' +
-      '<p class="text-[11px] text-slate-400 mt-2">Berjalan <b id="sip-ai-detik">' + d + '</b> detik · biasanya 5–20 detik</p>';
+      '<div class="mt-3 h-1.5 rounded-full bg-slate-200 overflow-hidden"><div id="sip-ai-bar" class="h-full ' + warnaBar + '" style="width:' + persen + '%"></div></div>' +
+      '<p class="text-[11px] text-slate-500 mt-2">Berjalan <b id="sip-ai-detik">' + d + '</b> detik · batas maksimal <b id="sip-ai-batas">' + batas + '</b> detik · sisa <b id="sip-ai-sisa">' + sisa + '</b> detik</p>' +
+      '<p class="text-[11px] text-slate-400">Biasanya selesai 5–20 detik. Bila lewat ' + batas + ' detik, proses dihentikan otomatis dan soal <b>tidak</b> berubah.</p>';
   };
   Swal.fire({ title: judul, html: isi(), allowOutsideClick: false, showConfirmButton: false });
   _sipAiTimer = setInterval(function () {
     var el = document.getElementById('sip-ai-detik');
     if (!el) return;
-    el.textContent = String(Math.floor((Date.now() - t0) / 1000));
+    var d = Math.floor((Date.now() - t0) / 1000);
+    el.textContent = String(d);
+    var sisa = document.getElementById('sip-ai-sisa');
+    if (sisa) sisa.textContent = String(Math.max(0, batas - d));
+    var bar = document.getElementById('sip-ai-bar');
+    if (bar) {
+      bar.style.width = Math.min(100, (d / batas) * 100) + '%';
+      bar.className = 'h-full ' + (d < 45 ? 'bg-violet-500' : (d < 75 ? 'bg-amber-500' : 'bg-rose-500'));
+    }
   }, 1000);
+  // Pengaman: lewat batas = berhenti menunggu, jangan biarkan pengguna terkunci.
+  _sipAiBatasTimer = setTimeout(function () {
+    if (!_sipAiTimer) return;
+    _sipAiKedaluwarsa = true;
+    sipAiLoadingStop_();
+    Swal.fire({
+      icon: 'warning',
+      title: 'Melebihi ' + batas + ' detik',
+      html: '<div class="text-left text-xs"><p>AI tidak selesai dalam batas <b>' + batas + ' detik</b>, jadi proses dihentikan.</p>' +
+        '<p class="mt-1 text-slate-500"><b>Soal Anda tidak berubah.</b> Tekan Perbaiki lagi — sistem otomatis memakai model tercepat. ' +
+        'Bila berulang, periksa kuota API key atau ganti provider AI.</p></div>',
+      confirmButtonText: 'Mengerti', confirmButtonColor: '#1b3a6b'
+    });
+  }, (batas + 2) * 1000);
 }
 
 /* ===== [V5.9] AI PERBAIKAN LEVEL KOGNITIF SOAL (khusus Admin) ===== */
@@ -16829,7 +16873,7 @@ function aiLevelSoalAt(idx, segar) {
     html:
       '<div class="text-left space-y-3">' +
       '<p class="text-xs text-slate-500">AI menulis ulang <b>deskripsi soal</b> agar mencapai level kognitif target. Tipe soal, Materi/Bab, bobot, dan jumlah soal per bab <b>tidak berubah</b>. Hasil berupa usulan — Anda meninjau dulu sebelum diterapkan.</p>' +
-      '<p class="text-[11px] text-emerald-600"><i class="fas fa-bolt mr-1"></i>Mode cepat: biasanya selesai 5–20 detik. Soal & level yang sama tidak diulang ke AI (langsung tampil).</p>' +
+      '<p class="text-[11px] text-emerald-600"><i class="fas fa-bolt mr-1"></i>Mode cepat: biasanya selesai 5–20 detik, <b>batas maksimal 90 detik</b> (otomatis berhenti, soal tidak berubah). Soal & level yang sama tidak diulang ke AI (langsung tampil).</p>' +
       '<label class="block text-xs font-bold text-slate-600">Level Kognitif Target' +
       '<select id="swal-ai-level" class="mt-1 w-full border rounded-xl px-3 py-2 text-sm font-normal">' +
       '<option value="C1">C1 — Mengingat (menyebutkan, mengidentifikasi)</option>' +
@@ -16862,14 +16906,16 @@ function aiLevelSoalAt(idx, segar) {
     google.script.run
       .withSuccessHandler(function (res) {
         sipAiLoadingStop_();
+        if (sipAiSudahKedaluwarsa_()) return;
         if (!res || !res.success) {
-          Swal.fire('Gagal', (res && res.message) || 'AI tidak merespon.', 'error');
+          Swal.fire(res && res.aiTimeout ? 'Melebihi batas waktu' : 'Gagal', (res && res.message) || 'AI tidak merespon.', res && res.aiTimeout ? 'warning' : 'error');
           return;
         }
         aiLevelTampilkanUsulan_(res);
       })
       .withFailureHandler(function (err) {
         sipAiLoadingStop_();
+        if (sipAiSudahKedaluwarsa_()) return;
         Swal.fire('Error', (err && err.message) || String(err), 'error');
       })
       .perbaikiSoalLevelAI(q.id, r.value.level, r.value.prov, currentUser.userID, currentUser.token, { segar: !!segar });
@@ -16896,6 +16942,7 @@ function aiLevelTampilkanUsulan_(res) {
       '<p class="text-[11px] font-bold text-slate-500 uppercase">Soal lama</p>' +
       '<div class="border rounded-xl p-3 text-xs bg-slate-50 text-slate-600">' + esc(res.lama && res.lama.content) + '</div>' +
       '<p class="text-[11px] font-bold text-violet-600 uppercase">Soal baru (usulan AI)</p>' +
+      '<p class="text-[10px] text-slate-400 -mt-1">' + (res.dariCache ? '<i class="fas fa-bolt mr-1"></i>Dari simpanan: instan (tidak memanggil AI lagi)' : '<i class="fas fa-stopwatch mr-1"></i>AI selesai dalam ' + (res.detik !== undefined ? res.detik : '?') + ' detik · batas ' + (res.batasDetik || 90) + ' detik') + '</p>' +
       '<div class="border-2 border-violet-200 rounded-xl p-3 text-xs bg-violet-50 text-slate-700">' + esc(res.baru && res.baru.content) + '</div>' +
       optHtml +
       (res.baru && res.baru.correct ? '<p class="text-[11px] text-emerald-700 mt-1"><b>Kunci baru:</b> ' + String(JSON.stringify(res.baru.correct)).replace(/</g, '&lt;') + '</p>' : '') +
@@ -24635,5 +24682,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a58a16b11e4b880b',t:'MTc5NDM2NjQ2Ng=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a58a16b11e4b880b',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a58bc393bccb3fbc',t:'MTc5NDM4NDAzMw=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a58bc393bccb3fbc',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
