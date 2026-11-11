@@ -1924,6 +1924,12 @@
               <div id="menu-anggota" class="sidebar-item" onclick="showAdminTab('dash-anggota', this)">
                 <i class="fas fa-id-card"></i> <span class="sidebar-text font-medium">Anggota &amp; SK</span>
               </div>
+              <div id="menu-presensi" class="sidebar-item" onclick="showAdminTab('dash-presensi', this)">
+                <i class="fas fa-clipboard-user"></i> <span class="sidebar-text font-medium">Presensi &amp; Jurnal</span>
+              </div>
+              <div id="menu-ekskul" class="sidebar-item" onclick="showAdminTab('dash-ekskul', this)">
+                <i class="fas fa-medal"></i> <span class="sidebar-text font-medium">Nilai Ekskul</span>
+              </div>
             </div>
           </div>
 
@@ -2953,7 +2959,7 @@ function initAdminPanel() {
   const adminOnlyMenus = ['menu-questions', 'menu-kisi', 'menu-ai-generator', 'menu-hermes',
     'menu-report-template', 'menu-users', 'menu-profil', 'menu-kartu', 'menu-hadir',
     'menu-images', 'menu-music', 'menu-config', 'menu-akademik', 'menu-buknilai', 'menu-rapor',
-    'menu-kegiatan', 'menu-rekrutmen', 'menu-seleksi', 'menu-anggota',
+    'menu-kegiatan', 'menu-rekrutmen', 'menu-seleksi', 'menu-anggota', 'menu-presensi', 'menu-ekskul',
     'menu-master-data', 'menu-pengawas', 'menu-timsoal', 'menu-panitia', 'menu-exams', 'menu-sesi-bagi', 'menu-results',
     'menu-pgw-ujian', 'menu-pgw-koreksi'];
   const guruOnlyMenus = ['menu-pgw-ujian', 'menu-pgw-koreksi'];
@@ -3015,6 +3021,10 @@ function initAdminPanel() {
     if (elMenuSel) elMenuSel.classList.toggle('hidden', !(_izPembina || _izPewawancara));
     const elMenuAng = document.getElementById('menu-anggota');
     if (elMenuAng) elMenuAng.classList.toggle('hidden', !_izPembina);
+    const elMenuPrs = document.getElementById('menu-presensi');
+    if (elMenuPrs) elMenuPrs.classList.toggle('hidden', !_izPembina);
+    const elMenuEks = document.getElementById('menu-ekskul');
+    if (elMenuEks) elMenuEks.classList.toggle('hidden', !_izPembina);
     const elMenuKeg = document.getElementById('menu-kegiatan');
     if (elMenuKeg) elMenuKeg.classList.add('hidden'); // master kegiatan tetap khusus Admin
     // [V6.5] Buku Nilai: guru PENGAMPU tetap dapat membuka menunya. Modul
@@ -4130,7 +4140,7 @@ function showAdminTab(tabId, el) {
     const _pgwIzinTab = (currentUser && currentUser.pengawas) || {};
     // [V6.5] Buku Nilai untuk guru PENGAMPU (server tetap membatasi: guru
     // hanya menerima baris nilai mapel & kelas yang diampu).
-    const allowedGuruTabs = ['dash-home', 'dash-profil-guru', 'dash-buknilai', 'dash-rapor', 'dash-rekrutmen', 'dash-seleksi', 'dash-anggota'];
+    const allowedGuruTabs = ['dash-home', 'dash-profil-guru', 'dash-buknilai', 'dash-rapor', 'dash-rekrutmen', 'dash-seleksi', 'dash-anggota', 'dash-presensi', 'dash-ekskul'];
     // [V3] Izin harus EKSPLISIT true dari penunjukan Admin
     // [V6.2] PENGAWAS: hanya pantau lewat Monitor Ujian (Manajemen User)
     if (_pgwIzinTab.izinUjian === true) allowedGuruTabs.push('dash-users');
@@ -4139,7 +4149,7 @@ function showAdminTab(tabId, el) {
     if (_pgwIzinTab.izinPanitia === true) allowedGuruTabs.push('dash-profil', 'dash-kartu', 'dash-hadir', 'dash-results', 'dash-pgw-ujian', 'dash-exams', 'dash-sesi-bagi', 'dash-pgw-koreksi', 'dash-questions', 'dash-materibab');
     // [V6.8] Menu modul kegiatan bergantung peran: Rekrutmen & Anggota khusus
     // PEMBINA; Seleksi & Wawancara untuk PEMBINA atau PEWAWANCARA.
-    if (tabId === 'dash-rekrutmen' || tabId === 'dash-anggota') {
+    if (tabId === 'dash-rekrutmen' || tabId === 'dash-anggota' || tabId === 'dash-presensi' || tabId === 'dash-ekskul') {
       if (_pgwIzinTab.izinPembina !== true) allowedGuruTabs.splice(allowedGuruTabs.indexOf(tabId), 1);
     }
     if (tabId === 'dash-seleksi') {
@@ -4294,6 +4304,14 @@ function showAdminTab(tabId, el) {
   } else if (tabId === 'dash-anggota') {
     title.innerText = 'Anggota & SK';
     renderAnggotaPage(content);
+
+  } else if (tabId === 'dash-presensi') {
+    title.innerText = 'Presensi & Jurnal Kegiatan';
+    renderPresensiPage(content);
+
+  } else if (tabId === 'dash-ekskul') {
+    title.innerText = 'Nilai Ekstrakurikuler';
+    renderNilaiEkskulPage(content);
 
   } else if (tabId === 'dash-master-data') {
     title.innerText = 'Data Master';
@@ -4790,9 +4808,11 @@ function renderSiswaDashboard_() {
           <button type="button" onclick="showSiswaTab('ujian')" class="px-4 py-2 rounded-xl bg-[#1b3a6b] text-white text-sm font-bold"><i class="fas fa-laptop mr-1"></i> Buka modul ujian</button>
         </div>
         <div id="siswa-rekrutmen" class="mt-6"></div>
-        <div id="siswa-hasil-seleksi" class="mt-6"></div>`; // [V6.7] Rekrutmen · [V6.8] Pengumuman seleksi
+        <div id="siswa-hasil-seleksi" class="mt-6"></div>
+        <div id="siswa-ekskul" class="mt-6"></div>`; // [V6.7] Rekrutmen · [V6.8] Seleksi · [V6.9] Kegiatan saya
       try { sipRekrutmenSiswaMuat_(); } catch (eRkmS) {}
       try { sipHasilSeleksiMuat_(); } catch (eHslS) {}
+      try { sipEkskulSiswaMuat_(); } catch (eEksS) {}
     })
     .withFailureHandler(function () {
       box.innerHTML = '<div class="bg-white rounded-2xl p-5 border">Informasi dashboard belum tersedia.</div>';
@@ -6951,6 +6971,636 @@ function sipSkorWarna_(n) {
 }
 
 /* --------------------------- HALAMAN SELEKSI ----------------------------- */
+/* ===========================================================================
+   [V6.9] PRESENSI & JURNAL KEGIATAN + NILAI EKSTRAKURIKULER (Pilar A)
+   Halaman baru di Modul Kegiatan. Presensi dicatat sekali klik per pertemuan.
+   Nilai ekskul (A/B/C/D + deskripsi) mengalir ke kartu Pilar A di Rekap Rapor.
+   =========================================================================== */
+var _prsData = null;
+var _prsKeg = '';
+var _eksData = null;
+var _jrnEdit = '';
+
+function sipHadirWarna_(k) {
+  if (k === 'H') return 'bg-emerald-500 text-white border-emerald-600';
+  if (k === 'I') return 'bg-sky-500 text-white border-sky-600';
+  if (k === 'S') return 'bg-amber-500 text-white border-amber-600';
+  return 'bg-rose-500 text-white border-rose-600';
+}
+function sipHadirLabel_(k) {
+  return { H: 'Hadir', I: 'Izin', S: 'Sakit', A: 'Alpa' }[k] || 'Hadir';
+}
+
+/* ============================ PRESENSI & JURNAL ========================== */
+function renderPresensiPage(container) {
+  var eh = escapeHtmlProfil_;
+  container.innerHTML =
+    '<div class="fade-in w-full space-y-6">' +
+      '<div class="dash-card p-6">' +
+        '<div class="flex items-start gap-3">' +
+          '<div class="w-10 h-10 rounded-lg bg-indigo-600 flex items-center justify-center text-white shadow-md"><i class="fas fa-clipboard-user"></i></div>' +
+          '<div><h2 class="text-xl font-bold text-slate-800 tracking-tight">Presensi &amp; Jurnal Kegiatan</h2>' +
+          '<p class="text-slate-500 text-sm">Catat kehadiran <b>sekali klik per pertemuan</b> lalu tulis jurnal singkat materi latihan.</p></div>' +
+        '</div>' +
+        '<div class="flex flex-wrap gap-2 items-end mt-4">' +
+          '<div class="min-w-[240px] flex-1"><label class="text-[10px] font-bold text-slate-500 uppercase">Kegiatan</label>' +
+          '<select id="prs-kegiatan" onchange="sipPrsMuat_(this.value)" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white"></select></div>' +
+          '<button type="button" onclick="sipPrsMuat_()" class="px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700"><i class="fas fa-rotate mr-1"></i>Muat Ulang</button>' +
+          '<button type="button" onclick="sipPrsEkspor_()" class="px-4 py-2 rounded-lg bg-[#1b3a6b] text-white text-xs font-bold hover:bg-[#152f57]"><i class="fas fa-file-pdf mr-1"></i>Cetak Presensi</button>' +
+        '</div>' +
+        '<p id="prs-info" class="text-[11px] text-slate-400 mt-2"></p>' +
+      '</div>' +
+      '<div id="prs-ringkas" class="grid grid-cols-2 sm:grid-cols-4 gap-3"></div>' +
+
+      // ---- FORM PERTEMUAN ----
+      '<div class="dash-card p-5">' +
+        '<div class="flex items-center justify-between gap-2 flex-wrap">' +
+          '<h3 class="font-bold text-slate-800 text-sm"><i class="fas fa-calendar-plus text-indigo-500 mr-2"></i><span id="prs-form-judul">Catat Pertemuan Baru</span></h3>' +
+          '<div class="flex items-center gap-1 text-[11px] text-slate-500">' +
+            '<span class="font-bold">Tandai semua:</span>' +
+            '<button type="button" onclick="sipPrsTandaiSemua_(\'H\')" class="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold">Hadir</button>' +
+            '<button type="button" onclick="sipPrsTandaiSemua_(\'A\')" class="px-2 py-1 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 font-bold">Kosongkan</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="grid grid-cols-1 sm:grid-cols-4 gap-3 mt-3">' +
+          '<div><label class="text-[10px] font-bold text-slate-500 uppercase">Tanggal</label>' +
+            '<input id="prs-tanggal" type="date" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"></div>' +
+          '<div><label class="text-[10px] font-bold text-slate-500 uppercase">Pertemuan ke-</label>' +
+            '<input id="prs-pertemuan" type="number" min="1" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"></div>' +
+          '<div class="sm:col-span-2"><label class="text-[10px] font-bold text-slate-500 uppercase">Materi latihan</label>' +
+            '<input id="prs-materi" maxlength="200" placeholder="mis. Pionering dasar" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"></div>' +
+          '<div class="sm:col-span-4"><label class="text-[10px] font-bold text-slate-500 uppercase">Catatan (opsional)</label>' +
+            '<input id="prs-catatan" maxlength="300" placeholder="mis. 2 anggota mengikuti lomba" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"></div>' +
+        '</div>' +
+        '<div id="prs-anggota" class="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2"></div>' +
+        '<div class="flex gap-2 mt-3">' +
+          '<button type="button" onclick="sipPrsSimpan_()" class="px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700"><i class="fas fa-save mr-1"></i>Simpan Pertemuan</button>' +
+          '<button type="button" onclick="sipPrsReset_()" class="px-4 py-2 rounded-lg bg-slate-100 text-slate-600 text-xs font-bold">Bersihkan</button>' +
+        '</div>' +
+      '</div>' +
+
+      // ---- RIWAYAT PERTEMUAN ----
+      '<div class="dash-card p-5">' +
+        '<h3 class="font-bold text-slate-800 text-sm mb-2"><i class="fas fa-table-list text-indigo-500 mr-2"></i>Riwayat Pertemuan</h3>' +
+        '<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-[10px] uppercase text-slate-400 border-b">' +
+          '<th class="py-2 text-center w-12">Ke-</th><th>Tanggal</th><th>Materi</th><th class="text-center">Hadir</th>' +
+          '<th class="text-center">Izin</th><th class="text-center">Sakit</th><th class="text-center">Alpa</th><th class="text-right">Aksi</th>' +
+        '</tr></thead><tbody id="prs-list"><tr><td colspan="8" class="py-8 text-center text-slate-400 text-xs">Memuat\u2026</td></tr></tbody></table></div>' +
+      '</div>' +
+
+      // ---- JURNAL ----
+      '<div class="dash-card p-5">' +
+        '<h3 class="font-bold text-slate-800 text-sm mb-1"><i class="fas fa-book-open text-indigo-500 mr-2"></i><span id="jrn-form-judul">Jurnal Latihan</span></h3>' +
+        '<p class="text-[11px] text-slate-400 mb-3">Catatan singkat materi, kendala, dan rencana pertemuan berikutnya.</p>' +
+        '<div class="grid grid-cols-1 sm:grid-cols-4 gap-3">' +
+          '<div><label class="text-[10px] font-bold text-slate-500 uppercase">Tanggal</label><input id="jrn-tanggal" type="date" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"></div>' +
+          '<div><label class="text-[10px] font-bold text-slate-500 uppercase">Pertemuan ke-</label><input id="jrn-pertemuan" type="number" min="1" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"></div>' +
+          '<div class="sm:col-span-2"><label class="text-[10px] font-bold text-slate-500 uppercase">Materi</label><input id="jrn-materi" maxlength="200" placeholder="mis. Simpul & ikatan" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"></div>' +
+          '<div class="sm:col-span-2"><label class="text-[10px] font-bold text-slate-500 uppercase">Kegiatan yang dilakukan</label><input id="jrn-isi" maxlength="600" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"></div>' +
+          '<div><label class="text-[10px] font-bold text-slate-500 uppercase">Kendala</label><input id="jrn-kendala" maxlength="300" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"></div>' +
+          '<div><label class="text-[10px] font-bold text-slate-500 uppercase">Rencana berikutnya</label><input id="jrn-rencana" maxlength="300" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"></div>' +
+        '</div>' +
+        '<div class="flex gap-2 mt-3">' +
+          '<button type="button" onclick="sipJrnSimpan_()" class="px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700"><i class="fas fa-save mr-1"></i>Simpan Jurnal</button>' +
+          '<button type="button" onclick="sipJrnReset_()" class="px-4 py-2 rounded-lg bg-slate-100 text-slate-600 text-xs font-bold">Bersihkan</button>' +
+        '</div>' +
+        '<div id="jrn-list" class="mt-4 space-y-2"></div>' +
+      '</div>' +
+    '</div>';
+  sipPrsMuat_(null, true);
+}
+
+function sipPrsMuat_(kegiatanID, awal) {
+  var sel = document.getElementById('prs-kegiatan');
+  _prsKeg = kegiatanID || (sel && sel.value) || '';
+  var body = document.getElementById('prs-list');
+  if (body) body.innerHTML = '<tr><td colspan="8" class="py-8 text-center text-slate-400 text-xs"><i class="fas fa-circle-notch fa-spin mr-1"></i>Memuat\u2026</td></tr>';
+  google.script.run
+    .withSuccessHandler(function (d) { _prsData = d || {}; sipPrsIsi_(awal === true); })
+    .withFailureHandler(function (e) {
+      if (body) body.innerHTML = '<tr><td colspan="8" class="py-8 text-center text-rose-500 text-xs">Gagal: ' + escapeHtmlProfil_(String((e && e.message) || e)) + '</td></tr>';
+    })
+    .getPresensiData({ kegiatanID: _prsKeg }, currentUser.userID, currentUser.token);
+}
+
+function sipPrsIsi_(pertama) {
+  var d = _prsData || {};
+  var eh = escapeHtmlProfil_;
+  if (d.success === false) {
+    var b0 = document.getElementById('prs-list');
+    if (b0) b0.innerHTML = '<tr><td colspan="8" class="py-8 text-center text-rose-500 text-xs">' + eh(d.message) + '</td></tr>';
+    return;
+  }
+  var sel = document.getElementById('prs-kegiatan');
+  if (sel) {
+    var lama = sel.value;
+    sel.innerHTML = (d.kegiatanList || []).map(function (k) {
+      return '<option value="' + eh(k.id) + '">' + eh(k.nama) + ' \u00b7 ' + eh(k.kategori) + '</option>';
+    }).join('');
+    if (lama) sel.value = lama;
+    if (d.kegiatanID) sel.value = d.kegiatanID;
+  }
+  var _selKeg = document.getElementById('prs-kegiatan');
+  _prsKeg = d.kegiatanID || (_selKeg && _selKeg.value) || ''; // [V6.9] kunci kegiatan aktif
+  var info = document.getElementById('prs-info');
+  var kg = (d.kegiatanList || []).filter(function (k) { return k.id === _prsKeg; })[0] || {};
+  if (info) {
+    info.innerHTML = '<i class="fas fa-circle-info mr-1"></i><b>' + eh(d.kegiatan || '-') + '</b> \u00b7 pembina ' + eh(kg.pembinaNama || '-') +
+      ' \u00b7 ' + eh([kg.hari, kg.waktu, kg.tempat].filter(Boolean).join(' \u00b7 ') || '-') + ' \u00b7 TA ' + eh(d.tahunAktif || '-') + ' \u00b7 semester ' + eh(d.semester || '-');
+  }
+  var rg = document.getElementById('prs-ringkas');
+  if (rg) {
+    var h = d.ringkasan || {};
+    var chip = function (l, v, w) { return '<div class="dash-card px-4 py-3"><p class="text-[9px] uppercase font-bold text-slate-400 tracking-wider">' + l + '</p><p class="text-xl font-black ' + w + '">' + eh(v) + '</p></div>'; };
+    rg.innerHTML = chip('Pertemuan', h.pertemuan || 0, 'text-slate-800') + chip('Anggota aktif', h.anggota || 0, 'text-indigo-600') +
+      chip('Rata kehadiran', (h.rataKehadiran || 0) + '%', 'text-emerald-600') + chip('Jurnal', h.jurnal || 0, 'text-violet-600');
+  }
+  var pIn = document.getElementById('prs-pertemuan');
+  if (pIn && !pIn.value) pIn.value = String((d.ringkasan || {}).pertemuanBerikut || 1);
+  var tIn = document.getElementById('prs-tanggal');
+  if (tIn && !tIn.value) {
+    var now = new Date();
+    var p2 = function (n) { return (n < 10 ? '0' : '') + n; };
+    tIn.value = now.getFullYear() + '-' + p2(now.getMonth() + 1) + '-' + p2(now.getDate());
+  }
+
+  // daftar anggota dengan pilihan H/I/S/A
+  var box = document.getElementById('prs-anggota');
+  if (box) {
+    var anggota = d.anggota || [];
+    if (!anggota.length) {
+      box.innerHTML = '<p class="text-[11px] text-amber-600 col-span-3"><i class="fas fa-triangle-exclamation mr-1"></i>Kegiatan ini belum punya anggota aktif. Tetapkan hasil seleksi atau tambah anggota di menu <b>Anggota &amp; SK</b>.</p>';
+    } else {
+      box.innerHTML = anggota.map(function (a) {
+        var cepat = ['H', 'I', 'S', 'A'].map(function (k) {
+          var aktif = (k === 'H');
+          return '<button type="button" data-uid="' + eh(a.userID) + '" data-kode="' + k + '" onclick="sipPrsSet_(\'' + eh(a.userID) + '\',\'' + k + '\')"' +
+            ' class="px-2 py-1 rounded-lg text-[10px] font-bold border ' + (aktif ? sipHadirWarna_(k) : 'bg-white text-slate-500 border-slate-200') + '">' + k + '</button>';
+        }).join('');
+        return '<div class="flex items-center justify-between gap-2 border border-slate-200 rounded-xl px-3 py-2 bg-white" data-baris="' + eh(a.userID) + '">' +
+          '<div><p class="text-xs font-medium text-slate-700">' + eh(a.nama) + '</p>' +
+          '<p class="text-[10px] text-slate-400">' + eh(a.kelas) + ' \u00b7 ' + eh(a.jabatan) + ' \u00b7 hadir ' + eh(a.persen === '' ? '-' : a.persen + '%') + '</p></div>' +
+          '<div class="flex gap-1">' + cepat + '</div></div>';
+      }).join('');
+      window._prsHadir = {};
+      anggota.forEach(function (a) { window._prsHadir[a.userID] = 'H'; });
+    }
+  }
+
+  // riwayat pertemuan
+  var body = document.getElementById('prs-list');
+  if (body) {
+    var rows = d.pertemuan || [];
+    body.innerHTML = rows.length ? rows.map(function (p) {
+      var r = p.rekap || {};
+      return '<tr class="border-b border-slate-50 hover:bg-slate-50/60">' +
+        '<td class="py-2 text-center text-xs font-bold text-slate-500">' + eh(p.pertemuan) + '</td>' +
+        '<td class="text-xs">' + eh(sipTglTampil_(p.tanggal)) + '</td>' +
+        '<td class="text-xs text-slate-700">' + eh(p.materi || '\u2013') + (p.catatan ? '<div class="text-[10px] text-slate-400">' + eh(p.catatan) + '</div>' : '') + '</td>' +
+        '<td class="text-center text-xs font-bold text-emerald-600">' + eh(r.hadir || 0) + '</td>' +
+        '<td class="text-center text-xs text-sky-600">' + eh(r.izin || 0) + '</td>' +
+        '<td class="text-center text-xs text-amber-600">' + eh(r.sakit || 0) + '</td>' +
+        '<td class="text-center text-xs text-rose-600">' + eh(r.alpa || 0) + '</td>' +
+        '<td class="text-right whitespace-nowrap">' +
+          '<button type="button" onclick="sipPrsUbah_(\'' + eh(p.id) + '\')" class="text-[11px] font-bold text-indigo-600 hover:underline mr-3">Ubah</button>' +
+          '<button type="button" onclick="sipPrsHapus_(\'' + eh(p.id) + '\')" class="text-[11px] font-bold text-rose-500 hover:underline">Hapus</button>' +
+        '</td></tr>';
+    }).join('') : '<tr><td colspan="8" class="py-8 text-center text-slate-400 text-xs">Belum ada pertemuan. Catat pertemuan pertama di form atas.</td></tr>';
+  }
+
+  // jurnal
+  var jl = document.getElementById('jrn-list');
+  if (jl) {
+    var jr = d.jurnal || [];
+    jl.innerHTML = jr.length ? jr.map(function (j) {
+      return '<div class="border border-slate-200 rounded-xl px-3 py-2 bg-white">' +
+        '<div class="flex items-start justify-between gap-2">' +
+          '<div><p class="text-xs font-bold text-slate-700">Pertemuan ' + eh(j.pertemuan) + ' \u00b7 ' + eh(j.materi) + '</p>' +
+          '<p class="text-[10px] text-slate-400">' + eh(sipTglTampil_(j.tanggal)) + '</p>' +
+          (j.kegiatan ? '<p class="text-[11px] text-slate-600 mt-1">' + eh(j.kegiatan) + '</p>' : '') +
+          (j.kendala ? '<p class="text-[11px] text-amber-600">Kendala: ' + eh(j.kendala) + '</p>' : '') +
+          (j.rencana ? '<p class="text-[11px] text-sky-600">Rencana: ' + eh(j.rencana) + '</p>' : '') + '</div>' +
+          '<div class="whitespace-nowrap">' +
+            '<button type="button" onclick="sipJrnUbah_(\'' + eh(j.id) + '\')" class="text-[11px] font-bold text-indigo-600 hover:underline mr-3">Ubah</button>' +
+            '<button type="button" onclick="sipJrnHapus_(\'' + eh(j.id) + '\')" class="text-[11px] font-bold text-rose-500 hover:underline">Hapus</button>' +
+          '</div></div></div>';
+    }).join('') : '<p class="text-[11px] text-slate-400">Belum ada jurnal.</p>';
+  }
+  if (pertama) {
+    var t2 = document.getElementById('jrn-tanggal');
+    if (t2 && !t2.value) t2.value = (document.getElementById('prs-tanggal') || {}).value || '';
+  }
+}
+
+function sipPrsSet_(uid, kode) {
+  window._prsHadir = window._prsHadir || {};
+  window._prsHadir[uid] = kode;
+  var baris = document.querySelector('[data-baris="' + uid + '"]');
+  if (!baris) return;
+  baris.querySelectorAll('button[data-kode]').forEach(function (btn) {
+    var on = btn.getAttribute('data-kode') === kode;
+    btn.className = 'px-2 py-1 rounded-lg text-[10px] font-bold border ' + (on ? sipHadirWarna_(kode) : 'bg-white text-slate-500 border-slate-200');
+  });
+}
+
+function sipPrsTandaiSemua_(kode) {
+  Object.keys(window._prsHadir || {}).forEach(function (uid) { sipPrsSet_(uid, kode); });
+}
+
+function sipPrsKirim_(payload, lanjut) {
+  document.getElementById('global-loading').classList.remove('hidden');
+  google.script.run
+    .withSuccessHandler(function (res) {
+      document.getElementById('global-loading').classList.add('hidden');
+      if (res && res.success) { sipPrsMuat_(_prsKeg); if (lanjut) lanjut(res); }
+      else Swal.fire('Gagal', (res && res.message) || 'Terjadi kesalahan.', 'warning');
+    })
+    .withFailureHandler(function (e) {
+      document.getElementById('global-loading').classList.add('hidden');
+      Swal.fire('Gagal', String((e && e.message) || e), 'error');
+    })
+    .simpanPresensi(payload, currentUser.userID, currentUser.token);
+}
+
+function sipPrsSimpan_() {
+  var v = function (id) { var el = document.getElementById(id); return el ? el.value : ''; };
+  if (!_prsKeg) { Swal.fire('Belum lengkap', 'Pilih kegiatan terlebih dahulu.', 'warning'); return; }
+  if (!v('prs-tanggal')) { Swal.fire('Belum lengkap', 'Tanggal pertemuan wajib diisi.', 'warning'); return; }
+  sipPrsKirim_({
+    kegiatanID: _prsKeg,
+    tanggal: v('prs-tanggal'),
+    pertemuan: v('prs-pertemuan'),
+    materi: v('prs-materi'),
+    catatan: v('prs-catatan'),
+    hadir: window._prsHadir || {}
+  }, function (res) {
+    sipPrsReset_(true);
+    Swal.fire({ icon: 'success', title: 'Pertemuan tersimpan', text: res.message || '', timer: 1700, showConfirmButton: false });
+  });
+}
+
+function sipPrsUbah_(id) {
+  var p = ((_prsData || {}).pertemuan || []).filter(function (x) { return x.id === id; })[0];
+  if (!p) return;
+  var set = function (i, val) { var el = document.getElementById(i); if (el) el.value = val; };
+  set('prs-tanggal', String(sipTglInput_(p.tanggal) || '').slice(0, 10));
+  set('prs-pertemuan', p.pertemuan);
+  set('prs-materi', p.materi);
+  set('prs-catatan', p.catatan);
+  var judul = document.getElementById('prs-form-judul');
+  if (judul) judul.textContent = 'Ubah Pertemuan ke-' + p.pertemuan;
+  Object.keys(window._prsHadir || {}).forEach(function (uid) {
+    sipPrsSet_(uid, p.hadir[uid] || 'A');
+  });
+  try { document.getElementById('prs-tanggal').scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+}
+
+function sipPrsReset_(pertahankan) {
+  if (!pertahankan) {
+    ['prs-materi', 'prs-catatan'].forEach(function (i) { var el = document.getElementById(i); if (el) el.value = ''; });
+  } else {
+    var el1 = document.getElementById('prs-materi'); if (el1) el1.value = '';
+    var el2 = document.getElementById('prs-catatan'); if (el2) el2.value = '';
+  }
+  var pIn = document.getElementById('prs-pertemuan');
+  if (pIn) pIn.value = String(((_prsData || {}).ringkasan || {}).pertemuanBerikut || '');
+  var judul = document.getElementById('prs-form-judul');
+  if (judul) judul.textContent = 'Catat Pertemuan Baru';
+  sipPrsTandaiSemua_('H');
+}
+
+function sipPrsHapus_(id) {
+  Swal.fire({ title: 'Hapus pertemuan ini?', text: 'Kehadiran pada pertemuan ini ikut terhapus.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Ya, hapus', cancelButtonText: 'Batal', confirmButtonColor: '#e11d48' })
+    .then(function (r) { if (r.isConfirmed) sipPrsKirim_({ kegiatanID: _prsKeg, aksi: 'hapus', id: id }); });
+}
+
+function sipPrsEkspor_() {
+  if (!_prsKeg) { Swal.fire('Pilih kegiatan', 'Pilih kegiatan terlebih dahulu.', 'warning'); return; }
+  document.getElementById('global-loading').classList.remove('hidden');
+  google.script.run
+    .withSuccessHandler(function (res) {
+      document.getElementById('global-loading').classList.add('hidden');
+      if (res && res.success) {
+        Swal.fire({
+          icon: 'success', title: 'Presensi tercetak',
+          html: escapeHtmlProfil_(res.message) + '<br><a href="' + escapeHtmlProfil_(res.url) + '" target="_blank" class="text-indigo-600 font-bold underline">Buka berkas PDF</a>',
+          confirmButtonText: 'Tutup', confirmButtonColor: '#1b3a6b'
+        });
+      } else Swal.fire('Gagal', (res && res.message) || 'Gagal membuat berkas.', 'warning');
+    })
+    .withFailureHandler(function (e) {
+      document.getElementById('global-loading').classList.add('hidden');
+      Swal.fire('Gagal', String((e && e.message) || e), 'error');
+    })
+    .eksporPresensiKegiatan({ kegiatanID: _prsKeg }, currentUser.userID, currentUser.token);
+}
+
+/* --------------------------------- jurnal -------------------------------- */
+function sipJrnKirim_(payload, lanjut) {
+  document.getElementById('global-loading').classList.remove('hidden');
+  google.script.run
+    .withSuccessHandler(function (res) {
+      document.getElementById('global-loading').classList.add('hidden');
+      if (res && res.success) { sipPrsMuat_(_prsKeg); if (lanjut) lanjut(res); }
+      else Swal.fire('Gagal', (res && res.message) || 'Terjadi kesalahan.', 'warning');
+    })
+    .withFailureHandler(function (e) {
+      document.getElementById('global-loading').classList.add('hidden');
+      Swal.fire('Gagal', String((e && e.message) || e), 'error');
+    })
+    .simpanJurnalKegiatan(payload, currentUser.userID, currentUser.token);
+}
+
+function sipJrnSimpan_() {
+  var v = function (id) { var el = document.getElementById(id); return el ? el.value : ''; };
+  if (!_prsKeg) { Swal.fire('Belum lengkap', 'Pilih kegiatan terlebih dahulu.', 'warning'); return; }
+  if (!v('jrn-tanggal')) { Swal.fire('Belum lengkap', 'Tanggal jurnal wajib diisi.', 'warning'); return; }
+  if (String(v('jrn-materi')).trim().length < 3) { Swal.fire('Belum lengkap', 'Materi minimal 3 karakter.', 'warning'); return; }
+  sipJrnKirim_({
+    kegiatanID: _prsKeg, aksi: _jrnEdit ? 'ubah' : 'tambah', id: _jrnEdit,
+    tanggal: v('jrn-tanggal'), pertemuan: v('jrn-pertemuan'), materi: v('jrn-materi'),
+    kegiatan: v('jrn-isi'), kendala: v('jrn-kendala'), rencana: v('jrn-rencana')
+  }, function () {
+    sipJrnReset_();
+    Swal.fire({ icon: 'success', title: 'Jurnal tersimpan', timer: 1400, showConfirmButton: false });
+  });
+}
+
+function sipJrnUbah_(id) {
+  var j = ((_prsData || {}).jurnal || []).filter(function (x) { return x.id === id; })[0];
+  if (!j) return;
+  _jrnEdit = id;
+  var set = function (i, val) { var el = document.getElementById(i); if (el) el.value = val; };
+  set('jrn-tanggal', String(sipTglInput_(j.tanggal) || '').slice(0, 10));
+  set('jrn-pertemuan', j.pertemuan);
+  set('jrn-materi', j.materi);
+  set('jrn-isi', j.kegiatan);
+  set('jrn-kendala', j.kendala);
+  set('jrn-rencana', j.rencana);
+  var judul = document.getElementById('jrn-form-judul');
+  if (judul) judul.textContent = 'Ubah Jurnal Pertemuan ' + j.pertemuan;
+}
+
+function sipJrnReset_() {
+  _jrnEdit = '';
+  ['jrn-materi', 'jrn-isi', 'jrn-kendala', 'jrn-rencana'].forEach(function (i) { var el = document.getElementById(i); if (el) el.value = ''; });
+  var judul = document.getElementById('jrn-form-judul');
+  if (judul) judul.textContent = 'Jurnal Latihan';
+}
+
+function sipJrnHapus_(id) {
+  Swal.fire({ title: 'Hapus jurnal ini?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Ya, hapus', cancelButtonText: 'Batal', confirmButtonColor: '#e11d48' })
+    .then(function (r) { if (r.isConfirmed) sipJrnKirim_({ kegiatanID: _prsKeg, aksi: 'hapus', id: id }); });
+}
+
+/* ============================== NILAI EKSKUL ============================= */
+function renderNilaiEkskulPage(container) {
+  var eh = escapeHtmlProfil_;
+  container.innerHTML =
+    '<div class="fade-in w-full space-y-6">' +
+      '<div class="dash-card p-6">' +
+        '<div class="flex items-start gap-3">' +
+          '<div class="w-10 h-10 rounded-lg bg-indigo-600 flex items-center justify-center text-white shadow-md"><i class="fas fa-medal"></i></div>' +
+          '<div><h2 class="text-xl font-bold text-slate-800 tracking-tight">Nilai Ekstrakurikuler</h2>' +
+          '<p class="text-slate-500 text-sm">Predikat <b>A/B/C/D</b> + deskripsi per semester. Draf otomatis diambil dari kehadiran &amp; jurnal, lalu mengalir ke <b>Rekap Rapor</b>.</p></div>' +
+        '</div>' +
+        '<div class="flex flex-wrap gap-2 items-end mt-4">' +
+          '<div class="min-w-[220px] flex-1"><label class="text-[10px] font-bold text-slate-500 uppercase">Kegiatan</label>' +
+          '<select id="eks-kegiatan" onchange="sipEksMuat_()" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white"></select></div>' +
+          '<div class="min-w-[130px]"><label class="text-[10px] font-bold text-slate-500 uppercase">Semester</label>' +
+          '<select id="eks-semester" onchange="sipEksMuat_()" class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white"><option>Ganjil</option><option>Genap</option></select></div>' +
+          '<button type="button" onclick="sipEksMuat_()" class="px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700"><i class="fas fa-rotate mr-1"></i>Muat Ulang</button>' +
+        '</div>' +
+        '<p id="eks-info" class="text-[11px] text-slate-400 mt-2"></p>' +
+      '</div>' +
+      '<div id="eks-ringkas" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3"></div>' +
+      '<div class="dash-card p-5">' +
+        '<div class="flex items-center justify-between gap-2 flex-wrap mb-2">' +
+          '<h3 class="font-bold text-slate-800 text-sm"><i class="fas fa-list-check text-indigo-500 mr-2"></i>Predikat &amp; Deskripsi</h3>' +
+          '<div class="flex gap-2">' +
+            '<button type="button" onclick="sipEksDrafUlang_()" class="px-3 py-2 rounded-lg bg-slate-100 text-slate-700 text-xs font-bold hover:bg-slate-200"><i class="fas fa-wand-magic-sparkles mr-1"></i>Susun Draf</button>' +
+            '<button type="button" onclick="sipEksSimpan_()" class="px-4 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700"><i class="fas fa-save mr-1"></i>Simpan Nilai</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-[10px] uppercase text-slate-400 border-b">' +
+          '<th class="py-2">Nama</th><th>Kelas</th><th class="text-center">H</th><th class="text-center">I</th><th class="text-center">S</th>' +
+          '<th class="text-center">A</th><th class="text-center">%</th><th class="text-center w-24">Predikat</th><th>Deskripsi</th>' +
+        '</tr></thead><tbody id="eks-list"><tr><td colspan="9" class="py-8 text-center text-slate-400 text-xs">Memuat\u2026</td></tr></tbody></table></div>' +
+        '<p class="text-[10px] text-slate-400 mt-2">Predikat: A \u2265 90% kehadiran, B \u2265 80%, C \u2265 70%, D &lt; 70%. Draf dapat diubah bebas oleh pembina.</p>' +
+      '</div>' +
+    '</div>';
+  sipEksMuat_(true);
+}
+
+function sipEksMuat_(awal) {
+  var selK = document.getElementById('eks-kegiatan');
+  var selS = document.getElementById('eks-semester');
+  var body = document.getElementById('eks-list');
+  if (body) body.innerHTML = '<tr><td colspan="9" class="py-8 text-center text-slate-400 text-xs"><i class="fas fa-circle-notch fa-spin mr-1"></i>Memuat\u2026</td></tr>';
+  google.script.run
+    .withSuccessHandler(function (d) { _eksData = d || {}; sipEksIsi_(awal === true); })
+    .withFailureHandler(function (e) {
+      if (body) body.innerHTML = '<tr><td colspan="9" class="py-8 text-center text-rose-500 text-xs">Gagal: ' + escapeHtmlProfil_(String((e && e.message) || e)) + '</td></tr>';
+    })
+    .getNilaiEkskulData({ kegiatanID: selK ? selK.value : '', semester: selS ? selS.value : '' }, currentUser.userID, currentUser.token);
+}
+
+function sipEksIsi_(pertama) {
+  var d = _eksData || {};
+  var eh = escapeHtmlProfil_;
+  if (d.success === false) {
+    var b0 = document.getElementById('eks-list');
+    if (b0) b0.innerHTML = '<tr><td colspan="9" class="py-8 text-center text-rose-500 text-xs">' + eh(d.message) + '</td></tr>';
+    return;
+  }
+  var selK = document.getElementById('eks-kegiatan');
+  if (selK) {
+    var lama = selK.value;
+    selK.innerHTML = (d.kegiatanList || []).map(function (k) { return '<option value="' + eh(k.id) + '">' + eh(k.nama) + '</option>'; }).join('');
+    if (lama) selK.value = lama;
+    if (d.kegiatanID) selK.value = d.kegiatanID;
+  }
+  var selS = document.getElementById('eks-semester');
+  if (selS) {
+    selS.innerHTML = (d.semesterList || ['Ganjil', 'Genap']).map(function (s) { return '<option>' + eh(s) + '</option>'; }).join('');
+    selS.value = d.semesterDipilih || d.semester || 'Ganjil';
+  }
+  var info = document.getElementById('eks-info');
+  if (info) {
+    info.innerHTML = '<i class="fas fa-circle-info mr-1"></i><b>' + eh(d.kegiatan || '-') + '</b> \u00b7 semester <b>' + eh(d.semesterDipilih || '-') +
+      '</b> \u00b7 TA ' + eh(d.tahunAktif || '-') + ' \u00b7 ' + eh((d.ringkasan || {}).pertemuan || 0) + ' pertemuan \u00b7 ' + eh((d.ringkasan || {}).jurnal || 0) + ' jurnal';
+  }
+  var rg = document.getElementById('eks-ringkas');
+  if (rg) {
+    var n = (d.ringkasan || {}).nilai || {};
+    var chip = function (l, v, w) { return '<div class="dash-card px-4 py-3"><p class="text-[9px] uppercase font-bold text-slate-400 tracking-wider">' + l + '</p><p class="text-xl font-black ' + w + '">' + eh(v) + '</p></div>'; };
+    rg.innerHTML = chip('Anggota', (d.ringkasan || {}).anggota || 0, 'text-slate-800') +
+      chip('Sudah dinilai', n.sudah || 0, 'text-indigo-600') +
+      chip('Predikat A', n.A || 0, 'text-emerald-600') + chip('B', n.B || 0, 'text-sky-600') +
+      chip('C', n.C || 0, 'text-amber-600') + chip('D', n.D || 0, 'text-rose-600');
+  }
+  var body = document.getElementById('eks-list');
+  if (body) {
+    var rows = d.daftar || [];
+    body.innerHTML = rows.length ? rows.map(function (x, i) {
+      var opsi = ['A', 'B', 'C', 'D'].map(function (p) {
+        return '<option' + (p === x.predikat ? ' selected' : '') + '>' + p + '</option>';
+      }).join('');
+      return '<tr class="border-b border-slate-50 align-top" data-eks="' + i + '">' +
+        '<td class="py-2"><div class="font-medium text-slate-700">' + eh(x.nama) + '</div>' +
+          (x.tersimpan ? '<span class="text-[9px] font-bold text-emerald-600">tersimpan</span>' : '<span class="text-[9px] font-bold text-slate-400">draf</span>') + '</td>' +
+        '<td class="text-xs">' + eh(x.kelas) + '</td>' +
+        '<td class="text-center text-xs text-emerald-600">' + eh(x.H) + '</td>' +
+        '<td class="text-center text-xs text-sky-600">' + eh(x.I) + '</td>' +
+        '<td class="text-center text-xs text-amber-600">' + eh(x.S) + '</td>' +
+        '<td class="text-center text-xs text-rose-600">' + eh(x.A) + '</td>' +
+        '<td class="text-center text-xs font-bold">' + eh(x.persen === '' ? '\u2013' : x.persen) + '</td>' +
+        '<td class="text-center"><select class="eks-pred accent-indigo-600 border border-slate-300 rounded-lg px-2 py-1 text-xs bg-white" data-uid="' + eh(x.userID) + '">' + opsi + '</select></td>' +
+        '<td><textarea rows="2" class="eks-desk w-full border border-slate-300 rounded-lg px-2 py-1 text-[11px]" maxlength="500" data-uid="' + eh(x.userID) + '">' + eh(x.deskripsi) + '</textarea></td>' +
+      '</tr>';
+    }).join('') : '<tr><td colspan="9" class="py-8 text-center text-slate-400 text-xs">Belum ada anggota aktif pada kegiatan ini.</td></tr>';
+  }
+  if (pertama) { /* siap dipakai */ }
+}
+
+function sipEksKumpul_() {
+  var out = [];
+  document.querySelectorAll('.eks-pred').forEach(function (sel) {
+    var uid = sel.getAttribute('data-uid');
+    var desk = document.querySelector('.eks-desk[data-uid="' + uid + '"]');
+    out.push({ userID: uid, predikat: sel.value, deskripsi: desk ? desk.value : '', sumber: 'manual' });
+  });
+  return out;
+}
+
+function sipEksDrafUlang_() {
+  var d = _eksData || {};
+  var rub = d.daftar || [];
+  if (!rub.length) return;
+  var jurnalMateri = ((d.ringkasan || {}).jurnal || 0) > 0;
+  rub.forEach(function (x) {
+    var sel = document.querySelector('.eks-pred[data-uid="' + x.userID + '"]');
+    var desk = document.querySelector('.eks-desk[data-uid="' + x.userID + '"]');
+    var p = parseFloat(x.persen);
+    var pred = isNaN(p) ? 'C' : (p >= 90 ? 'A' : p >= 80 ? 'B' : p >= 70 ? 'C' : 'D');
+    var kata = { A: 'sangat baik dan konsisten', B: 'baik', C: 'cukup baik', D: 'perlu bimbingan' }[pred];
+    var teks = 'Menunjukkan sikap ' + kata + ' dalam mengikuti kegiatan ' + (d.kegiatan || '-') + '. ' +
+      'Kehadiran ' + x.H + ' dari ' + x.total + ' pertemuan' +
+      (x.I ? ', izin ' + x.I + ' kali' : '') + (x.S ? ', sakit ' + x.S + ' kali' : '') + (x.A ? ', tanpa keterangan ' + x.A + ' kali' : '') + '. ' +
+      (jurnalMateri ? 'Materi latihan tercatat pada jurnal pembina.' : 'Aktif mengikuti latihan rutin sesuai jadwal.');
+    if (sel) sel.value = pred;
+    if (desk) desk.value = teks;
+  });
+  Swal.fire({ icon: 'success', title: 'Draf disusun ulang', text: 'Periksa kembali sebelum menyimpan.', timer: 1600, showConfirmButton: false });
+}
+
+function sipEksSimpan_() {
+  var payload = {
+    kegiatanID: (document.getElementById('eks-kegiatan') || {}).value || '',
+    semester: (document.getElementById('eks-semester') || {}).value || 'Ganjil',
+    daftar: sipEksKumpul_()
+  };
+  if (!payload.kegiatanID) { Swal.fire('Pilih kegiatan', 'Pilih kegiatan terlebih dahulu.', 'warning'); return; }
+  if (!payload.daftar.length) { Swal.fire('Belum ada data', 'Belum ada anggota untuk dinilai.', 'warning'); return; }
+  document.getElementById('global-loading').classList.remove('hidden');
+  google.script.run
+    .withSuccessHandler(function (res) {
+      document.getElementById('global-loading').classList.add('hidden');
+      if (res && res.success) {
+        sipEksMuat_();
+        Swal.fire({ icon: 'success', title: 'Nilai tersimpan', text: res.message || '', timer: 1900, showConfirmButton: false });
+      } else Swal.fire('Gagal', (res && res.message) || 'Gagal menyimpan.', 'warning');
+    })
+    .withFailureHandler(function (e) {
+      document.getElementById('global-loading').classList.add('hidden');
+      Swal.fire('Gagal', String((e && e.message) || e), 'error');
+    })
+    .simpanNilaiEkskul(payload, currentUser.userID, currentUser.token);
+}
+
+/* ------------------ kartu Pilar A di halaman Rekap Rapor ---------------- */
+function sipRaporEkskulMuat_() {
+  var box = document.getElementById('rapor-ekskul');
+  if (!box) return;
+  var kelas = (document.getElementById('rapor-kelas') || {}).value || '';
+  if (!kelas) { box.innerHTML = ''; return; }
+  google.script.run
+    .withSuccessHandler(function (d) {
+      var el = document.getElementById('rapor-ekskul');
+      if (!el) return;
+      if (!d || d.success === false || !(d.daftar || []).length) {
+        el.innerHTML = '<div class="dash-card p-5"><h3 class="font-bold text-slate-800 text-sm"><i class="fas fa-medal text-indigo-500 mr-2"></i>Nilai Ekstrakurikuler (Pilar A)</h3>' +
+          '<p class="text-[11px] text-slate-400 mt-1">Belum ada nilai ekstrakurikuler untuk kelas ini pada semester ' + escapeHtmlProfil_((d && d.semester) || '-') + '. Isi di menu <b>Modul Kegiatan \u2192 Nilai Ekskul</b>.</p></div>';
+        return;
+      }
+      var eh = escapeHtmlProfil_;
+      var kol = d.kegiatanList || [];
+      el.innerHTML = '<div class="dash-card p-5">' +
+        '<div class="flex items-center justify-between gap-2 flex-wrap mb-2">' +
+          '<h3 class="font-bold text-slate-800 text-sm"><i class="fas fa-medal text-indigo-500 mr-2"></i>Nilai Ekstrakurikuler (Pilar A)</h3>' +
+          '<span class="text-[10px] font-bold px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100">' + eh(d.semester) + ' \u00b7 ' + eh(d.kelas) + '</span>' +
+        '</div>' +
+        '<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-[10px] uppercase text-slate-400 border-b">' +
+          '<th class="py-2">Nama Siswa</th>' + kol.map(function (k) { return '<th class="text-center">' + eh(k.nama) + '</th>'; }).join('') +
+        '</tr></thead><tbody>' +
+        (d.daftar || []).map(function (s) {
+          return '<tr class="border-b border-slate-50"><td class="py-1.5 text-slate-700">' + eh(s.nama) + '</td>' +
+            kol.map(function (k) {
+              var v = s.nilai[k.id];
+              return '<td class="text-center text-xs">' + (v
+                ? '<span class="font-black ' + (v.predikat === 'A' ? 'text-emerald-600' : v.predikat === 'B' ? 'text-sky-600' : v.predikat === 'C' ? 'text-amber-600' : 'text-rose-600') + '" title="' + eh(v.deskripsi || '') + '">' + eh(v.predikat) + '</span>'
+                : '<span class="text-slate-300">\u2013</span>') + '</td>';
+            }).join('') + '</tr>';
+        }).join('') +
+        '</tbody></table></div>' +
+        '<p class="text-[10px] text-slate-400 mt-2">Arahkan kursor ke predikat untuk melihat deskripsi rapor. Sumber: menu Nilai Ekskul (Modul Kegiatan).</p></div>';
+    })
+    .withFailureHandler(function () {})
+    .getNilaiEkskulKelas({ kelas: kelas }, currentUser.userID, currentUser.token);
+}
+
+/* --------------------- kartu kegiatan & presensi SISWA ------------------ */
+function sipEkskulSiswaMuat_() {
+  if (!currentUser || currentUser.role !== 'Siswa') return;
+  var box = document.getElementById('siswa-ekskul');
+  if (!box) return;
+  google.script.run
+    .withSuccessHandler(function (d) {
+      var el = document.getElementById('siswa-ekskul');
+      if (!el) return;
+      var list = (d && d.daftar) || [];
+      if (!list.length) { el.innerHTML = ''; return; }
+      var eh = escapeHtmlProfil_;
+      el.innerHTML = '<div class="space-y-3">' +
+        '<div class="flex items-center justify-between"><h2 class="font-bold text-slate-800 text-lg">Kegiatan Saya</h2>' +
+        '<span class="text-[10px] font-bold px-2 py-1 rounded-lg bg-sky-50 text-sky-700 border border-sky-100">' + eh(d.semester) + ' \u00b7 ' + eh(d.tahunAktif) + '</span></div>' +
+        list.map(function (k) {
+          var predWarna = k.predikat === 'A' ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+            : k.predikat === 'B' ? 'bg-sky-50 text-sky-700 border-sky-200'
+            : k.predikat === 'C' ? 'bg-amber-50 text-amber-700 border-amber-200'
+            : k.predikat === 'D' ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-slate-100 text-slate-500 border-slate-200';
+          return '<article class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">' +
+            '<div class="flex items-start justify-between gap-2">' +
+              '<div><p class="text-[10px] uppercase tracking-[0.16em] text-sky-600 font-bold">' + eh(k.kategori) + ' \u00b7 ' + eh(k.jabatan) + '</p>' +
+              '<h3 class="font-black text-slate-800 text-base">' + eh(k.nama) + '</h3>' +
+              '<p class="text-[11px] text-slate-500">' + eh([k.hari, k.waktu, k.tempat].filter(Boolean).join(' \u00b7 ') || '-') + ' \u00b7 Pembina ' + eh(k.pembina || '-') + '</p></div>' +
+              '<span class="text-[10px] font-bold px-2 py-1 rounded-lg border ' + predWarna + '">' + (k.sudahDinilai ? 'Nilai ' + eh(k.predikat) : 'belum dinilai') + '</span>' +
+            '</div>' +
+            '<div class="grid grid-cols-5 gap-2 mt-3 text-center">' +
+              '<div><p class="text-[9px] uppercase font-bold text-slate-400">Hadir</p><p class="text-sm font-black text-emerald-600">' + eh(k.H) + '</p></div>' +
+              '<div><p class="text-[9px] uppercase font-bold text-slate-400">Izin</p><p class="text-sm font-black text-sky-600">' + eh(k.I) + '</p></div>' +
+              '<div><p class="text-[9px] uppercase font-bold text-slate-400">Sakit</p><p class="text-sm font-black text-amber-600">' + eh(k.S) + '</p></div>' +
+              '<div><p class="text-[9px] uppercase font-bold text-slate-400">Alpa</p><p class="text-sm font-black text-rose-600">' + eh(k.A) + '</p></div>' +
+              '<div><p class="text-[9px] uppercase font-bold text-slate-400">Kehadiran</p><p class="text-sm font-black text-slate-800">' + eh(k.persen === '' ? '-' : k.persen + '%') + '</p></div>' +
+            '</div>' +
+            (k.deskripsi ? '<p class="text-[11px] text-slate-500 mt-2"><b>Catatan pembina:</b> ' + eh(k.deskripsi) + '</p>' : '') +
+            '<p class="text-[10px] text-slate-400 mt-1">' + eh(k.pertemuan) + ' pertemuan tercatat.</p></article>';
+        }).join('') + '</div>';
+    })
+    .withFailureHandler(function () {})
+    .getEkskulSiswa(currentUser.userID, currentUser.token);
+}
+
 function renderSeleksiPage(container) {
   var eh = escapeHtmlProfil_;
   container.innerHTML =
@@ -8167,6 +8817,7 @@ function renderRekapRaporPage(container) {
           '<tbody id="rapor-body"><tr><td class="py-8 text-center text-slate-400 text-xs">Pilih kelas lalu tekan Tampilkan.</td></tr></tbody>' +
         '</table></div>' +
       '</div>' +
+      '<div id="rapor-ekskul"></div>' +
       '<div class="dash-card p-5">' +
         '<div class="flex flex-wrap items-center justify-between gap-2 mb-3">' +
           '<h3 class="font-bold text-slate-800 text-sm"><i class="fas fa-chart-simple text-indigo-500 mr-2"></i>Analisis Butir Soal</h3>' +
@@ -8189,6 +8840,8 @@ function renderRekapRaporPage(container) {
 }
 
 function sipRaporMuatOpsi_() {
+  // [V6.9] kartu Pilar A dimuat bersama data rapor
+  try { sipRaporEkskulMuat_(); } catch (eEks) {}
   // Kelas dari Master_Data (datalist) + daftar ujian utk analisis butir
   google.script.run
     .withSuccessHandler(function (d) {
@@ -23611,5 +24264,5 @@ function sipSisipTandaGambar_() {
     } catch (e) {}
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a58a0628bf97880b',t:'MTc5NDM2NTc4OQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a58a0628bf97880b',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a58a0eff8e21880b',t:'MTc5NDM2NjE1MQ=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a58a0eff8e21880b',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
