@@ -1828,6 +1828,9 @@
               <div id="menu-sesi-bagi" class="sidebar-item" onclick="showAdminTab('dash-sesi-bagi', this)">
                 <i class="fas fa-clock"></i> <span class="sidebar-text font-medium">Pembagian Sesi</span>
               </div>
+              <div id="menu-ruangan" class="sidebar-item" onclick="showAdminTab('dash-ruangan', this)">
+                <i class="fas fa-door-open"></i> <span class="sidebar-text font-medium">Pembagian Ruangan</span>
+              </div>
               <div id="menu-questions" class="sidebar-item" onclick="showAdminTab('dash-questions', this)">
                 <i class="fas fa-book"></i> <span class="sidebar-text font-medium">Bank Soal</span>
               </div>
@@ -2961,7 +2964,7 @@ function initAdminPanel() {
  
   // ── LOGIKA VISIBILITAS MENU BERDASARKAN ROLE ──────────────────────
   // [PENGAWAS] Guru (pengawas) hanya melihat: Dashboard, Jadwal Ujian, Bank Soal, Hasil & Nilai
-  const guruAllowedMenus = ['menu-home', 'menu-profil-guru', 'menu-pgw-ujian', 'menu-pgw-koreksi', 'menu-questions', 'menu-materibab', 'menu-exams', 'menu-sesi-bagi', 'menu-results', 'menu-profil', 'menu-kartu', 'menu-hadir', 'menu-users', 'menu-images'];
+  const guruAllowedMenus = ['menu-home', 'menu-profil-guru', 'menu-pgw-ujian', 'menu-pgw-koreksi', 'menu-questions', 'menu-materibab', 'menu-exams', 'menu-sesi-bagi', 'menu-ruangan', 'menu-results', 'menu-profil', 'menu-kartu', 'menu-hadir', 'menu-users', 'menu-images'];
   const adminOnlyMenus = ['menu-questions', 'menu-kisi', 'menu-ai-generator', 'menu-hermes',
     'menu-report-template', 'menu-users', 'menu-profil', 'menu-kartu', 'menu-hadir',
     'menu-images', 'menu-music', 'menu-config', 'menu-akademik', 'menu-buknilai', 'menu-rapor',
@@ -3001,6 +3004,9 @@ function initAdminPanel() {
       // [V6.2] Jadwal Ujian & Pembagian Sesi: HANYA Admin dan PANITIA
       if ((id === 'menu-exams' || id === 'menu-sesi-bagi') && !izinPanitiaGuru) return;
       if ((id === 'menu-profil' || id === 'menu-kartu' || id === 'menu-hadir' || id === 'menu-results') && !izinPanitiaGuru) return;
+      // [V7.3] Pembagian Ruangan: Panitia mengelola, Pengawas melihat & mengajukan.
+      // Tim Pembuat Soal TIDAK melihat menu ini (peran eksklusif).
+      if (id === 'menu-ruangan' && !(izinPanitiaGuru || izinUjianGuru)) return;
       // [V3.9] Manajemen User (mode monitor) utk PENGAWAS; Folder Gambar utk TIM SOAL
       if (id === 'menu-users' && !izinUjianGuru) return;
       if (id === 'menu-images' && !izinBankGuru) return;
@@ -4153,7 +4159,9 @@ function showAdminTab(tabId, el) {
     if (_pgwIzinTab.izinUjian === true) allowedGuruTabs.push('dash-users');
     // [V6.2] TIM SOAL: kelola bank soal SETELAH jadwal dibuat Admin/Panitia
     if (_pgwIzinTab.izinBankSoal === true) allowedGuruTabs.push('dash-questions', 'dash-materibab', 'dash-images');
-    if (_pgwIzinTab.izinPanitia === true) allowedGuruTabs.push('dash-profil', 'dash-kartu', 'dash-hadir', 'dash-results', 'dash-pgw-ujian', 'dash-exams', 'dash-sesi-bagi', 'dash-pgw-koreksi', 'dash-questions', 'dash-materibab');
+    if (_pgwIzinTab.izinPanitia === true) allowedGuruTabs.push('dash-profil', 'dash-kartu', 'dash-hadir', 'dash-results', 'dash-pgw-ujian', 'dash-exams', 'dash-sesi-bagi', 'dash-ruangan', 'dash-pgw-koreksi', 'dash-questions', 'dash-materibab');
+    // [V7.3] Pengawas boleh membuka Pembagian Ruangan (hanya lihat + ajukan pindah)
+    if (_pgwIzinTab.izinUjian === true) allowedGuruTabs.push('dash-ruangan');
     // [V6.8] Menu modul kegiatan bergantung peran: Rekrutmen & Anggota khusus
     // PEMBINA; Seleksi & Wawancara untuk PEMBINA atau PEWAWANCARA.
     if (tabId === 'dash-rekrutmen' || tabId === 'dash-anggota' || tabId === 'dash-presensi' || tabId === 'dash-ekskul') {
@@ -4205,6 +4213,12 @@ function showAdminTab(tabId, el) {
   } else if (tabId === 'dash-sesi-bagi') {
     title.innerText = 'Pembagian Sesi Ujian';
     renderSesiBagiPage(content);
+
+  } else if (tabId === 'dash-ruangan') {
+    title.innerText = 'Pembagian Ruangan Ujian';
+    try { renderRuanganPage(content); } catch (eRgn) {
+      content.innerHTML = '<div class="dash-card p-6 text-sm text-rose-600 font-bold">Halaman ruangan gagal dimuat. Muat ulang halaman (Ctrl+Shift+R).</div>';
+    }
  
   } else if (tabId === 'dash-questions') {
     title.innerText = 'Bank Soal';
@@ -6284,7 +6298,12 @@ function kartuExportPayload_() {
     userIds: selectedKartuUserIds_(),
     templateId: (document.getElementById('kartu-tpl-select') || {}).value,
     examID: (document.getElementById('kartu-exam-select') || {}).value,
-    kelas: (document.getElementById('kartu-filter-kelas') || {}).value
+    kelas: (document.getElementById('kartu-filter-kelas') || {}).value,
+    // [V7.3] Poin 6: centang "tampilkan foto profil" pada layar cetak langsung
+    // dipakai server (null = ikuti template yang tersimpan).
+    tampilkanFoto: document.getElementById('kt-foto')
+      ? !!document.getElementById('kt-foto').checked
+      : null
   };
 }
 
@@ -6310,7 +6329,7 @@ function fetchKartuData_(cb) {
       }
       cb(res);
     })
-    .getKartuExportData(p.userIds, p.templateId, p.examID, currentUser.userID, currentUser.token, p.kelas);
+    .getKartuExportData(p.userIds, p.templateId, p.examID, currentUser.userID, currentUser.token, p.kelas, p.tampilkanFoto);
 }
 
 function buildKartuPrintHtml_(res) {
@@ -6347,8 +6366,9 @@ function buildKartuPrintHtml_(res) {
         + (t.tampilkanFoto
           ? '<div style="display:table-cell;width:21mm;vertical-align:top;padding:2mm 2mm 0 0">'
             + '<div style="width:19mm;height:25mm;border:1px solid #cbd5e1;border-radius:2px;overflow:hidden;background:#f1f5f9;text-align:center">'
-            + (c.fotoUrl
-              ? '<img src="' + escapeHtmlProfil_(c.fotoUrl) + '" style="width:100%;height:100%;object-fit:cover" referrerpolicy="no-referrer">'
+            + ((c.fotoB64 || c.fotoUrl)
+              ? '<img src="' + escapeHtmlProfil_(c.fotoB64 || c.fotoUrl) + '" style="width:100%;height:100%;object-fit:cover" referrerpolicy="no-referrer"'
+                + (c.fotoUrl ? ' onerror="this.onerror=null;this.src=\'' + escapeHtmlProfil_(c.fotoUrl) + '\';"' : '') + '>'
               : '<div style="font-size:6px;color:#94a3b8;padding-top:11mm">FOTO 3&times;4</div>')
             + '</div></div>'
           : '')
@@ -10217,10 +10237,11 @@ function renderAdminHome(container) {
         if (!_pb2) return;
         if (pw && pw.success && pw.ada && pw.aktif) {
           var _tugas = [];
-          if (pw.izinUjian !== false) _tugas.push('Pengawas Ujian' + (pw.kelas ? ' (' + pw.kelas + ')' : ''));
-          if (pw.izinBankSoal !== false) _tugas.push('Tim Pembuat Soal' + (pw.mapelTimSoal ? ' (' + pw.mapelTimSoal + ')' : ''));
+          if (pw.izinUjian === true) _tugas.push('Pengawas Ujian' + (pw.kelas ? ' (' + pw.kelas + ')' : ''));
+          if (pw.izinBankSoal === true) _tugas.push('Tim Pembuat Soal' + (pw.mapelTimSoal ? ' (' + pw.mapelTimSoal + ')' : ''));
           if (pw.izinPanitia === true) _tugas.push('Panitia Ujian');
-          var _btn = (pw.izinUjian !== false)
+          if (pw.izinPanitia === true) _tugas.push('Panitia Ujian');
+          var _btn = (pw.izinUjian === true)
             ? '<button type="button" onclick="sipPgwBukaJadwal_()" class="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold"><i class="fas fa-calendar-days mr-1"></i>Buka Jadwal Ujian</button>'
             : '<button type="button" onclick="sipPgwBukaBank_()" class="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold"><i class="fas fa-book mr-1"></i>Buka Bank Soal</button>';
           _pb2.innerHTML = '<div class="flex items-center justify-between gap-4 flex-wrap">' +
@@ -11284,6 +11305,11 @@ function toggleExamStatus(examId, currentStatus) {
 }
 
 function switchStatus(id, currentStatus) {
+  // [V7.3] Poin 2: hanya Admin & Panitia boleh mengaktifkan/menonaktifkan jadwal.
+  if (!sipBolehPanitiaKlien_()) {
+    Swal.fire('Akses Ditolak', 'Mengaktifkan/menonaktifkan jadwal ujian hanya untuk Admin dan Guru Panitia.', 'warning');
+    return;
+  }
   Swal.fire({
     title: 'Memproses...',
     text: 'Mengubah status ujian...',
@@ -11311,7 +11337,7 @@ function switchStatus(id, currentStatus) {
     .withFailureHandler(function(err) {
       Swal.fire('Error', err.message, 'error');
     })
-    .toggleExamStatus(id, currentStatus);
+    .toggleExamStatus(id, currentStatus, currentUser.userID, currentUser.token);
 }
 
 function refreshExamList() {
@@ -11708,6 +11734,13 @@ function renderQuestionBank(container) {
                      class="bg-violet-600 hover:bg-violet-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg transition flex items-center gap-2 transform active:scale-95"
                      title="AI: perbaiki level kognitif soal pada mapel terpilih (maks 90 detik)">
                         <i class="fas fa-wand-magic-sparkles"></i> <span class="hidden sm:inline">AI Level</span>
+                    </button>
+
+                    <!-- [V7.3] Ekspor Bank Soal ke Word dengan format yang dapat disesuaikan -->
+                    <button onclick="sipBankSoalWordDialog_()" id="btn-word-bank"
+                     class="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg transition flex items-center gap-2 transform active:scale-95"
+                     title="Ekspor soal mapel terpilih ke berkas Word (.docx) — kop, font, spasi, nomor, kunci jawaban dapat diatur">
+                        <i class="fas fa-file-word"></i> <span class="hidden sm:inline">Word</span>
                     </button>
 
                     <!-- [BARU] Menu Fungsi SOAL ACAK per jenis soal -->
@@ -24807,6 +24840,495 @@ function sipSisipTandaGambar_() {
       }).withFailureHandler(function () {}).getAppConfig();
     } catch (e) {}
   });
+
+/* ============================================================================
+   [V7.3] PEMBAGIAN RUANGAN UJIAN + PENGAJUAN PINDAH RUANGAN
+   Additive: menu baru, memakai API GAS getRuanganData / simpanRuangan /
+   hapusRuangan / bagiRuanganOtomatis / pindahSiswaRuangan /
+   ajukanPindahRuangan / getPermintaanPindah / putuskanPindahRuangan /
+   cetakDaftarRuangan. Tidak menyentuh alur ujian yang sedang berjalan.
+   ============================================================================ */
+var _sipRuanganData = null;
+var _sipRuanganExam = '';
+
+function sipRuanganBolehLihat_() {
+  if (!currentUser) return false;
+  if (currentUser.role === 'Admin') return true;
+  if (currentUser.role !== 'Guru') return false;
+  var p = currentUser.pengawas || {};
+  return p.izinPanitia === true || p.izinUjian === true;
+}
+function sipRuanganBolehKelola_() {
+  if (!currentUser) return false;
+  if (currentUser.role === 'Admin') return true;
+  return currentUser.role === 'Guru' && ((currentUser.pengawas || {}).izinPanitia === true);
+}
+function sipRuanganEsc_(s) { return escapeHtmlProfil_(s == null ? '' : s); }
+
+function renderRuanganPage(container) {
+  if (!sipRuanganBolehLihat_()) {
+    container.innerHTML = '<div class="fade-in w-full"><div class="dash-card p-8 text-center">' +
+      '<i class="fas fa-lock text-3xl text-rose-500"></i>' +
+      '<p class="mt-3 font-bold text-slate-700">Akses Ditolak</p>' +
+      '<p class="text-sm text-slate-500 mt-1">Menu ini untuk Admin, Panitia, dan Pengawas ujian.</p></div></div>';
+    return;
+  }
+  var exams = (cachedExams || []).filter(function (e) { return e && e.id; });
+  // [V7.3] Bila daftar ujian belum dimuat (mis. menu dibuka pertama kali),
+  // ambil dulu dari server lalu render ulang.
+  if (!exams.length && currentUser && !container.__sipRgnAmbil) {
+    container.__sipRgnAmbil = true;
+    google.script.run
+      .withSuccessHandler(function (list) {
+        cachedExams = (list || []);
+        container.__sipRgnAmbil = false;
+        renderRuanganPage(container);
+      })
+      .withFailureHandler(function () { container.__sipRgnAmbil = false; })
+      .getExamList(currentUser.userID, currentUser.token);
+  }
+  var opts = exams.map(function (e) {
+    return '<option value="' + sipRuanganEsc_(e.id) + '">' + sipRuanganEsc_(e.subject) + ' \u2022 ' + sipRuanganEsc_(e.class) + ' \u2022 ' + sipRuanganEsc_(e.dateStr || e.date || '') + '</option>';
+  }).join('');
+  var kelola = sipRuanganBolehKelola_();
+  container.innerHTML =
+    '<div class="fade-in w-full space-y-4" id="ruangan-wrap">' +
+      '<div class="dash-card p-5">' +
+        '<div class="flex flex-wrap items-center justify-between gap-3">' +
+          '<div>' +
+            '<h3 class="font-extrabold text-slate-800 text-lg"><i class="fas fa-door-open text-blue-600 mr-2"></i>Pembagian Ruangan Ujian</h3>' +
+            '<p class="text-xs text-slate-500 mt-1">Tempatkan siswa ke ruangan, tentukan pengawas tiap ruangan, dan proses pengajuan pindah ruangan darurat (HP mati/rusak) dari pengawas.</p>' +
+          '</div>' +
+          '<div class="flex flex-wrap gap-2">' +
+            (kelola ? '<button onclick="sipRuanganForm_(\'\')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow transition"><i class="fas fa-plus mr-1"></i> Tambah Ruangan</button>' : '') +
+            (kelola ? '<button onclick="sipRuanganBagi_()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow transition"><i class="fas fa-shuffle mr-1"></i> Bagi Otomatis</button>' : '') +
+            '<button onclick="sipRuanganMuat_(_sipRuanganExam)" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-sm font-bold transition"><i class="fas fa-rotate mr-1"></i> Muat Ulang</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="mt-4">' +
+          '<label class="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1">Pilih Ujian</label>' +
+          '<select id="ruangan-exam-select" onchange="sipRuanganMuat_(this.value)" class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-blue-500">' +
+            '<option value="">-- Pilih ujian --</option>' + opts +
+          '</select>' +
+        '</div>' +
+      '</div>' +
+      '<div id="ruangan-isi"></div>' +
+    '</div>';
+  if (exams.length) {
+    var sel = document.getElementById('ruangan-exam-select');
+    if (sel) sel.value = exams[0].id;
+    sipRuanganMuat_(exams[0].id);
+  } else {
+    document.getElementById('ruangan-isi').innerHTML = '<div class="dash-card p-8 text-center text-slate-400"><i class="fas fa-calendar-xmark text-3xl"></i><p class="mt-2 text-sm">Belum ada jadwal ujian.</p></div>';
+  }
+}
+
+function sipRuanganMuat_(examID) {
+  if (!examID) return;
+  _sipRuanganExam = examID;
+  var box = document.getElementById('ruangan-isi');
+  if (box) box.innerHTML = '<div class="dash-card p-8 text-center text-slate-400"><i class="fas fa-circle-notch fa-spin text-2xl"></i><p class="mt-2 text-sm">Memuat pembagian ruangan\u2026</p></div>';
+  google.script.run
+    .withSuccessHandler(function (d) {
+      if (!d || !d.success) {
+        if (box) box.innerHTML = '<div class="dash-card p-6 text-center text-rose-600 text-sm font-bold"><i class="fas fa-triangle-exclamation"></i> ' + sipRuanganEsc_((d && d.message) || 'Gagal memuat data.') + '</div>';
+        return;
+      }
+      _sipRuanganData = d;
+      sipRuanganRenderIsi_(d);
+    })
+    .withFailureHandler(function (err) {
+      if (box) box.innerHTML = '<div class="dash-card p-6 text-center text-rose-600 text-sm font-bold">Gagal terhubung: ' + sipRuanganEsc_(err && err.message ? err.message : err) + '</div>';
+    })
+    .getRuanganData(examID, currentUser.userID, currentUser.token);
+}
+
+function sipRuanganRenderIsi_(d) {
+  var box = document.getElementById('ruangan-isi');
+  if (!box) return;
+  var kelola = d.bolehKelola === true;
+  var bolehAjukan = d.bolehAjukan === true;
+  var ruangan = d.ruangan || [];
+  var tanpa = d.tanpaRuangan || [];
+  var permintaan = d.permintaan || [];
+  var menunggu = permintaan.filter(function (p) { return p.status === 'PENGAJUAN'; });
+
+  var stat =
+    '<div class="grid grid-cols-2 md:grid-cols-4 gap-3">' +
+      sipRuanganStat_('Siswa Peserta', d.totalSiswa, 'fa-users', 'blue') +
+      sipRuanganStat_('Sudah Ditempatkan', d.totalDibagi, 'fa-check', 'emerald') +
+      sipRuanganStat_('Ruangan', ruangan.length, 'fa-door-open', 'indigo') +
+      sipRuanganStat_('Menunggu Persetujuan', menunggu.length, 'fa-clock', menunggu.length ? 'amber' : 'slate') +
+    '</div>';
+
+  var kartu = ruangan.map(function (r) {
+    var anggota = r.anggota || [];
+    var baris = anggota.length ? anggota.map(function (a, i) {
+      var aksi = '';
+      if (kelola) {
+        aksi = '<button onclick="sipRuanganPindah_(\'' + sipRuanganEsc_(a.userID) + '\')" class="text-[11px] font-bold text-blue-600 hover:underline mr-2">Pindah</button>';
+      } else if (bolehAjukan) {
+        aksi = '<button onclick="sipRuanganAjukan_(\'' + sipRuanganEsc_(a.userID) + '\')" class="text-[11px] font-bold text-rose-600 hover:underline mr-2">Ajukan Pindah</button>';
+      }
+      return '<tr class="border-b border-slate-100">' +
+        '<td class="py-1.5 pr-2 text-center text-xs font-bold text-slate-500">' + sipRuanganEsc_(a.nomorMeja || (i + 1)) + '</td>' +
+        '<td class="py-1.5 pr-2 text-xs font-medium text-slate-700">' + sipRuanganEsc_(a.nama) + '</td>' +
+        '<td class="py-1.5 pr-2 text-xs text-slate-500">' + sipRuanganEsc_(a.kelas) + '</td>' +
+        '<td class="py-1.5 text-right">' + aksi + '</td></tr>';
+    }).join('') : '<tr><td colspan="4" class="py-3 text-center text-xs text-slate-400">Belum ada siswa di ruangan ini.</td></tr>';
+
+    var persen = r.kapasitas ? Math.min(100, Math.round((anggota.length / r.kapasitas) * 100)) : 0;
+    return '<div class="dash-card p-4">' +
+      '<div class="flex items-start justify-between gap-2">' +
+        '<div>' +
+          '<div class="font-extrabold text-slate-800 text-sm">' + sipRuanganEsc_(r.nama) + '</div>' +
+          '<div class="text-[11px] text-slate-500 mt-0.5"><i class="fas fa-location-dot mr-1"></i>' + sipRuanganEsc_(r.lokasi || '-') + '</div>' +
+          '<div class="text-[11px] text-slate-500 mt-0.5"><i class="fas fa-user-shield mr-1"></i>' + sipRuanganEsc_(r.pengawasNama || 'Pengawas belum ditentukan') + '</div>' +
+        '</div>' +
+        '<div class="text-right">' +
+          '<div class="text-[11px] font-bold ' + (anggota.length >= (r.kapasitas || 0) ? 'text-rose-600' : 'text-emerald-600') + '">' + anggota.length + '/' + (r.kapasitas || 0) + '</div>' +
+          (r.status !== 'AKTIF' ? '<div class="text-[10px] font-bold text-slate-400">NON-AKTIF</div>' : '') +
+        '</div>' +
+      '</div>' +
+      '<div class="w-full h-1.5 bg-slate-100 rounded-full mt-2 overflow-hidden"><div class="h-full ' + (persen >= 100 ? 'bg-rose-500' : 'bg-blue-500') + '" style="width:' + persen + '%"></div></div>' +
+      '<div class="mt-2 max-h-56 overflow-auto"><table class="w-full">' + baris + '</table></div>' +
+      '<div class="flex flex-wrap gap-2 mt-3 pt-2 border-t border-slate-100">' +
+        (kelola ? '<button onclick="sipRuanganForm_(\'' + sipRuanganEsc_(r.id) + '\')" class="text-[11px] font-bold text-slate-600 hover:text-blue-600"><i class="fas fa-pen mr-1"></i>Ubah</button>' : '') +
+        (kelola ? '<button onclick="sipRuanganHapus_(\'' + sipRuanganEsc_(r.id) + '\')" class="text-[11px] font-bold text-rose-600 hover:underline"><i class="fas fa-trash mr-1"></i>Hapus</button>' : '') +
+        '<button onclick="sipRuanganCetak_(\'' + sipRuanganEsc_(r.id) + '\')" class="text-[11px] font-bold text-indigo-600 hover:underline ml-auto"><i class="fas fa-print mr-1"></i>Daftar Hadir</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  var tanpaHtml = tanpa.length ? tanpa.map(function (s) {
+    return '<div class="flex items-center justify-between gap-2 border-b border-slate-100 py-1.5">' +
+      '<div class="text-xs"><span class="font-bold text-slate-700">' + sipRuanganEsc_(s.nama) + '</span> <span class="text-slate-400">\u2022 ' + sipRuanganEsc_(s.kelas) + '</span></div>' +
+      (kelola ? '<button onclick="sipRuanganPindah_(\'' + sipRuanganEsc_(s.userID) + '\')" class="text-[11px] font-bold text-blue-600 hover:underline">Tempatkan</button>' : '<span class="text-[11px] text-slate-400">belum ditempatkan</span>') +
+      '</div>';
+  }).join('') : '<p class="text-xs text-slate-400 py-2">Semua siswa sudah mendapat ruangan.</p>';
+
+  var permHtml = permintaan.length ? permintaan.slice(0, 40).map(function (p) {
+    var warna = p.status === 'DISETUJUI' ? 'emerald' : (p.status === 'DITOLAK' ? 'rose' : 'amber');
+    var tombol = (kelola && p.status === 'PENGAJUAN')
+      ? '<button onclick="sipRuanganPutus_(\'' + sipRuanganEsc_(p.id) + '\', true)" class="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-lg mr-1">Setujui</button>' +
+        '<button onclick="sipRuanganPutus_(\'' + sipRuanganEsc_(p.id) + '\', false)" class="text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-1 rounded-lg">Tolak</button>'
+      : '';
+    return '<div class="border-b border-slate-100 py-2">' +
+      '<div class="flex items-start justify-between gap-2">' +
+        '<div class="text-xs">' +
+          '<div class="font-bold text-slate-700">' + sipRuanganEsc_(p.nama) + ' <span class="text-slate-400 font-normal">(' + sipRuanganEsc_(p.kelas) + ')</span></div>' +
+          '<div class="text-[11px] text-slate-500 mt-0.5">' + sipRuanganEsc_(p.dariRuanganNama) + ' \u2192 ' + sipRuanganEsc_(p.keRuanganNama) + '</div>' +
+          '<div class="text-[11px] text-slate-500">Alasan: ' + sipRuanganEsc_(p.alasan || '-') + '</div>' +
+          '<div class="text-[10px] text-slate-400 mt-0.5">Diajukan: ' + sipRuanganEsc_(p.diajukanNama || p.diajukanOleh || '-') + (p.diputusNama ? ' \u2022 Diputus: ' + sipRuanganEsc_(p.diputusNama) : '') + '</div>' +
+        '</div>' +
+        '<div class="text-right shrink-0">' +
+          '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-' + warna + '-50 text-' + warna + '-700 border border-' + warna + '-200">' + sipRuanganEsc_(p.status) + '</span>' +
+          '<div class="mt-1">' + tombol + '</div>' +
+        '</div>' +
+      '</div></div>';
+  }).join('') : '<p class="text-xs text-slate-400 py-2">Belum ada pengajuan pindah ruangan.</p>';
+
+  box.innerHTML = stat +
+    '<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">' + (kartu || '<div class="dash-card p-6 text-center text-slate-400 text-sm">Belum ada ruangan. Klik <b>Tambah Ruangan</b> atau <b>Bagi Otomatis</b>.</div>') + '</div>' +
+    '<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">' +
+      '<div class="dash-card p-4"><div class="font-bold text-slate-800 text-sm mb-1"><i class="fas fa-user-slash text-amber-500 mr-1"></i>Belum Dapat Ruangan (' + tanpa.length + ')</div><div class="max-h-64 overflow-auto">' + tanpaHtml + '</div></div>' +
+      '<div class="dash-card p-4"><div class="font-bold text-slate-800 text-sm mb-1"><i class="fas fa-right-left text-indigo-500 mr-1"></i>Pengajuan Pindah Ruangan</div><div class="max-h-64 overflow-auto">' + permHtml + '</div></div>' +
+    '</div>';
+}
+
+function sipRuanganStat_(label, nilai, ikon, warna) {
+  return '<div class="dash-card p-3 flex items-center gap-3">' +
+    '<div class="w-9 h-9 rounded-xl bg-' + warna + '-50 text-' + warna + '-600 flex items-center justify-center"><i class="fas ' + ikon + '"></i></div>' +
+    '<div><div class="text-lg font-extrabold text-slate-800 leading-none">' + (nilai || 0) + '</div><div class="text-[10px] font-bold text-slate-500 uppercase mt-1">' + label + '</div></div></div>';
+}
+
+function sipRuanganForm_(id) {
+  if (!sipRuanganBolehKelola_()) return;
+  var d = _sipRuanganData || {};
+  var ruangan = d.ruangan || [];
+  var r = null;
+  for (var i = 0; i < ruangan.length; i++) if (String(ruangan[i].id) === String(id)) r = ruangan[i];
+  var pgw = d.pengawasList || [];
+  var optPgw = '<option value="">\u2014 Belum ditentukan \u2014</option>' + pgw.map(function (p) {
+    var tanda = p.pengawas ? ' (Pengawas)' : (p.panitia ? ' (Panitia)' : '');
+    return '<option value="' + sipRuanganEsc_(p.userID) + '"' + (r && r.pengawasUserID === p.userID ? ' selected' : '') + '>' + sipRuanganEsc_(p.nama) + tanda + '</option>';
+  }).join('');
+  Swal.fire({
+    title: r ? 'Ubah Ruangan' : 'Tambah Ruangan',
+    html:
+      '<div style="text-align:left;font-size:13px">' +
+        '<label style="font-weight:700;font-size:11px;color:#475569">Nama Ruangan *</label>' +
+        '<input id="rgn-nama" class="swal2-input" style="width:100%;margin:2px 0 8px" value="' + sipRuanganEsc_(r ? r.nama : '') + '" placeholder="mis. Lab Komputer 1">' +
+        '<label style="font-weight:700;font-size:11px;color:#475569">Lokasi</label>' +
+        '<input id="rgn-lokasi" class="swal2-input" style="width:100%;margin:2px 0 8px" value="' + sipRuanganEsc_(r ? r.lokasi : '') + '" placeholder="mis. Gedung B lantai 2">' +
+        '<label style="font-weight:700;font-size:11px;color:#475569">Kapasitas (siswa) *</label>' +
+        '<input id="rgn-kapasitas" type="number" min="1" max="200" class="swal2-input" style="width:100%;margin:2px 0 8px" value="' + (r ? r.kapasitas : 20) + '">' +
+        '<label style="font-weight:700;font-size:11px;color:#475569">Pengawas Ruangan</label>' +
+        '<select id="rgn-pengawas" class="swal2-select" style="width:100%;margin:2px 0 8px">' + optPgw + '</select>' +
+        '<label style="font-weight:700;font-size:11px;color:#475569">Catatan</label>' +
+        '<input id="rgn-catatan" class="swal2-input" style="width:100%;margin:2px 0 0" value="' + sipRuanganEsc_(r ? r.catatan : '') + '">' +
+      '</div>',
+    showCancelButton: true,
+    confirmButtonText: r ? 'Simpan Perubahan' : 'Tambah',
+    cancelButtonText: 'Batal',
+    confirmButtonColor: '#2563eb',
+    preConfirm: function () {
+      var nama = (document.getElementById('rgn-nama') || {}).value || '';
+      var kap = parseInt((document.getElementById('rgn-kapasitas') || {}).value, 10);
+      if (!String(nama).trim()) { Swal.showValidationMessage('Nama ruangan wajib diisi.'); return false; }
+      if (isNaN(kap) || kap < 1) { Swal.showValidationMessage('Kapasitas minimal 1 siswa.'); return false; }
+      return {
+        id: r ? r.id : '',
+        examID: _sipRuanganExam,
+        nama: nama,
+        lokasi: (document.getElementById('rgn-lokasi') || {}).value || '',
+        kapasitas: kap,
+        pengawasUserID: (document.getElementById('rgn-pengawas') || {}).value || '',
+        catatan: (document.getElementById('rgn-catatan') || {}).value || ''
+      };
+    }
+  }).then(function (res) {
+    if (!res.isConfirmed || !res.value) return;
+    sipRuanganProses_('simpanRuangan', [res.value, currentUser.userID, currentUser.token], 'Menyimpan ruangan\u2026');
+  });
+}
+
+function sipRuanganHapus_(id) {
+  if (!sipRuanganBolehKelola_()) return;
+  Swal.fire({
+    icon: 'warning', title: 'Hapus ruangan?',
+    text: 'Siswa pada ruangan ini akan kembali ke daftar "belum dapat ruangan".',
+    showCancelButton: true, confirmButtonText: 'Ya, hapus', confirmButtonColor: '#dc2626', cancelButtonText: 'Batal'
+  }).then(function (res) {
+    if (!res.isConfirmed) return;
+    sipRuanganProses_('hapusRuangan', [{ id: id, examID: _sipRuanganExam }, currentUser.userID, currentUser.token], 'Menghapus ruangan\u2026');
+  });
+}
+
+function sipRuanganBagi_() {
+  if (!sipRuanganBolehKelola_()) return;
+  Swal.fire({
+    title: 'Bagi Otomatis',
+    html:
+      '<div style="text-align:left;font-size:13px">' +
+        '<p style="color:#475569;margin-bottom:8px">Siswa dibagikan berurutan ke ruangan AKTIF sesuai kapasitas. Pembagian yang ada akan diganti.</p>' +
+        '<label style="font-weight:700;font-size:11px;color:#475569">Urutan pengisian</label>' +
+        '<select id="rgn-urut" class="swal2-select" style="width:100%">' +
+          '<option value="kelas">Per kelas, lalu nama (disarankan)</option>' +
+          '<option value="nama">Urut nama seluruh siswa</option>' +
+          '<option value="acak">Acak (menyebar rata)</option>' +
+        '</select></div>',
+    showCancelButton: true, confirmButtonText: 'Bagi Sekarang', cancelButtonText: 'Batal', confirmButtonColor: '#059669'
+  }).then(function (res) {
+    if (!res.isConfirmed) return;
+    var urut = (document.getElementById('rgn-urut') || {}).value || 'kelas';
+    sipRuanganProses_('bagiRuanganOtomatis', [{ examID: _sipRuanganExam, urut: urut }, currentUser.userID, currentUser.token], 'Membagi siswa ke ruangan\u2026');
+  });
+}
+
+function sipRuanganPindah_(userID) {
+  if (!sipRuanganBolehKelola_()) return;
+  var d = _sipRuanganData || {};
+  var ruangan = (d.ruangan || []);
+  var opt = ruangan.map(function (r) {
+    return '<option value="' + sipRuanganEsc_(r.id) + '">' + sipRuanganEsc_(r.nama) + ' (' + (r.terisi || 0) + '/' + (r.kapasitas || 0) + ')</option>';
+  }).join('');
+  Swal.fire({
+    title: 'Pindahkan Siswa',
+    html: '<div style="text-align:left;font-size:13px"><label style="font-weight:700;font-size:11px;color:#475569">Ruangan tujuan</label>' +
+      '<select id="rgn-tujuan" class="swal2-select" style="width:100%;margin-bottom:8px">' + opt + '</select>' +
+      '<label style="font-weight:700;font-size:11px;color:#475569">Alasan</label>' +
+      '<input id="rgn-alasan" class="swal2-input" style="width:100%" placeholder="mis. HP mati, dikerjakan di lab"></div>',
+    showCancelButton: true, confirmButtonText: 'Pindahkan', cancelButtonText: 'Batal', confirmButtonColor: '#2563eb',
+    preConfirm: function () {
+      var ke = (document.getElementById('rgn-tujuan') || {}).value || '';
+      if (!ke) { Swal.showValidationMessage('Pilih ruangan tujuan.'); return false; }
+      return { ke: ke, alasan: (document.getElementById('rgn-alasan') || {}).value || '' };
+    }
+  }).then(function (res) {
+    if (!res.isConfirmed || !res.value) return;
+    sipRuanganProses_('pindahSiswaRuangan', [{ examID: _sipRuanganExam, userID: userID, ruanganID: res.value.ke, alasan: res.value.alasan }, currentUser.userID, currentUser.token], 'Memindahkan siswa\u2026');
+  });
+}
+
+function sipRuanganAjukan_(userID) {
+  if (!sipRuanganBolehLihat_()) return;
+  var d = _sipRuanganData || {};
+  var ruangan = (d.ruangan || []);
+  var opt = ruangan.map(function (r) {
+    return '<option value="' + sipRuanganEsc_(r.id) + '">' + sipRuanganEsc_(r.nama) + ' (' + (r.terisi || 0) + '/' + (r.kapasitas || 0) + ')</option>';
+  }).join('');
+  Swal.fire({
+    title: 'Ajukan Pindah Ruangan',
+    html: '<div style="text-align:left;font-size:13px">' +
+      '<p style="color:#475569;margin-bottom:8px">Pengajuan dikirim ke Panitia/Admin untuk disetujui. Siswa tetap di ruangan asal sampai disetujui.</p>' +
+      '<label style="font-weight:700;font-size:11px;color:#475569">Ruangan tujuan</label>' +
+      '<select id="rgn-tujuan" class="swal2-select" style="width:100%;margin-bottom:8px">' + opt + '</select>' +
+      '<label style="font-weight:700;font-size:11px;color:#475569">Alasan (wajib) *</label>' +
+      '<input id="rgn-alasan" class="swal2-input" style="width:100%" placeholder="mis. HP mati / rusak"></div>',
+    showCancelButton: true, confirmButtonText: 'Kirim Pengajuan', cancelButtonText: 'Batal', confirmButtonColor: '#dc2626',
+    preConfirm: function () {
+      var ke = (document.getElementById('rgn-tujuan') || {}).value || '';
+      var alasan = String((document.getElementById('rgn-alasan') || {}).value || '').trim();
+      if (!ke) { Swal.showValidationMessage('Pilih ruangan tujuan.'); return false; }
+      if (!alasan) { Swal.showValidationMessage('Tuliskan alasan pemindahan.'); return false; }
+      return { ke: ke, alasan: alasan };
+    }
+  }).then(function (res) {
+    if (!res.isConfirmed || !res.value) return;
+    sipRuanganProses_('ajukanPindahRuangan', [{ examID: _sipRuanganExam, userID: userID, keRuanganID: res.value.ke, alasan: res.value.alasan }, currentUser.userID, currentUser.token], 'Mengirim pengajuan\u2026');
+  });
+}
+
+function sipRuanganPutus_(id, setuju) {
+  if (!sipRuanganBolehKelola_()) return;
+  Swal.fire({
+    icon: setuju ? 'question' : 'warning',
+    title: setuju ? 'Setujui pemindahan?' : 'Tolak pengajuan?',
+    input: 'text',
+    inputLabel: 'Catatan (opsional)',
+    showCancelButton: true,
+    confirmButtonText: setuju ? 'Setujui' : 'Tolak',
+    confirmButtonColor: setuju ? '#059669' : '#dc2626',
+    cancelButtonText: 'Batal'
+  }).then(function (res) {
+    if (!res.isConfirmed) return;
+    sipRuanganProses_('putuskanPindahRuangan', [{ id: id, setuju: setuju, catatan: res.value || '' }, currentUser.userID, currentUser.token], 'Memproses keputusan\u2026');
+  });
+}
+
+function sipRuanganCetak_(id) {
+  Swal.fire({ title: 'Menyiapkan\u2026', html: 'Membuat daftar hadir ruangan', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
+  google.script.run
+    .withSuccessHandler(function (res) {
+      if (!res || !res.success) { Swal.fire('Gagal', (res && res.message) || 'Tidak dapat mencetak.', 'error'); return; }
+      Swal.fire({ icon: 'success', title: 'Daftar hadir siap', html: '<a href="' + sipRuanganEsc_(res.url) + '" target="_blank" style="color:#2563eb;font-weight:bold">Buka / unduh ' + sipRuanganEsc_(res.fileName) + '</a>', showConfirmButton: true });
+    })
+    .withFailureHandler(function (err) { Swal.fire('Gagal', err && err.message ? err.message : String(err), 'error'); })
+    .cetakDaftarRuangan({ examID: _sipRuanganExam, ruanganID: id }, currentUser.userID, currentUser.token);
+}
+
+function sipRuanganProses_(fn, args, pesan) {
+  Swal.fire({ title: 'Memproses\u2026', html: pesan, allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
+  var runner = google.script.run.withSuccessHandler(function (res) {
+    if (!res || !res.success) {
+      Swal.fire('Gagal', (res && res.message) || 'Terjadi kesalahan.', 'error');
+      return;
+    }
+    try { Swal.fire({ icon: 'success', title: 'Berhasil', text: res.message || 'Tersimpan.', timer: 2200, showConfirmButton: false }); } catch (eS) {}
+    sipRuanganMuat_(_sipRuanganExam);
+  }).withFailureHandler(function (err) {
+    Swal.fire('Gagal', err && err.message ? err.message : String(err), 'error');
+  });
+  runner[fn].apply(runner, args);
+}
+
+/* ---------------------- [V7.3] EKSPOR BANK SOAL KE WORD -------------------- */
+var SIP_WORD_FMT_KEY_ = 'sipintar_word_format';
+
+function sipWordFormatTersimpan_() {
+  var bawaan = {
+    kop1: '', kop2: '', kop3: '', kop4: '',
+    judul: 'SOAL UJIAN', subjudul: '', instansi: '',
+    identitas: 'Nama : ..................................................    Kelas : ................    No. Peserta : ................',
+    petunjuk: 'Tuliskan jawaban pada lembar jawaban yang disediakan. Kerjakan soal yang mudah lebih dahulu.',
+    ukuranFont: 11, spasiBaris: 1.15, nomorMulai: 1,
+    tampilkanKunci: true, tampilkanGambar: true, mathMode: 'teks', namaFile: ''
+  };
+  try {
+    var simpan = JSON.parse(localStorage.getItem(SIP_WORD_FMT_KEY_) || '{}');
+    Object.keys(bawaan).forEach(function (k) { if (simpan[k] !== undefined && simpan[k] !== null) bawaan[k] = simpan[k]; });
+  } catch (e) {}
+  return bawaan;
+}
+
+function sipBankSoalWordDialog_() {
+  // [V7.3] Satu sumber kebenaran: Admin, Panitia, atau Tim Pembuat Soal.
+  var _p = (currentUser && currentUser.pengawas) || {};
+  var boleh = !!(currentUser && (currentUser.role === 'Admin' || (currentUser.role === 'Guru' && (_p.izinBankSoal === true || _p.izinPanitia === true))));
+  if (!boleh) { Swal.fire('Akses Ditolak', 'Ekspor Word khusus Admin, Panitia, dan Tim Pembuat Soal.', 'warning'); return; }
+  var examID = (document.getElementById('select-exam-q') || {}).value || '';
+  if (!examID) { Swal.fire('Pilih mata pelajaran', 'Pilih ujian/mapel pada daftar Bank Soal terlebih dahulu.', 'info'); return; }
+  var f = sipWordFormatTersimpan_();
+  var opsiUkuran = [9, 10, 11, 12, 13, 14].map(function (n) { return '<option value="' + n + '"' + (Number(f.ukuranFont) === n ? ' selected' : '') + '>' + n + ' pt</option>'; }).join('');
+  var opsiSpasi = [1, 1.15, 1.5, 2].map(function (n) { return '<option value="' + n + '"' + (Number(f.spasiBaris) === n ? ' selected' : '') + '>' + n + '</option>'; }).join('');
+  Swal.fire({
+    title: 'Ekspor Bank Soal ke Word',
+    width: 720,
+    html:
+      '<div style="text-align:left;font-size:12px;max-height:60vh;overflow:auto;padding-right:4px">' +
+        '<div style="background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;border-radius:10px;padding:8px 10px;margin-bottom:10px;font-size:11px">' +
+          '<b>Format bisa Anda sesuaikan.</b> Isian di bawah disimpan otomatis di perangkat ini dan dipakai lagi pada ekspor berikutnya.</div>' +
+        '<div style="font-weight:800;color:#1e293b;margin:6px 0 4px">KOP SEKOLAH</div>' +
+        '<input id="wf-kop1" class="swal2-input" style="width:100%;margin:2px 0" placeholder="PEMERINTAH KOTA ..." value="' + sipRuanganEsc_(f.kop1) + '">' +
+        '<input id="wf-kop2" class="swal2-input" style="width:100%;margin:2px 0" placeholder="DINAS PENDIDIKAN" value="' + sipRuanganEsc_(f.kop2) + '">' +
+        '<input id="wf-kop3" class="swal2-input" style="width:100%;margin:2px 0" placeholder="SMP NEGERI ..." value="' + sipRuanganEsc_(f.kop3) + '">' +
+        '<input id="wf-kop4" class="swal2-input" style="width:100%;margin:2px 0" placeholder="Alamat / telepon (opsional)" value="' + sipRuanganEsc_(f.kop4) + '">' +
+        '<div style="font-weight:800;color:#1e293b;margin:10px 0 4px">JUDUL</div>' +
+        '<input id="wf-judul" class="swal2-input" style="width:100%;margin:2px 0" placeholder="SOAL UJIAN" value="' + sipRuanganEsc_(f.judul) + '">' +
+        '<input id="wf-subjudul" class="swal2-input" style="width:100%;margin:2px 0" placeholder="Tahun Pelajaran 2026/2027" value="' + sipRuanganEsc_(f.subjudul) + '">' +
+        '<div style="font-weight:800;color:#1e293b;margin:10px 0 4px">IDENTITAS & PETUNJUK</div>' +
+        '<input id="wf-identitas" class="swal2-input" style="width:100%;margin:2px 0" value="' + sipRuanganEsc_(f.identitas) + '">' +
+        '<textarea id="wf-petunjuk" class="swal2-textarea" style="width:100%;margin:2px 0;height:54px">' + sipRuanganEsc_(f.petunjuk) + '</textarea>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">' +
+          '<div style="flex:1;min-width:120px"><label style="font-weight:700;font-size:11px;color:#475569">Ukuran huruf</label><select id="wf-ukuran" class="swal2-select" style="width:100%">' + opsiUkuran + '</select></div>' +
+          '<div style="flex:1;min-width:120px"><label style="font-weight:700;font-size:11px;color:#475569">Spasi baris</label><select id="wf-spasi" class="swal2-select" style="width:100%">' + opsiSpasi + '</select></div>' +
+          '<div style="flex:1;min-width:120px"><label style="font-weight:700;font-size:11px;color:#475569">Nomor soal mulai</label><input id="wf-nomor" type="number" min="1" class="swal2-input" style="width:100%;margin:0" value="' + (f.nomorMulai || 1) + '"></div>' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">' +
+          '<div style="flex:1;min-width:150px"><label style="font-weight:700;font-size:11px;color:#475569">Penulisan rumus</label><select id="wf-math" class="swal2-select" style="width:100%">' +
+            '<option value="teks"' + (f.mathMode === 'teks' ? ' selected' : '') + '>Rapi otomatis (3², ½, √)</option>' +
+            '<option value="latex"' + (f.mathMode === 'latex' ? ' selected' : '') + '>LaTeX apa adanya</option></select></div>' +
+          '<div style="flex:1;min-width:150px"><label style="font-weight:700;font-size:11px;color:#475569">Nama berkas (opsional)</label><input id="wf-namafile" class="swal2-input" style="width:100%;margin:0" placeholder="otomatis" value="' + sipRuanganEsc_(f.namaFile) + '"></div>' +
+        '</div>' +
+        '<div style="margin-top:10px;display:flex;flex-direction:column;gap:4px">' +
+          '<label style="font-size:12px;font-weight:700;color:#334155"><input type="checkbox" id="wf-kunci"' + (f.tampilkanKunci ? ' checked' : '') + '> Sertakan kunci jawaban (halaman terpisah)</label>' +
+          '<label style="font-size:12px;font-weight:700;color:#334155"><input type="checkbox" id="wf-gambar"' + (f.tampilkanGambar ? ' checked' : '') + '> Sertakan gambar soal</label>' +
+        '</div>' +
+      '</div>',
+    showCancelButton: true,
+    confirmButtonText: 'Ekspor Word',
+    cancelButtonText: 'Batal',
+    confirmButtonColor: '#1d4ed8',
+    preConfirm: function () {
+      return {
+        kop1: (document.getElementById('wf-kop1') || {}).value || '',
+        kop2: (document.getElementById('wf-kop2') || {}).value || '',
+        kop3: (document.getElementById('wf-kop3') || {}).value || '',
+        kop4: (document.getElementById('wf-kop4') || {}).value || '',
+        judul: (document.getElementById('wf-judul') || {}).value || 'SOAL UJIAN',
+        subjudul: (document.getElementById('wf-subjudul') || {}).value || '',
+        identitas: (document.getElementById('wf-identitas') || {}).value || '',
+        petunjuk: (document.getElementById('wf-petunjuk') || {}).value || '',
+        ukuranFont: parseInt((document.getElementById('wf-ukuran') || {}).value, 10) || 11,
+        spasiBaris: parseFloat((document.getElementById('wf-spasi') || {}).value) || 1.15,
+        nomorMulai: parseInt((document.getElementById('wf-nomor') || {}).value, 10) || 1,
+        mathMode: (document.getElementById('wf-math') || {}).value || 'teks',
+        namaFile: (document.getElementById('wf-namafile') || {}).value || '',
+        tampilkanKunci: !!((document.getElementById('wf-kunci') || {}).checked),
+        tampilkanGambar: !!((document.getElementById('wf-gambar') || {}).checked)
+      };
+    }
+  }).then(function (res) {
+    if (!res.isConfirmed || !res.value) return;
+    try { localStorage.setItem(SIP_WORD_FMT_KEY_, JSON.stringify(res.value)); } catch (eS) {}
+    Swal.fire({ title: 'Membuat dokumen\u2026', html: 'Menyusun berkas Word dari bank soal', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
+    google.script.run
+      .withSuccessHandler(function (r) {
+        if (!r || !r.success) { Swal.fire('Gagal', (r && r.message) || 'Ekspor gagal.', 'error'); return; }
+        Swal.fire({
+          icon: 'success',
+          title: 'Berhasil',
+          html: '<div style="font-size:13px">' + sipRuanganEsc_(r.message) + '</div>' +
+            '<div style="margin-top:10px"><a href="' + sipRuanganEsc_(r.url) + '" target="_blank" style="background:#1d4ed8;color:#fff;padding:8px 14px;border-radius:8px;font-weight:bold;text-decoration:none">Unduh .docx</a></div>',
+          showConfirmButton: true
+        });
+      })
+      .withFailureHandler(function (err) { Swal.fire('Gagal', err && err.message ? err.message : String(err), 'error'); })
+      .exportBankSoalWord({ examID: examID, format: res.value }, currentUser.userID, currentUser.token);
+  });
+}
+
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a58bd40aebcbfe09',t:'MTc5NDM4NDcwOA=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a58bd40aebcbfe09',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a593404bffd5ce39',t:'MTc5NDQ2MjU0Mg=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a593404bffd5ce39',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
