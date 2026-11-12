@@ -2999,8 +2999,11 @@ function initAdminPanel() {
       // [V6.2] Sesi & PIN Ujian: PIN dibuat PANITIA. Pengawas tidak lagi
       // mengubah/melihat menu ini; pengawas memantau lewat Manajemen User.
       if (id === 'menu-pgw-ujian' && !izinPanitiaGuru) return;
-      // [V6.2] Bank Soal tampil utk Admin, PANITIA, dan TIM PEMBUAT SOAL
-      if ((id === 'menu-questions' || id === 'menu-materibab') && !izinBankGuru && !izinPanitiaGuru) return;
+      // [V7.4] Bank Soal & Materi/Bab HANYA milik TIM PEMBUAT SOAL.
+      // Panitia TIDAK lagi melihat menu ini kecuali Admin juga menunjuknya
+      // sebagai Tim Pembuat Soal. Inilah yang membuat menu guru persis sama
+      // dengan peran yang ditetapkan Admin.
+      if ((id === 'menu-questions' || id === 'menu-materibab') && !izinBankGuru) return;
       // [V6.2] Jadwal Ujian & Pembagian Sesi: HANYA Admin dan PANITIA
       if ((id === 'menu-exams' || id === 'menu-sesi-bagi') && !izinPanitiaGuru) return;
       if ((id === 'menu-profil' || id === 'menu-kartu' || id === 'menu-hadir' || id === 'menu-results') && !izinPanitiaGuru) return;
@@ -3084,6 +3087,12 @@ function sipPgwBukaJadwal_() {
 function sipPgwBukaBank_() {
   var el = document.querySelector("[onclick*='dash-questions']");
   showAdminTab('dash-questions', el);
+}
+
+// [V7.4] Pengawas: langsung ke Manajemen User (Monitor Ujian)
+function sipPgwBukaMonitor_() {
+  var el = document.querySelector("[onclick*='dash-users']");
+  showAdminTab('dash-users', el);
 }
 
 /* ==========================================================================
@@ -3237,7 +3246,12 @@ function renderPengawasPage(container, fokus) {
     '</div>' +
     '<p class="text-slate-500 text-sm mt-1.5 leading-relaxed">' + R.deskripsi + '</p>' +
     '</div></div>' +
-    '<button type="button" onclick="sipPgwForm_(null)" class="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-700 shadow-lg shadow-blue-500/30 whitespace-nowrap self-start"><i class="fas fa-user-plus mr-2"></i>' + R.tombol + '</button>' +
+    '<div class="flex flex-col sm:flex-row gap-2 self-start">' +
+    (currentUser && currentUser.role === 'Admin'
+      ? '<button type="button" onclick="sipPgwAturPeran_(null)" class="bg-white border border-slate-300 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-50 shadow-sm whitespace-nowrap"><i class="fas fa-user-gear mr-2"></i>Atur Peran Guru</button>'
+      : '') +
+    '<button type="button" onclick="sipPgwForm_(null)" class="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-700 shadow-lg shadow-blue-500/30 whitespace-nowrap"><i class="fas fa-user-plus mr-2"></i>' + R.tombol + '</button>' +
+    '</div>' +
     '</div>' +
     '<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-5">' +
     '<div class="rounded-xl border border-slate-200 bg-slate-50/60 p-4">' +
@@ -3314,13 +3328,20 @@ function loadPengawasData() {
         var lainHtml = lain.length
           ? lain.map(function (t) { return '<span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200 text-[11px] font-bold mr-1">' + t + '</span>'; }).join('')
           : '<span class="text-slate-300 text-xs">—</span>';
+        var tanda = p.perluDiperiksa
+          ? '<span class="ml-2 px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-bold" title="Peran tanpa syarat (Pengawas tanpa kelas / Tim Soal tanpa mapel) tidak diberlakukan. Tekan Peran untuk menetapkan ulang."><i class="fas fa-triangle-exclamation"></i> perlu ditetapkan ulang</span>'
+          : '';
         return '<tr class="border-b border-slate-100">' +
-          '<td class="py-3 pr-4 font-bold text-slate-700">' + escapeHtmlProfil_(p.nama || '-') + '</td>' +
+          '<td class="py-3 pr-4 font-bold text-slate-700">' + escapeHtmlProfil_(p.nama || '-') + tanda + '</td>' +
           '<td class="py-3 pr-4 text-slate-500 font-mono">' + escapeHtmlProfil_(p.userID) + '</td>' +
           '<td class="py-3 pr-4">' + utama + '</td>' +
           '<td class="py-3 pr-4">' + lainHtml + '</td>' +
           '<td class="py-3 pr-4">' + badge + '</td>' +
-          '<td class="py-3"><button type="button" onclick="sipPgwForm_(\'' + escapeHtmlProfil_(p.id) + '\')" class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 text-xs font-bold hover:bg-blue-50 hover:text-blue-600 mr-1"><i class="fas fa-pen"></i> Ubah</button>' +
+          '<td class="py-3">' +
+          (currentUser && currentUser.role === 'Admin'
+            ? '<button type="button" onclick="sipPgwAturPeran_(\'' + escapeHtmlProfil_(p.userID) + '\')" class="px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-slate-700 text-xs font-bold hover:bg-slate-50 mr-1" title="Tetapkan peran guru ini (Pengawas / Tim Soal / Panitia)"><i class="fas fa-user-gear"></i> Peran</button>'
+            : '') +
+          '<button type="button" onclick="sipPgwForm_(\'' + escapeHtmlProfil_(p.id) + '\')" class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 text-xs font-bold hover:bg-blue-50 hover:text-blue-600 mr-1"><i class="fas fa-pen"></i> Ubah</button>' +
           '<button type="button" onclick="sipPgwHapus_(\'' + escapeHtmlProfil_(p.id) + '\', \'' + escapeHtmlProfil_(p.userID) + '\', \'' + escapeHtmlProfil_(p.nama) + '\')" class="px-3 py-1.5 rounded-lg bg-rose-50 text-rose-600 text-xs font-bold hover:bg-rose-100"><i class="fas fa-user-minus"></i> Cabut Peran</button></td></tr>';
       }).join('');
     })
@@ -3533,7 +3554,7 @@ function sipPgwForm_(editId) {
           '<option value="AKTIF"' + (!data || data.status === 'AKTIF' ? ' selected' : '') + '>AKTIF (guru bisa login)</option>' +
           '<option value="NON-AKTIF"' + (data && data.status === 'NON-AKTIF' ? ' selected' : '') + '>NON-AKTIF (guru tidak bisa login)</option>' +
           '</select>' +
-          '<p style="color:#64748b;font-size:11px;margin-top:8px">Hanya peran <b>' + R.judul + '</b> yang disimpan dari form ini \u2014 peran lain milik guru yang sama tetap berlaku. Berlaku langsung pada login berikutnya.</p>' +
+          '<p style="color:#64748b;font-size:11px;margin-top:8px">Form ini HANYA menyimpan peran <b>' + R.judul + '</b>. Bila guru tersebut juga memegang peran lain, peran itu tetap berlaku — periksa kolom <b>Peran Lain</b>. Untuk menetapkan peran secara pasti (mis. hanya Panitia), gunakan tombol <b>Peran</b> pada baris guru. Berlaku pada login berikutnya.</p>' +
           '</div>',
         showCancelButton: true,
         confirmButtonText: 'Simpan',
@@ -3575,6 +3596,129 @@ function sipPgwForm_(editId) {
         simpanSatu();
       });
 
+    })
+    .withFailureHandler(function (err) { Swal.close(); Swal.fire('Gagal', 'Data Master tidak dapat dimuat: ' + String(err), 'error'); })
+    .getMasterData();
+}
+
+/* [V7.4] ATUR PERAN SATU GURU — penetapan eksplisit:
+   Admin mencentang tepat peran yang diinginkan. Peran yang tidak dicentang
+   disimpan FALSE, sehingga menu guru = peran yang ditetapkan Admin. */
+function sipPgwAturPeran_(userID) {
+  if (!(currentUser && currentUser.role === 'Admin')) {
+    Swal.fire('Akses Ditolak', 'Penetapan peran hanya untuk Admin.', 'warning');
+    return;
+  }
+  var guruUsers = window._pgwGuruUsers || [];
+  if (!guruUsers.length) {
+    Swal.fire('Belum ada Guru', 'Tambahkan user ber-role Guru dulu di Manajemen User.', 'info');
+    return;
+  }
+  var pilihUid = String(userID || guruUsers[0].userID);
+  var p = (window._pgwList || []).filter(function (x) { return String(x.userID) === pilihUid; })[0] || null;
+
+  Swal.fire({ title: 'Menyiapkan form…', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
+  google.script.run
+    .withSuccessHandler(function (md) {
+      var d = (md && (md.data || md)) || {};
+      var kelasList = (d.classes || []).map(function (k) { return String(k || '').trim(); }).filter(Boolean);
+      var mapelList = (d.subjects || []).map(function (m) { return String(m || '').trim(); }).filter(Boolean);
+      var optsUid = guruUsers.map(function (g) {
+        return '<option value="' + escapeHtmlProfil_(g.userID) + '"' + (String(g.userID) === pilihUid ? ' selected' : '') + '>' + escapeHtmlProfil_(g.username + ' (' + g.userID + ')') + '</option>';
+      }).join('');
+      var adaP = !!(p && p.izinUjian === true);
+      var adaT = !!(p && p.izinBankSoal === true);
+      var adaN = !!(p && p.izinPanitia === true);
+      var kelasNow = (p && p.kelas) || '';
+      var mapelNow = (p && p.mapelTimSoal) || '';
+      var statusNow = (p && p.status) || 'AKTIF';
+
+      Swal.fire({
+        title: 'Atur Peran Guru',
+        width: 680,
+        html:
+          '<div style="text-align:left;font-size:13px;max-height:64vh;overflow-y:auto;padding-right:4px">' +
+            '<div style="background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;border-radius:10px;padding:8px 10px;margin-bottom:10px;font-size:11.5px;line-height:1.5">' +
+              '<b>Peran yang dicentang = menu yang muncul.</b> Peran yang tidak dicentang disimpan sebagai FALSE, sehingga guru tidak melihat menu peran tersebut.' +
+            '</div>' +
+            '<label style="font-weight:700;display:block;margin-bottom:4px">Guru</label>' +
+            '<select id="prn-uid" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px;margin-bottom:10px">' + optsUid + '</select>' +
+
+            '<label style="display:flex;align-items:flex-start;gap:8px;border:1px solid #cbd5e1;border-radius:10px;padding:8px 10px;margin-bottom:8px;cursor:pointer">' +
+              '<input type="checkbox" id="prn-pengawas" style="margin-top:2px"' + (adaP ? ' checked' : '') + '>' +
+              '<span><b>Pengawas Ujian</b><br><span style="color:#64748b;font-size:11.5px">Memantau ujian kelas yang diawasi, mengajukan pindah ruangan. Menu: Manajemen User (Monitor), Pembagian Ruangan.</span></span>' +
+            '</label>' +
+            '<div style="margin:0 0 10px 26px"><label style="font-size:11px;font-weight:700;color:#475569">Kelas yang diawasi (pisahkan dengan koma)</label>' +
+              '<input id="prn-kelas" style="width:100%;padding:7px 8px;border:1px solid #cbd5e1;border-radius:8px" value="' + escapeHtmlProfil_(kelasNow) + '" placeholder="mis. 7A, 7B">' +
+              (kelasList.length ? '<div style="font-size:10.5px;color:#94a3b8;margin-top:2px">Pilihan: ' + kelasList.map(function (k) { return escapeHtmlProfil_(k); }).join(' · ') + '</div>' : '') +
+            '</div>' +
+
+            '<label style="display:flex;align-items:flex-start;gap:8px;border:1px solid #cbd5e1;border-radius:10px;padding:8px 10px;margin-bottom:8px;cursor:pointer">' +
+              '<input type="checkbox" id="prn-timsoal" style="margin-top:2px"' + (adaT ? ' checked' : '') + '>' +
+              '<span><b>Tim Pembuat Soal</b><br><span style="color:#64748b;font-size:11.5px">Menyusun soal. Menu: Bank Soal, Materi &amp; Bab, Folder Gambar.</span></span>' +
+            '</label>' +
+            '<div style="margin:0 0 10px 26px"><label style="font-size:11px;font-weight:700;color:#475569">Mapel yang diampu (pisahkan dengan koma)</label>' +
+              '<input id="prn-mapel" style="width:100%;padding:7px 8px;border:1px solid #cbd5e1;border-radius:8px" value="' + escapeHtmlProfil_(mapelNow) + '" placeholder="mis. Matematika">' +
+              (mapelList.length ? '<div style="font-size:10.5px;color:#94a3b8;margin-top:2px">Pilihan: ' + mapelList.map(function (m) { return escapeHtmlProfil_(m); }).join(' · ') + '</div>' : '') +
+            '</div>' +
+
+            '<label style="display:flex;align-items:flex-start;gap:8px;border:1px solid #cbd5e1;border-radius:10px;padding:8px 10px;margin-bottom:10px;cursor:pointer">' +
+              '<input type="checkbox" id="prn-panitia" style="margin-top:2px"' + (adaN ? ' checked' : '') + '>' +
+              '<span><b>Panitia Ujian</b><br><span style="color:#64748b;font-size:11.5px">Mengurus jadwal, sesi &amp; PIN, ruangan, koreksi, kartu ujian, daftar hadir, hasil. Tanpa Bank Soal.</span></span>' +
+            '</label>' +
+
+            '<label style="font-weight:700;display:block;margin:2px 0 4px">Status penunjukan</label>' +
+            '<select id="prn-status" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px">' +
+              '<option value="AKTIF"' + (statusNow === 'AKTIF' ? ' selected' : '') + '>AKTIF (guru bisa login)</option>' +
+              '<option value="NON-AKTIF"' + (statusNow === 'NON-AKTIF' ? ' selected' : '') + '>NON-AKTIF (guru tidak bisa login)</option>' +
+            '</select>' +
+            '<p style="color:#64748b;font-size:11px;margin-top:8px">Bila ketiga peran dilepas, penunjukan guru dihapus dan guru tidak dapat login lagi.</p>' +
+          '</div>',
+        showCancelButton: true,
+        confirmButtonText: 'Simpan Peran',
+        confirmButtonColor: '#2563eb',
+        cancelButtonText: 'Batal',
+        didOpen: function () {
+          var sel = document.getElementById('prn-uid');
+          if (sel) sel.addEventListener('change', function () { sipPgwAturPeran_(sel.value); });
+          var sinkron = function () {
+            var k = document.getElementById('prn-kelas');
+            var m = document.getElementById('prn-mapel');
+            var cp = document.getElementById('prn-pengawas');
+            var ct = document.getElementById('prn-timsoal');
+            if (k) { k.disabled = !(cp && cp.checked); k.style.background = k.disabled ? '#f1f5f9' : '#fff'; }
+            if (m) { m.disabled = !(ct && ct.checked); m.style.background = m.disabled ? '#f1f5f9' : '#fff'; }
+          };
+          ['prn-pengawas', 'prn-timsoal'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) el.addEventListener('change', sinkron);
+          });
+          sinkron();
+        },
+        preConfirm: function () {
+          var uid = (document.getElementById('prn-uid') || {}).value || '';
+          var cP = !!((document.getElementById('prn-pengawas') || {}).checked);
+          var cT = !!((document.getElementById('prn-timsoal') || {}).checked);
+          var cN = !!((document.getElementById('prn-panitia') || {}).checked);
+          var kelas = String((document.getElementById('prn-kelas') || {}).value || '').trim();
+          var mapel = String((document.getElementById('prn-mapel') || {}).value || '').trim();
+          if (!uid) { Swal.showValidationMessage('Pilih guru terlebih dahulu.'); return false; }
+          if (cP && !kelas) { Swal.showValidationMessage('Peran Pengawas wajib disertai kelas yang diawasi.'); return false; }
+          if (cT && !mapel) { Swal.showValidationMessage('Peran Tim Pembuat Soal wajib disertai mapel yang diampu.'); return false; }
+          return { userID: uid, peran: { pengawas: cP, timsoal: cT, panitia: cN }, kelas: cP ? kelas : '', mapel: cT ? mapel : '', status: (document.getElementById('prn-status') || {}).value || 'AKTIF' };
+        }
+      }).then(function (r) {
+        if (!r.isConfirmed || !r.value) return;
+        Swal.fire({ title: 'Menyimpan…', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
+        google.script.run
+          .withSuccessHandler(function (res) {
+            if (!res || !res.success) { Swal.fire('Gagal', (res && res.message) || 'Peran tidak tersimpan.', 'error'); return; }
+            Swal.fire({ icon: 'success', title: 'Peran Ditetapkan', html: '<div style="font-size:13px">' + escapeHtmlProfil_(res.message || '') + '</div>', showConfirmButton: true })
+              .then(function () { loadPengawasData(); });
+          })
+          .withFailureHandler(function (err) { Swal.fire('Gagal', String(err), 'error'); })
+          .simpanPeranGuru(r.value, currentUser.userID, currentUser.token);
+      });
     })
     .withFailureHandler(function (err) { Swal.close(); Swal.fire('Gagal', 'Data Master tidak dapat dimuat: ' + String(err), 'error'); })
     .getMasterData();
@@ -4159,7 +4303,9 @@ function showAdminTab(tabId, el) {
     if (_pgwIzinTab.izinUjian === true) allowedGuruTabs.push('dash-users');
     // [V6.2] TIM SOAL: kelola bank soal SETELAH jadwal dibuat Admin/Panitia
     if (_pgwIzinTab.izinBankSoal === true) allowedGuruTabs.push('dash-questions', 'dash-materibab', 'dash-images');
-    if (_pgwIzinTab.izinPanitia === true) allowedGuruTabs.push('dash-profil', 'dash-kartu', 'dash-hadir', 'dash-results', 'dash-pgw-ujian', 'dash-exams', 'dash-sesi-bagi', 'dash-ruangan', 'dash-pgw-koreksi', 'dash-questions', 'dash-materibab');
+    // [V7.4] Panitia: jadwal, sesi, ruangan, PIN, koreksi, hasil, kartu, hadir,
+    // profil siswa. Bank Soal & Materi/Bab TIDAK termasuk — itu milik Tim Soal.
+    if (_pgwIzinTab.izinPanitia === true) allowedGuruTabs.push('dash-profil', 'dash-kartu', 'dash-hadir', 'dash-results', 'dash-pgw-ujian', 'dash-exams', 'dash-sesi-bagi', 'dash-ruangan', 'dash-pgw-koreksi');
     // [V7.3] Pengawas boleh membuka Pembagian Ruangan (hanya lihat + ajukan pindah)
     if (_pgwIzinTab.izinUjian === true) allowedGuruTabs.push('dash-ruangan');
     // [V6.8] Menu modul kegiatan bergantung peran: Rekrutmen & Anggota khusus
@@ -10240,10 +10386,16 @@ function renderAdminHome(container) {
           if (pw.izinUjian === true) _tugas.push('Pengawas Ujian' + (pw.kelas ? ' (' + pw.kelas + ')' : ''));
           if (pw.izinBankSoal === true) _tugas.push('Tim Pembuat Soal' + (pw.mapelTimSoal ? ' (' + pw.mapelTimSoal + ')' : ''));
           if (pw.izinPanitia === true) _tugas.push('Panitia Ujian');
-          if (pw.izinPanitia === true) _tugas.push('Panitia Ujian');
-          var _btn = (pw.izinUjian === true)
-            ? '<button type="button" onclick="sipPgwBukaJadwal_()" class="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold"><i class="fas fa-calendar-days mr-1"></i>Buka Jadwal Ujian</button>'
-            : '<button type="button" onclick="sipPgwBukaBank_()" class="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold"><i class="fas fa-book mr-1"></i>Buka Bank Soal</button>';
+          // [V7.4] Tombol pintas mengikuti peran yang benar-benar berlaku:
+          // Panitia -> Jadwal Ujian; Pengawas -> Monitor Ujian; Tim Soal -> Bank Soal.
+          var _btn = '';
+          if (pw.izinPanitia === true) {
+            _btn = '<button type="button" onclick="sipPgwBukaJadwal_()" class="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold"><i class="fas fa-calendar-days mr-1"></i>Buka Jadwal Ujian</button>';
+          } else if (pw.izinUjian === true) {
+            _btn = '<button type="button" onclick="sipPgwBukaMonitor_()" class="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold"><i class="fas fa-desktop mr-1"></i>Buka Monitor Ujian</button>';
+          } else if (pw.izinBankSoal === true) {
+            _btn = '<button type="button" onclick="sipPgwBukaBank_()" class="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold"><i class="fas fa-book mr-1"></i>Buka Bank Soal</button>';
+          }
           _pb2.innerHTML = '<div class="flex items-center justify-between gap-4 flex-wrap">' +
             '<div><p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Tugas dari Admin</p>' +
             '<p class="text-base font-bold text-slate-800"><i class="fas fa-clipboard-check text-blue-600 mr-2"></i>' + escapeHtmlProfil_(_tugas.join(' & ')) + '</p>' +
@@ -12724,7 +12876,8 @@ function applyGuruBankSoalMode_() {
   if (btnAi) btnAi.classList.toggle('hidden', !sipBolehAiLevel_());
   if (!(currentUser && currentUser.role === 'Guru')) return;
   const _pgw = (currentUser && currentUser.pengawas) || {};
-  if (_pgw.izinBankSoal !== false) {
+  // [V7.4] Harus TRUE eksplisit — sel kosong / panitia murni bukan Tim Soal.
+  if (_pgw.izinBankSoal === true) {
     // Tim Pembuat Soal: boleh menambah/mengedit soal untuk mapel yang ditentukan Admin
     const p = document.getElementById('qb-subtitle');
     if (p) p.textContent = 'Tim Pembuat Soal' + (_pgw.mapelTimSoal ? ' — mapel: ' + _pgw.mapelTimSoal : '') + '. Tulis dan perbaiki soal; verifikasi & penerbitan oleh Admin.';
@@ -25330,5 +25483,5 @@ function sipBankSoalWordDialog_() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a593404bffd5ce39',t:'MTc5NDQ2MjU0Mg=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a593404bffd5ce39',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a59368de9e3dfd20',t:'MTc5NDQ2NDIwNA=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a59368de9e3dfd20',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
